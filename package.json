@@ -20,12 +20,19 @@
   "author": "Google LLC",
   "license": "Apache-2.0",
   "dependencies": {
+    "@google-cloud/storage": "^7.7.0",
+    "docxtemplater": "^3.44.0",
+    "dotenv": "^16.4.1",
     "express": "^4.17.1",
+    "fs": "^0.0.1-security",
     "gcp-metadata": "^6.0.0",
     "google-auth-library": "^9.0.0",
+    "openai": "^4.26.0",
+    "path": "^0.12.7",
     "pino": "^8.0.0",
     "pino-http": "^9.0.0",
-    "pino-pretty": "^10.3.1"
+    "pino-pretty": "^10.3.1",
+    "pizzip": "^3.1.6"
   },
   "devDependencies": {
     "eslint": "^8.0.0",
