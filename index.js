@@ -15,10 +15,12 @@
 import app from './app.js';
 import {logger, initLogCorrelation} from './utils/logging.js';
 import {fetchProjectId} from './utils/metadata.js';
-
+import dotenv from 'dotenv';
+dotenv.config();
 /**
  * Initialize app and start Express server
  */
+
 const main = async () => {
   let project = process.env.GOOGLE_CLOUD_PROJECT;
   if (!project) {

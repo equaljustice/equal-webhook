@@ -59,7 +59,7 @@
                     "questions": [
                         {
                             "qid": 3,
-                            "question": "Are you a senior citizen i.e. is your age above 60 years?",
+                            "question":{"text": "Are you a senior citizen i.e. is your age above 60 years?","audioUrl":"https://equaljustice.ai/assest/recordings/audio/bankname-question.mp3"},
                             "answerType": "Choice",
                             "choices": [
                                 "Yes",
@@ -73,7 +73,7 @@
                         },
                         {
                             "qid": 31,
-                            "question": "Is this your pension savings bank account?",
+                            "question": {"text":"Is this your pension savings bank account?","audioUrl":"https://equaljustice.ai/assest/recordings/audio/bankname-question.mp3"},
                             "answerType": "Choice",
                             "choices": [
                                 "Yes",

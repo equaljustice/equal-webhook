@@ -17,7 +17,7 @@
 # Exclude locally installed dependencies
 node_modules/
 npm-debug.log
-
+.env
 # Exclude local IDE settings
 .idea/
 .vscode/
