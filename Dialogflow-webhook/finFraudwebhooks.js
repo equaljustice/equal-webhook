@@ -193,12 +193,10 @@ export const atm = async (req, res) => {
         let parameters = sessionInfo.parameters;
         var counter = sessionInfo.parameters.counter;
         var threadId = parameters.threadId != null ? parameters.threadId : "";
-        console.log("Prameters", paramsString);
         var responseJson = '';
         //feeding the query based upon the requirment
-        if (option == null) {
+       
             query = req.body.text;
-            pop = false;
             assi_id = assistant_id_open_qna;
             let len = req.body.text.length;
             query += "Charter Limit: Kindly restrict your response within 1500 characters"
@@ -226,7 +224,7 @@ export const atm = async (req, res) => {
                 }
             };
 
-        }
+        
         res.json(responseJson);
 
     } catch (error) {
