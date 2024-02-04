@@ -1,5 +1,5 @@
 import { interactWithAssistant } from "../chatGPT/assistant-api.js";
-import { processDocx } from "../CloudStorage/processDocs.js";
+import { processDocx, uploadToCloudBucket } from "../CloudStorage/processDocs.js";
 let assi_id = "";
 let option = "";
 var responseMessage;
@@ -16,7 +16,7 @@ var assistant_id_failed_bank_obdsuman = "asst_G0kVGeyEEyGjTjxQmELYlvai";
 var assistant_id_failed_bank = "asst_fH5wEohrAz74A6dL4bHYpS5x";
 var assistant_id_failed_RTI = "asst_WyVP31LavBR40dVXTN9K6kyM";
 var assistant_id_failed_consumer_court = "asst_fecdkBrqZdpeSBVe0wvFNojd";
-var assistant_id_atm_Police_Compaint_Inestigation = "asst_40JZxhPmD3Ql4AP29X8k7I9M";
+var assistant_id_atm_Police_Compaint_Investigation = "asst_40JZxhPmD3Ql4AP29X8k7I9M";
 var assistant_id_atm_Police_complaint = "asst_CAFGrFNd7y1qgntXtIrvpY4F";
 var assistant_id_atm_bank_obdsuman = "asst_GNSQ6pHoSiR3JiPKiCRdSyYN";
 var assistant_id_atm_bank = "asst_JXg4cxpxQo0ZukFcQuNs2229";
@@ -189,19 +189,12 @@ export const failed_transaction = async (req, res) => {
 export const atm = async (req, res) => {
     console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     try {
-
-        //responseMessage = "";
         let sessionInfo = req.body.sessionInfo;
         let parameters = sessionInfo.parameters;
-        option = sessionInfo.parameters.option_for_compliant;
         var counter = sessionInfo.parameters.counter;
-        var police_investigation = sessionInfo.parameters.police_investigation;
-        var pop = true;
-        let paramsString = JSON.stringify(parameters);
         var threadId = parameters.threadId != null ? parameters.threadId : "";
         console.log("Prameters", paramsString);
-        console.log("option", option);
-        var responseJson ='';
+        var responseJson = '';
         //feeding the query based upon the requirment
         if (option == null) {
             query = req.body.text;
@@ -229,71 +222,64 @@ export const atm = async (req, res) => {
                     }]
                 },
                 sessionInfo: {
-                    parameters: {...parameters, threadId: responseMessage.threadId }
+                    parameters: { ...parameters, threadId: responseMessage.threadId }
                 }
             };
-    
-        } else {
-            if (option === "Bank") {
-                query = " User situation Info: " + paramsString;
-                //temp_doc = "Bank.docx";
-                assi_id = assistant_id_atm_bank;
-            } else if (option === "Banking Ombudsman") {
-                query = " User situation Info:" + paramsString;
-                temp_doc = "Banking_Ombudsman.docx";
-                assi_id = assistant_id_atm_bank_obdsuman;
-            } else if (option === "Police Complaint") {
-                if (police_investigation === "Request to thoroughly investigate") {
-                    query = " User situation Info:" + paramsString;
-                    temp_doc = "Police_Compliant.docx";
-                    assi_id = assistant_id_atm_Police_Compaint_Inestigation;
-                } else {
-                    query = " User situation Info:" + paramsString;
-                    temp_doc = "Police_Compliant.docx";
-                    assi_id = assistant_id_atm_Police_complaint;
-                }
-            } else if (option === "Consumer court") {
-                query = " User situation Info:" + paramsString;
-                temp_doc = "Consumer_Court.docx";
-                assi_id = assistant_id_atm_consumer_court;
-            } else if (option === "RTI Application") {
-                query = "User situation Info:" + paramsString;
-                temp_doc = "RTI.docx";
-                assi_id = assistant_id_atm_RTI;
-            }
-            console.log("assi_id", assi_id);
-            let len = req.body.text.length;
-            query += "Charter Limit: Kindly restrict your response within 1500 characters"
-            query += "Don't create any source and bold i.e avoid ** and 【7†source】etc"
-            if (len > 300 && counter < 12) {
-                let response = "It's crossing 300 characters limit, please be within limit"
-                responseMessage = { response, threadId };
-            } else if (counter == null || counter < 12 && len < 300) {
-                responseMessage = interactWithAssistant(query, threadId, assi_id);
-            } else {
-                let response = "Your 10 questions are over, Thank you for using our service, hope your issue will be resolved"
-                responseMessage = { response, threadId };
-            }
-            console.log("Response from Assistant:", JSON.stringify(responseMessage));
-            var filepath = '';
-            if (pop == true) { filepath = processDocx(responseMessage.response); }
-            responseJson = {
-                fulfillment_response: {
-                    messages: [{
-                        text: {
-                            text: ["Creating document please wait"]
-                        }
-                    }]
-                },
-                sessionInfo: {
-                    parameters: { ...parameters, threadId: responseMessage.threadId, filepath}
-                }
-            };
+
         }
         res.json(responseJson);
 
     } catch (error) {
         console.error('Error handling the webhook request:', error);
         res.status(500).send('Error processing the request');
+    }
+};
+
+export const createDoc = async (req, res) => {
+    let sessionInfo = req.body.sessionInfo;
+    let parameters = sessionInfo.parameters;
+    option = sessionInfo.parameters.option_for_compliant;
+    let paramsString = JSON.stringify(parameters);
+    var threadId = parameters.threadId != null ? parameters.threadId : "";
+    console.log("Prameters", paramsString);
+    console.log("option", option);
+    var police_investigation = sessionInfo.parameters.police_investigation;
+    query = " User situation Info: " + paramsString;
+    switch (option) {
+        case "Bank":
+            assi_id = assistant_id_atm_bank;
+            break;
+        case "Banking Ombudsman":
+            assi_id = assistant_id_atm_bank_obdsuman;
+            break;
+        case "Police Complaint":
+            assi_id = (police_investigation === "Request to thoroughly investigate") ? assistant_id_atm_Police_Compaint_Investigation : assistant_id_atm_Police_complaint;
+            break;
+        case "Consumer court":
+            assi_id = assistant_id_atm_consumer_court;
+            break;
+        case "RTI Application":
+            assi_id = assistant_id_atm_RTI;
+            break;
+    }
+
+    query += "Don't create any source and bold i.e avoid ** and 【7†source】etc"
+    
+    const responseJson = {
+        fulfillment_response: {
+            messages: [{
+                text: {
+                    text: ["Creating document please wait"]
+                }
+            }]
+        }
+    };
+    res.json(responseJson);
+
+    try {
+        const letterdata = await interactWithAssistant(query, threadId, assi_id);
+       processDocx(letterdata.response);
+    } catch (err) {
+        console.log(err);
     }
 };

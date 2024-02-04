@@ -28,25 +28,7 @@ export function processDocx(information) {
             info: information
         });
     }
-    /*else if (temp_doc == "Banking_Ombudsman.docx") {
-           doc.render({
-               Details: information
-                   //other deails will come from web form like loss, subject and Relief
-           });
-       } else if (temp_doc == "Police_Compliant.docx") {
-           doc.render({
-               info: information
-           });
-       } else if (temp_doc == "Consumer_Court.docx") {
-           doc.render({
-               info: information
-           });
-       } else if (temp_doc == "RTI.docx") {
-           console.log("True");
-           doc.render({
-               info: information
-           });
-       }*/
+   
     const buf = doc.getZip().generate({
         type: "nodebuffer",
         compression: "DEFLATE",
@@ -68,7 +50,7 @@ const bucket = storage.bucket(bucketName)
 
 // Sending the upload request
 bucket.upload(
-    destinationFile,
+    path.resolve(destinationFile),
   {
     destination: `letter-to-bank/${destinationFile}`,
   },
