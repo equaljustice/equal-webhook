@@ -3,17 +3,15 @@ import express from 'express';
 import {getQuestionJson} from './APIs/ATMFraudQuestions.js';
 import { getCities, getStates } from './APIs/StateCity.js';
 import { getBanks } from './APIs/Banks.js';
-import { upi, failed_transaction, atm } from './Dialogflow-webhook/finFraudwebhooks.js';
+import { upi, failed_transaction, atm, createDoc } from './Dialogflow-webhook/finFraudwebhooks.js';
 const APIrouter = express.Router();
-// Wire up middleware
-//router.use(middleware.doSomethingInteresting);
 
-// Wire up routers
 APIrouter.use('/atmfraud', getQuestionJson);
 APIrouter.use('/getStates', getStates);
 APIrouter.use('/getCities/:stateCode', getCities);
 APIrouter.use('/getBanks', getBanks);
 APIrouter.post('/webhook_atm', atm);
+APIrouter.post('/createDoc', createDoc);
 APIrouter.use('/webhook_failed_transaction', failed_transaction);
 APIrouter.use('/webhook_upi', upi);
 APIrouter.get('/', (req, res) => {
@@ -66,7 +64,7 @@ APIrouter.get('/', (req, res) => {
 // Route to handle file download
 APIrouter.get('/download', (req, res) => {
   
-  res.redirect("https://storage.googleapis.com/ejustice-public-bucket/letter-to-bank%2Foutput.docx"); // Set the download response
+  res.redirect(`https://storage.googleapis.com/ejustice-public-bucket/letter-to-bank%2Foutput.docx?time=${new Date().getTime()}`); // Set the download response
 });
 
 // Export the router
