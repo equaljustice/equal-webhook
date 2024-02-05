@@ -1,5 +1,5 @@
-import { interactWithAssistant } from "../chatGPT/assistant-api.js";
-import { processDocx, uploadToCloudBucket } from "../CloudStorage/processDocs.js";
+import { createAssistantThread, interactWithAssistant } from "../chatGPT/assistant-api.js";
+import { processDocx } from "../CloudStorage/processDocs.js";
 let assi_id = "";
 let option = "";
 var responseMessage;
@@ -25,12 +25,11 @@ var assistant_id_atm_consumer_court = "asst_AC6SXOaB2PgjyaTMF8YlarTh";
 var query = "";
 
 export const openQnA = async (req, res) => {
-    console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
+    //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     try {
         let sessionInfo = req.body.sessionInfo;
-        let parameters = sessionInfo.parameters;
         var counter = sessionInfo.parameters.counter;
-        var threadId = parameters.threadId != null ? parameters.threadId : "";
+        var threadId = sessionInfo.parameters.threadId != null ? sessionInfo.parameters.threadId : "";
         var responseJson = '';
         //feeding the query based upon the requirment
 
@@ -43,7 +42,7 @@ export const openQnA = async (req, res) => {
             let response = "It's crossing 300 characters limit, please be within limit"
             responseMessage = { response, threadId };
         } else if (counter == null || counter < 12 && len < 300) {
-            responseMessage = await interactWithAssistant(query, threadId, assi_id);
+              responseMessage = await interactWithAssistant(query, threadId, assi_id);
         } else {
             let response = "Your 10 questions are over, Thank you for using our service, hope your issue will be resolved"
             responseMessage = { response, threadId };
@@ -58,7 +57,7 @@ export const openQnA = async (req, res) => {
                 }]
             },
             sessionInfo: {
-                parameters: { ...parameters, threadId: responseMessage.threadId }
+                parameters: { threadId: responseMessage.threadId }
             }
         };
 
@@ -72,15 +71,18 @@ export const openQnA = async (req, res) => {
 };
 
 export const createDoc = async (req, res) => {
+    //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     let sessionInfo = req.body.sessionInfo;
-    let parameters = sessionInfo.parameters;
     option = sessionInfo.parameters.option_for_compliant;
-    let paramsString = JSON.stringify(parameters);
-    var threadId = parameters.threadId != null ? parameters.threadId : "";
-    console.log("Prameters", paramsString);
-    console.log("option", option);
+    let generalData = sessionInfo.parameters.generalData ?
+        JSON.stringify(cleanJson(sessionInfo.parameters.generalData))
+        : "";
+    let transitionArray = sessionInfo.parameters.transactionArray ?
+        JSON.stringify(cleanJson(sessionInfo.parameters.transactionArray))
+        : "";
     var police_investigation = sessionInfo.parameters.police_investigation;
-    query = " User situation Info: " + paramsString;
+    query = " User situation data in json object: " + generalData +
+        "\nTransactions Details json array: " + transitionArray;
     const tag = req.body.fulfillmentInfo.tag;
     switch (tag) {
         case "ATM":
@@ -142,8 +144,10 @@ export const createDoc = async (req, res) => {
 
     }
 
-    query += "Don't create any source and bold i.e avoid ** and 【7†source】etc"
-
+    query += " \n Don't create any source and bold i.e avoid *Title* and 【7†source】etc"
+    var threadId = sessionInfo.parameters.threadId != null ? 
+        sessionInfo.parameters.threadId 
+        : await createAssistantThread();
     const responseJson = {
         fulfillment_response: {
             messages: [{
@@ -151,14 +155,60 @@ export const createDoc = async (req, res) => {
                     text: ["Creating document please wait"]
                 }
             }]
+        },
+        sessionInfo: {
+            parameters: { threadId }
         }
     };
     res.json(responseJson);
 
     try {
+        console.log("Query string", query);
         const letterdata = await interactWithAssistant(query, threadId, assi_id);
-        processDocx(letterdata.response);
+        processDocx(letterdata.response, threadId);
     } catch (err) {
         console.log(err);
     }
 };
+
+function cleanJson2(json) {
+    try {
+        //json = json.replace(/\\/g, "");
+        let cleanedJson = JSON.parse(JSON.stringify(json)); // Create a deep copy of the json
+        (function _clean(obj) {
+            Object.keys(obj).forEach(key => {
+                if (obj[key] && typeof obj[key] === 'object' || typeof obj === '') _clean(obj[key]); // Recurse if the value is an object
+                else if (obj[key] === 'NA' || String(obj[key]).includes('$session.params')) delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
+            });
+        })(cleanedJson);
+        return cleanedJson;
+    } catch (err) {
+        return "";
+    }
+}
+
+function cleanJson(json) {
+    let cleanedJson = JSON.parse(JSON.stringify(json)); // Create a deep copy of the json
+    (function _clean(obj) {
+        Object.keys(obj).forEach(key => {
+            if (obj[key] && typeof obj[key] === 'object') {
+                if (Array.isArray(obj[key])) {
+                    obj[key] = obj[key].map(item => {
+                        if (typeof item === 'object') {
+                            return _clean(item);
+                        } else {
+                            return item;
+                        }
+                    });
+                } else {
+                    _clean(obj[key]); // Recurse if the value is an object
+                }
+            }
+            if (obj[key] === 'NA' || String(obj[key]).includes('$session')) {
+                delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
+            }
+        });
+    })(cleanedJson);
+    return cleanedJson;
+}
+

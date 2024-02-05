@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import {Storage} from '@google-cloud/storage';
 
-export function processDocx(information) {
+export function processDocx(information, threadId) {
     var temp_doc = "./CloudStorage/Bank.docx";
     // Load the docx file as binary content
     const content = fs.readFileSync(
@@ -36,8 +36,8 @@ export function processDocx(information) {
 
     // buf is a nodejs Buffer, you can either write it to a
     // file or res.send it with express for example.
-    fs.writeFileSync(path.resolve("output.docx"), buf);
-    return uploadToCloudBucket("output.docx");
+    fs.writeFileSync(`${threadId}.docx`, buf);
+    return uploadToCloudBucket(`${threadId}.docx`);
 }
 
 export function uploadToCloudBucket(destinationFile){
