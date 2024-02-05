@@ -12,7 +12,7 @@ APIrouter.use('/getCities/:stateCode', getCities);
 APIrouter.use('/getBanks', getBanks);
 APIrouter.post('/webhook_QnA', openQnA);
 APIrouter.post('/webhook_createDoc', createDoc);
-APIrouter.get('/', (req, res) => {
+APIrouter.get('/:session', (req, res) => {
   res.send(`
   <!DOCTYPE html>
   <html lang="en">
@@ -51,7 +51,7 @@ APIrouter.get('/', (req, res) => {
   </head>
   <body>
       <h1>Welcome to equaljustice.ai! Kindly download your file and go back to the previous tab.</h1>
-      <a href="/download" download>
+      <a href="/download/${req.params.session}" download>
           <button>Download File</button>
       </a>
   </body>
@@ -60,9 +60,9 @@ APIrouter.get('/', (req, res) => {
 });
 
 // Route to handle file download
-APIrouter.get('/download', (req, res) => {
+APIrouter.get('/download/:threadId', (req, res) => {
   
-  res.redirect(`https://storage.googleapis.com/ejustice-public-bucket/letter-to-bank%2Foutput.docx?time=${new Date().getTime()}`); // Set the download response
+  res.redirect(`https://storage.googleapis.com/ejustice-public-bucket/letter-to-bank%2F${req.params.threadId}.docx?time=${new Date().getTime()}`); // Set the download response
 });
 
 // Export the router
