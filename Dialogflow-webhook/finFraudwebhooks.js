@@ -1,5 +1,7 @@
 import { createAssistantThread, interactWithAssistant } from "../chatGPT/assistant-api.js";
 import { processDocx } from "../CloudStorage/processDocs.js";
+import { getLetterContent } from "../chatGPT/completion.js";
+import urbanPincodes from '../JSONs/urbanPincodes.json' assert {type: "json"}; 
 let assi_id = "";
 let option = "";
 var responseMessage;
@@ -36,8 +38,8 @@ export const openQnA = async (req, res) => {
         query = req.body.text;
         assi_id = assistant_id_open_qna;
         let len = req.body.text.length;
-        query += "Charter Limit: Kindly restrict your response within 1500 characters"
-        query += "Don't create any source and bold i.e avoid ** and 【7†source】etc"
+        query += "restrict response to 1500 chars"
+        query += "remove annotations from the response"
         if (len > 300 && counter < 12) {
             let response = "It's crossing 300 characters limit, please be within limit"
             responseMessage = { response, threadId };
@@ -70,7 +72,7 @@ export const openQnA = async (req, res) => {
     }
 };
 
-export const createDoc = async (req, res) => {
+export const createDocWithAssistant = async (req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     let sessionInfo = req.body.sessionInfo;
     option = sessionInfo.parameters.option_for_compliant;
@@ -144,7 +146,6 @@ export const createDoc = async (req, res) => {
 
     }
 
-    query += " \n Don't create any source and bold i.e avoid *Title* and 【7†source】etc"
     var threadId = sessionInfo.parameters.threadId != null ? 
         sessionInfo.parameters.threadId 
         : await createAssistantThread();
@@ -170,7 +171,107 @@ export const createDoc = async (req, res) => {
         console.log(err);
     }
 };
+export const createDocWithFineTuned = async (req, res) => {
+    //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
+    let sessionInfo = req.body.sessionInfo;
+    let letterType = "ATMFraudBank";
+    option = sessionInfo.parameters.option_for_compliant;
+    let generalData = sessionInfo.parameters.generalData ?
+        cleanJson(sessionInfo.parameters.generalData)
+        : "";
+    let transitionArray = sessionInfo.parameters.transactionArray ?
+        cleanJson(sessionInfo.parameters.transactionArray)
+        : "";
+    var police_investigation = sessionInfo.parameters.police_investigation;
+    generalData.area_pincode = urbanPincodes.includes(Number(toString(generalData.area_pincode).slice(0,3)))? "urban" : "rural";
+    
+    let userInputData =  {...generalData, transitionArray: [...transitionArray]}; 
+    const tag = req.body.fulfillmentInfo.tag;
+    switch (tag) {
+        case "ATM":
+            switch (option) {
+                case "Bank":
+                    letterType = "ATMFraudBank";
+                    break;
+                case "Banking Ombudsman":
+                    letterType = "ATMFraudBankingOmbudsman";
+                    break;
+                case "Police Complaint":
+                    assi_id = (police_investigation === "Request to thoroughly investigate") ? assistant_id_atm_Police_Compaint_Investigation : assistant_id_atm_Police_complaint;
+                    break;
+                case "Consumer court":
+                    assi_id = assistant_id_atm_consumer_court;
+                    break;
+                case "RTI Application":
+                    assi_id = assistant_id_atm_RTI;
+                    break;
+            }
+            break;
+        case "UPI":
+            switch (option) {
+                case "Bank":
+                    assi_id = assistant_id_upi_bank;
+                    break;
+                case "Banking Ombudsman":
+                    assi_id = assistant_id_upi_bank_obdsuman;
+                    break;
+                case "Police Complaint":
+                    assi_id = (police_investigation === "Request to thoroughly investigate") ? assistant_id_upi_Police_Compaint_Investigation : assistant_id_upi_Police_complaint;
+                    break;
+                case "Consumer court":
+                    assi_id = assistant_id_upi_consumer_court;
+                    break;
+                case "RTI Application":
+                    assi_id = assistant_id_upi_RTI;
+                    break;
+            }
+            break;
+        case "FAILED TR":
+            switch (option) {
+                case "Bank":
+                    assi_id = assistant_id_failed_bank;
+                    break;
+                case "Banking Ombudsman":
+                    assi_id = assistant_id_failed_bank_obdsuman;
+                    break;
+                case "Police Complaint":
+                    assi_id = (police_investigation === "Request to thoroughly investigate") ? assistant_id_failed_Police_Compaint_Investigation : assistant_id_failed_Police_complaint;
+                    break;
+                case "Consumer court":
+                    assi_id = assistant_id_failed_consumer_court;
+                    break;
+                case "RTI Application":
+                    assi_id = assistant_id_failed_RTI;
+                    break;
+            }
 
+    }
+
+    var threadId = sessionInfo.parameters.threadId != null ? 
+        sessionInfo.parameters.threadId 
+        : await createAssistantThread(); 
+    const responseJson = {
+        fulfillment_response: {
+            messages: [{
+                text: {
+                    text: ["Creating document please wait"]
+                }
+            }]
+        },
+        sessionInfo: {
+            parameters: { threadId }
+        }
+    };
+    res.json(responseJson);
+
+    try {
+        console.log("user Input json", userInputData);
+        const letterdata = await getLetterContent(letterType, userInputData);
+        processDocx(letterdata, threadId);
+    } catch (err) {
+        console.log(err);
+    }
+};
 function cleanJson2(json) {
     try {
         //json = json.replace(/\\/g, "");
@@ -178,7 +279,7 @@ function cleanJson2(json) {
         (function _clean(obj) {
             Object.keys(obj).forEach(key => {
                 if (obj[key] && typeof obj[key] === 'object' || typeof obj === '') _clean(obj[key]); // Recurse if the value is an object
-                else if (obj[key] === 'NA' || String(obj[key]).includes('$session.params')) delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
+                else if (obj[key] === 'NA' || String(obj[key]).includes('$')) delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
             });
         })(cleanedJson);
         return cleanedJson;
@@ -187,8 +288,8 @@ function cleanJson2(json) {
     }
 }
 
-function cleanJson(json) {
-    let cleanedJson = JSON.parse(JSON.stringify(json)); // Create a deep copy of the json
+function cleanJson(jsonData) {
+    let cleanedJson = JSON.parse(JSON.stringify(jsonData)); // Create a deep copy of the json
     (function _clean(obj) {
         Object.keys(obj).forEach(key => {
             if (obj[key] && typeof obj[key] === 'object') {
@@ -204,7 +305,7 @@ function cleanJson(json) {
                     _clean(obj[key]); // Recurse if the value is an object
                 }
             }
-            if (obj[key] === 'NA' || String(obj[key]).includes('$session')) {
+            if (obj[key] === 'NA' || String(obj[key]).includes('$')) {
                 delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
             }
         });
