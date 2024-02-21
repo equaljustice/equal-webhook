@@ -3,7 +3,7 @@ import express from 'express';
 import {getQuestionJson} from './APIs/ATMFraudQuestions.js';
 import { getCities, getStates } from './APIs/StateCity.js';
 import { getBanks } from './APIs/Banks.js';
-import { openQnA, createDoc } from './Dialogflow-webhook/finFraudwebhooks.js';
+import { openQnA, createDocWithAssistant, createDocWithFineTuned } from './Dialogflow-webhook/finFraudwebhooks.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/atmfraud', getQuestionJson);
@@ -11,7 +11,8 @@ APIrouter.use('/getStates', getStates);
 APIrouter.use('/getCities/:stateCode', getCities);
 APIrouter.use('/getBanks', getBanks);
 APIrouter.post('/webhook_QnA', openQnA);
-APIrouter.post('/webhook_createDoc', createDoc);
+APIrouter.post('/webhook_createDoc', createDocWithAssistant);
+APIrouter.post('/webhook_createDocWithFineTuned', createDocWithFineTuned);
 APIrouter.get('/:session', (req, res) => {
   res.send(`
   <!DOCTYPE html>
