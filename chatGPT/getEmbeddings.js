@@ -1,9 +1,9 @@
 import data from '../JSONs/LegalTrainingATMsample.json' assert {type: "json"}; 
 import fs from 'fs';
 import OpenAI from "openai";
-const openai = new OpenAI({apiKey:'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'});
 
 async function getEmbeddings(text) {
+  const openai = new OpenAI(process.env.OPENAI_API_KEY);
   const response = await openai.embeddings.create({
     model: "text-embedding-3-small",
     input: text

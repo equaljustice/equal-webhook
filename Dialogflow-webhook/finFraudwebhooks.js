@@ -1,7 +1,8 @@
 import { createAssistantThread, interactWithAssistant } from "../chatGPT/assistant-api.js";
 import { processDocx } from "../CloudStorage/processDocs.js";
-import { getLetterContent } from "../chatGPT/completion.js";
-import urbanPincodes from '../JSONs/urbanPincodes.json' assert {type: "json"}; 
+import { createLetterWithGPT3_5, createLetterWithGPT4, createLetterwithFineTuned } from "../chatGPT/completion.js";
+import urbanPincodes from '../JSONs/urbanPincodes.json' assert {type: "json"};
+import * as constants from '../constants.js';
 let assi_id = "";
 let option = "";
 var responseMessage;
@@ -44,7 +45,7 @@ export const openQnA = async (req, res) => {
             let response = "It's crossing 300 characters limit, please be within limit"
             responseMessage = { response, threadId };
         } else if (counter == null || counter < 12 && len < 300) {
-              responseMessage = await interactWithAssistant(query, threadId, assi_id);
+            responseMessage = await interactWithAssistant(query, threadId, assi_id);
         } else {
             let response = "Your 10 questions are over, Thank you for using our service, hope your issue will be resolved"
             responseMessage = { response, threadId };
@@ -146,8 +147,8 @@ export const createDocWithAssistant = async (req, res) => {
 
     }
 
-    var threadId = sessionInfo.parameters.threadId != null ? 
-        sessionInfo.parameters.threadId 
+    var threadId = sessionInfo.parameters.threadId != null ?
+        sessionInfo.parameters.threadId
         : await createAssistantThread();
     const responseJson = {
         fulfillment_response: {
@@ -166,7 +167,7 @@ export const createDocWithAssistant = async (req, res) => {
     try {
         console.log("Query string", query);
         const letterdata = await interactWithAssistant(query, threadId, assi_id);
-        processDocx(letterdata.response, threadId);
+        processDocx(letterdata.response, threadId, threadId + constants.ASSISTANT);
     } catch (err) {
         console.log(err);
     }
@@ -183,15 +184,26 @@ export const createDocWithFineTuned = async (req, res) => {
         cleanJson(sessionInfo.parameters.transactionArray)
         : "";
     var police_investigation = sessionInfo.parameters.police_investigation;
-    generalData.area_pincode = urbanPincodes.includes(Number(toString(generalData.area_pincode).slice(0,3)))? "urban" : "rural";
-    
-    let userInputData =  {...generalData, transitionArray: [...transitionArray]}; 
+    generalData.area_pincode = urbanPincodes.includes(Number(toString(generalData.area_pincode).slice(0, 3))) ? "urban" : "rural";
+    var threadId = sessionInfo.parameters.threadId != null ?
+        sessionInfo.parameters.threadId
+        : await createAssistantThread();
+    let userInputData = { ...generalData, transitionArray: [...transitionArray] };
     const tag = req.body.fulfillmentInfo.tag;
+    let textResponse = 'Not valid request';
     switch (tag) {
         case "ATM":
             switch (option) {
                 case "Bank":
                     letterType = "ATMFraudBank";
+                    try {
+                        console.log("user Input json", userInputData);
+                        createLetterwithFineTuned(letterType, userInputData, threadId);
+                        createLetterWithGPT3_5(letterType, userInputData, threadId)
+                        textResponse = 'Creating Document'
+                    } catch (err) {
+                        console.log(err);
+                    }
                     break;
                 case "Banking Ombudsman":
                     letterType = "ATMFraudBankingOmbudsman";
@@ -244,17 +256,24 @@ export const createDocWithFineTuned = async (req, res) => {
                     assi_id = assistant_id_failed_RTI;
                     break;
             }
+        case "ATMGPT4BANK":
+            letterType = "ATMFraudBank";
+            try {
+                console.log("user Input json", userInputData);
+                createLetterWithGPT4(letterType, userInputData, threadId);
+                textResponse = 'Creating Document'
+            } catch (err) {
+                console.log(err);
+            }
 
     }
 
-    var threadId = sessionInfo.parameters.threadId != null ? 
-        sessionInfo.parameters.threadId 
-        : await createAssistantThread(); 
+
     const responseJson = {
         fulfillment_response: {
             messages: [{
                 text: {
-                    text: ["Creating document please wait"]
+                    text: [textResponse]
                 }
             }]
         },
@@ -264,13 +283,7 @@ export const createDocWithFineTuned = async (req, res) => {
     };
     res.json(responseJson);
 
-    try {
-        console.log("user Input json", userInputData);
-        const letterdata = await getLetterContent(letterType, userInputData);
-        processDocx(letterdata, threadId);
-    } catch (err) {
-        console.log(err);
-    }
+
 };
 function cleanJson2(json) {
     try {

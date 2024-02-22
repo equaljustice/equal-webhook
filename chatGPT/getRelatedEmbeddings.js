@@ -1,7 +1,6 @@
 import fs from 'fs';
 import OpenAI from "openai";
 import similarity from "cosine-similarity";
-const openai = new OpenAI({apiKey:'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'});
 
 async function loadEmbeddingsCsv() {
     return new Promise((resolve, reject) => {
@@ -51,6 +50,7 @@ async function loadEmbeddings(){
   }
   // Get embedding for a key
   async function getKeyEmbeddings(text) {
+    const openai = new OpenAI(process.env.OPENAI_API_KEY);
     const response = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: text
