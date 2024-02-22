@@ -1,0 +1,9 @@
+export const USERINPUTFILENAME = 'UserInputContent',
+PUBLIC_BUCKET_DEV = 'ejustice-public-bucket',
+GPT3_5 = 'GPT3_5',
+GPT3_5_FINE_TUNED = 'GPT3_5FineTuned',
+FINE_TUNED_RESPONSE_JSON = 'FineTunedResponseJson',
+GPT3_5_RESPONSE_JSON = 'GPT3_5ResponseJson',
+GPT4= 'GPT4',
+GPT4_RESPONSE_JSON = 'GPT4ResponseJson',
+ASSISTANT = 'Assistant'

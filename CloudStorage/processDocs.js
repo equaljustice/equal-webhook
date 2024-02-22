@@ -3,8 +3,9 @@ import Docxtemplater from "docxtemplater";
 import fs from 'fs';
 import path from 'path';
 import {Storage} from '@google-cloud/storage';
+import * as constants from '../constants.js';
 
-export function processDocx(information, threadId) {
+export function processDocx(information, folder, fileName) {
     var temp_doc = "./CloudStorage/Bank.docx";
     // Load the docx file as binary content
     const content = fs.readFileSync(
@@ -36,23 +37,23 @@ export function processDocx(information, threadId) {
 
     // buf is a nodejs Buffer, you can either write it to a
     // file or res.send it with express for example.
-    fs.writeFileSync(`${threadId}.docx`, buf);
-    return uploadToCloudBucket(`${threadId}.docx`);
+    fs.writeFileSync(`${fileName}.docx`, buf);
+    return uploadToCloudBucket(folder,`${fileName}.docx`);
 }
 
-export function uploadToCloudBucket(destinationFile){
+function uploadToCloudBucket(folder, destinationFile){
 
 // Initialize storage
 const storage = new Storage();
 
-const bucketName = 'ejustice-public-bucket'
+const bucketName = constants.PUBLIC_BUCKET_DEV;
 const bucket = storage.bucket(bucketName)
 
 // Sending the upload request
 bucket.upload(
     path.resolve(destinationFile),
   {
-    destination: `letter-to-bank/${destinationFile}`,
+    destination: `${folder}/${destinationFile}`,
   },
   function (err, file) {
     if (err) {

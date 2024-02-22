@@ -122,7 +122,7 @@
         "qId": "18",
         "Question": "working days (excluding bank holidays) within which you informed the bank",
         "Parameter": "atm_lost_informed_within",
-        "Condition": "Between 4 to 7 days or More than 7 days",
+        "Condition": "More than 4 days",
         "LegalTrainingMaterial": "As per the RBI guidelines and settled legal principles a mere delayed intimation of the loss of ATM card by customer does not absolve bank from getting away from its primary duty to implement adequate monitoring / surveillance and other technologies to prevent the frauds in the account of the customer. Even if there is contributory negligence by the customer, which in this case can at best be a slight delay in informing i.e. between 4 to 7 days or more than 7 days, the bank is still fully liable to compensate the customer if the bank has been found negligent or there is a deficiency in service by the bank to protect the account of the customer, and the onus is on the bank to demonstrate that it was the sole negligence of the customer that caused this fraudulent transaction."
     },
     {
@@ -136,7 +136,7 @@
         "qId": "20",
         "Question": "Total amount of refund and compensation you wish to claim from the Bank? You may note that in addition to refund of the defrauded amount  the Banking Ombudsman can also provide compensation upto ₹1 lakh for mental agony/ harassment/costs/fees etc. suffered by the complainant  and consumer Courts may even provide higher compensation.",
         "Parameter": "refund_compensesion_expected",
-        "Condition": "any value",
+        "Condition": "yes",
         "LegalTrainingMaterial": "I am seeking a full refund of the amounts fraudulently withdrawan and additionally a interest of 9% per annunum and reasonable and bona fide compensation for the harassment, costs, fees and other grave inconvenience and hardship caused to me due to these negligent and non-compliant acts of the bank. In my belief RBI guidelines and various legal theories permit me to claim such additional compensation and interest."
     },
     {
@@ -185,7 +185,7 @@
         "qId": "27",
         "Question": "working days (excluding bank holidays) within which you informed the bank",
         "Parameter": "informed_bank_fraud_transaction_within",
-        "Condition": "4 to 7 days or More than 7 days",
+        "Condition": "More than 4 days",
         "LegalTrainingMaterial": "As per the RBI guidelines and settled legal principles a mere delayed intimation of the transaction by customer does not absolve bank from getting away from its primary duty to implement adequate monitoring / surveillance and other technologies to prevent the frauds in the account of the customer. Even if there is contributory negligence by the customer which in this case is a mere delayed intimation between 4 to 7 days or more than 7 days, the bank is still fully liable to compensate the customer if the bank has been found negligent or there is a deficiency in service by the bank to protect the account of the customer. As per RBI guidelines  the onus of proof is on the bank that the fraudulent transaction occurred due to sole negligence of the customer and there was no negligence from the bank's side  and that the bank should also be asked to demonstrate what actions and investigations it had undertaken to recover the money from the fraudulent person or from the account of the beneficiary or thereafter if there is a chain of onward transactions. In fact  the Supreme Court has also held that the development in means of communication  science & technology etc. have led to an enormous increase in economic crimes viz. phishing  ATM frauds etc. which are being committed by intelligent but devious individuals involving huge sums of public or government money. These are actually public wrongs or crimes committed against society and the gravity and magnitude attached to these offences is concentrated on the public at large."
     },
     {
@@ -206,7 +206,7 @@
         "qId": "30",
         "Question": "Did the fraudulent transaction happen from the ATM within the same city where you live or work?",
         "Parameter": "transaction_in_home_or_work_city",
-        "Condition": "Not Aware",
+        "Condition": "NA",
         "LegalTrainingMaterial": "As I am not aware whether the fraudulent ATM withdrawal occurred within the city where I live or work, it is incumbent on the bank to demonstrate that bank has complied with the RBI guidelines to implement robust surveillance / monitoring of card transactions and transaction velocity and transaction behavior including geotagging and IP address mapping to have prevented this fraudulent transaction, irrespective where it may have happened. RBI has mandated the bank to implement security measures including CCTV surveillance to ensure no fraudulent and unauthorized transactions are carried out from the ATMs. Bank failed to implement adequate monitoring / surveillance technologies to identify that a person other than me is withdrawing money from the ATM and have immediately blocked the ATM to dispense the money."
     },
     {
