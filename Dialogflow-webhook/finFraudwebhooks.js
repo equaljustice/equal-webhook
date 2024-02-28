@@ -180,15 +180,15 @@ export const createDocWithFineTuned = async (req, res) => {
     let generalData = sessionInfo.parameters.generalData ?
         cleanJson(sessionInfo.parameters.generalData)
         : "";
-    let transitionArray = sessionInfo.parameters.transactionArray ?
+    let transactionArray = sessionInfo.parameters.transactionArray ?
         cleanJson(sessionInfo.parameters.transactionArray)
         : "";
     var police_investigation = sessionInfo.parameters.police_investigation;
-    generalData.area_pincode = urbanPincodes.includes(Number(toString(generalData.area_pincode).slice(0, 3))) ? "urban" : "rural";
+    generalData.area_pincode = urbanPincodes.includes(Number(generalData.area_pincode.slice(0, 3))) ? "urban" : "rural";
     var threadId = sessionInfo.parameters.threadId != null ?
         sessionInfo.parameters.threadId
         : await createAssistantThread();
-    let userInputData = { ...generalData, transitionArray: [...transitionArray] };
+    let userInputData = { ...generalData, transactionArray: [...transactionArray] };
     const tag = req.body.fulfillmentInfo.tag;
     let textResponse = 'Not valid request';
     switch (tag) {
@@ -206,7 +206,14 @@ export const createDocWithFineTuned = async (req, res) => {
                     }
                     break;
                 case "Banking Ombudsman":
-                    letterType = "ATMFraudBankingOmbudsman";
+                    letterType = "ATMOmbudsman";
+                    try {
+                        console.log("user Input json", userInputData);
+                       createLetterWithGPT3_5(letterType, userInputData, threadId)
+                        textResponse = 'Creating Document'
+                    } catch (err) {
+                        console.log(err);
+                    }
                     break;
                 case "Police Complaint":
                     assi_id = (police_investigation === "Request to thoroughly investigate") ? assistant_id_atm_Police_Compaint_Investigation : assistant_id_atm_Police_complaint;
@@ -265,7 +272,16 @@ export const createDocWithFineTuned = async (req, res) => {
             } catch (err) {
                 console.log(err);
             }
-
+            break;
+        case "ATMGPT4BANKOmbudsman":
+                letterType = "ATMOmbudsman";
+                try {
+                    console.log("user Input json", userInputData);
+                    createLetterWithGPT4(letterType, userInputData, threadId);
+                    textResponse = 'Creating Document'
+                } catch (err) {
+                    console.log(err);
+                }
     }
 
 
