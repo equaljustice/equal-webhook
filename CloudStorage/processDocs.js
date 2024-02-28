@@ -59,15 +59,11 @@ bucket.upload(
     if (err) {
       console.error(`Error uploading ${destinationFile}: ${err}`)
     } else {
-      console.log(`${destinationFile} uploaded to ${bucketName}.`)
-
-        // Making file public to the internet
         file.makePublic(async function (err) {
         if (err) {
           console.error(`Error making file public: ${err}`)
           return err.message;
         } else {
-          console.log(`File ${file.name} is now public.`)
           const publicUrl = file.publicUrl()
           console.log(`Public URL for ${file.name}: ${publicUrl}`)
           return publicUrl;
