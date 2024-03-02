@@ -32,7 +32,7 @@ export async function interactWithAssistant(query, threadId, ass_id) {
         const assistantResponses = messagesResponse.data.filter(msg => msg.role === 'assistant');
         //console.log("assistantResponses[0]", JSON.stringify(assistantResponses[0]));
         const response = assistantResponses[0].content[0].text.value;
-        console.log("assistantResponses", JSON.stringify(assistantResponses, null, 2));
+       // console.log("assistantResponses", JSON.stringify(assistantResponses, null, 2));
         // If there are no text responses, response will remain an empty string.
         var return_data = { response, threadId };
         return return_data;

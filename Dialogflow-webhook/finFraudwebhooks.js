@@ -1,6 +1,6 @@
 import { createAssistantThread, interactWithAssistant } from "../chatGPT/assistant-api.js";
 import { processDocx } from "../CloudStorage/processDocs.js";
-import { createLetterWithGPT3_5, createLetterWithGPT4, createLetterwithFineTuned } from "../chatGPT/completion.js";
+import { createLetterWithGPT3_5, createLetterWithGPT4, createLetterwithFineTuned, createUserInputParagraph } from "../chatGPT/completion.js";
 import urbanPincodes from '../JSONs/urbanPincodes.json' assert {type: "json"};
 import * as constants from '../constants.js';
 let assi_id = "";
@@ -50,7 +50,7 @@ export const openQnA = async (req, res) => {
             let response = "Your 10 questions are over, Thank you for using our service, hope your issue will be resolved"
             responseMessage = { response, threadId };
         }
-        console.log("Response from Assistant:", JSON.stringify(responseMessage));
+       // console.log("Response from Assistant:", JSON.stringify(responseMessage));
         responseJson = {
             fulfillment_response: {
                 messages: [{
@@ -165,7 +165,7 @@ export const createDocWithAssistant = async (req, res) => {
     res.json(responseJson);
 
     try {
-        console.log("Query string", query);
+        //console.log("Query string", query);
         const letterdata = await interactWithAssistant(query, threadId, assi_id);
         processDocx(letterdata.response, threadId, threadId + constants.ASSISTANT);
     } catch (err) {
@@ -184,7 +184,7 @@ export const createDocWithFineTuned = async (req, res) => {
         cleanJson(sessionInfo.parameters.transactionArray)
         : "";
     var police_investigation = sessionInfo.parameters.police_investigation;
-    generalData.area_pincode = urbanPincodes.includes(Number(generalData.area_pincode.slice(0, 3))) ? "urban" : "rural";
+    generalData.area_of_user = urbanPincodes.includes(Number(generalData.area_of_user.slice(0, 3))) ? "urban" : "rural";
     var threadId = sessionInfo.parameters.threadId != null ?
         sessionInfo.parameters.threadId
         : await createAssistantThread();
@@ -197,7 +197,7 @@ export const createDocWithFineTuned = async (req, res) => {
                 case "Bank":
                     letterType = "ATMFraudBank";
                     try {
-                        console.log("user Input json", userInputData);
+                        //console.log("user Input json", userInputData);
                         createLetterwithFineTuned(letterType, userInputData, threadId);
                         createLetterWithGPT3_5(letterType, userInputData, threadId)
                         textResponse = 'Creating Document'
@@ -208,8 +208,9 @@ export const createDocWithFineTuned = async (req, res) => {
                 case "Banking Ombudsman":
                     letterType = "ATMOmbudsman";
                     try {
-                        console.log("user Input json", userInputData);
+                       // console.log("user Input json", userInputData);
                        createLetterWithGPT3_5(letterType, userInputData, threadId)
+                     //  createUserInputParagraph(userInputData,threadId);
                         textResponse = 'Creating Document'
                     } catch (err) {
                         console.log(err);
@@ -266,7 +267,7 @@ export const createDocWithFineTuned = async (req, res) => {
         case "ATMGPT4BANK":
             letterType = "ATMFraudBank";
             try {
-                console.log("user Input json", userInputData);
+                //console.log("user Input json", userInputData);
                 createLetterWithGPT4(letterType, userInputData, threadId);
                 textResponse = 'Creating Document'
             } catch (err) {
@@ -276,7 +277,7 @@ export const createDocWithFineTuned = async (req, res) => {
         case "ATMGPT4BANKOmbudsman":
                 letterType = "ATMOmbudsman";
                 try {
-                    console.log("user Input json", userInputData);
+                    //console.log("user Input json", userInputData);
                     createLetterWithGPT4(letterType, userInputData, threadId);
                     textResponse = 'Creating Document'
                 } catch (err) {
