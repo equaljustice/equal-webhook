@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node index.js",
-    "dev": "NODE_ENV=development nodemon index.js | pino-pretty",
+    "dev": "NODE_ENV=development nodemon index.js",
     "lint": "eslint --ext *.js --ext test/*.js",
     "fix": "eslint --fix --ext *.js --ext test/*.js",
     "build-image": "gcloud builds submit --pack image=asia-south1-docker.pkg.dev/atmprebuiltagent/cloud-run-source-deploy:manual",
