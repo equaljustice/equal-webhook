@@ -267,7 +267,6 @@ export const createDocWithFineTuned = async (req, res) => {
         case "ATMGPT4BANK":
             letterType = "ATMFraudBank";
             try {
-                //console.log("user Input json", userInputData);
                 createLetterWithGPT4(letterType, userInputData, threadId);
                 textResponse = 'Creating Document'
             } catch (err) {
@@ -277,7 +276,6 @@ export const createDocWithFineTuned = async (req, res) => {
         case "ATMGPT4BANKOmbudsman":
                 letterType = "ATMOmbudsman";
                 try {
-                    //console.log("user Input json", userInputData);
                     createLetterWithGPT4(letterType, userInputData, threadId);
                     textResponse = 'Creating Document'
                 } catch (err) {
@@ -318,7 +316,7 @@ function cleanJson2(json) {
     }
 }
 
-function cleanJson(jsonData) {
+export function cleanJson(jsonData) {
     let cleanedJson = JSON.parse(JSON.stringify(jsonData)); // Create a deep copy of the json
     (function _clean(obj) {
         Object.keys(obj).forEach(key => {
