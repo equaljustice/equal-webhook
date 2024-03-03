@@ -3,11 +3,11 @@ import { prompts } from "./prompts.js"
 import * as constants from '../constants.js';
 import LegalTrainingATM from '../JSONs/LegalTrainingATM.json' assert {type: "json"};
 import { processDocx } from '../CloudStorage/processDocs.js';
-let message;
+
 async function createMessageContent(prompttype, userInputData, threadId) {
   const legalTraining = await getLegalTrainingMaterials(userInputData);
   const userInputPara = await createUserInputParagraph(userInputData, threadId);
-  message = [
+ const message = [
     {
       "role": "system",
       "content": `${prompts[prompttype]}`
@@ -26,7 +26,7 @@ async function createMessageContent(prompttype, userInputData, threadId) {
 export async function createLetterwithFineTuned(prompttype, userInputData, threadId) {
   try {
 
-    message = await createMessageContent(prompttype, userInputData, threadId);
+    const message = await createMessageContent(prompttype, userInputData, threadId);
     const FineTunedModelResponse = await openAiCompletionWithFineTunedATMBank(message);
     processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
     // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
@@ -41,7 +41,7 @@ export async function createLetterwithFineTuned(prompttype, userInputData, threa
 export async function createLetterWithGPT3_5(prompttype, userInputData, threadId) {
   try {
 
-    message = message != null ? message : await createMessageContent(prompttype, userInputData, threadId);
+    const message = await createMessageContent(prompttype, userInputData, threadId);
     const GPT3_5Response = await openAiCompletionWithGPT3_5(message);
     // processDocx(JSON.stringify(GPT3_5Response, null, 2), threadId, threadId+constants.GPT3_5_RESPONSE_JSON + prompttype);
     processDocx(GPT3_5Response.choices[0].message.content, threadId, threadId + constants.GPT3_5 + prompttype);
@@ -58,22 +58,18 @@ export async function createUserInputParagraph(userInputData, threadId) {
     let updatedUserData = await removeKeys(userInputData);
     let userInputMessage = [
       {
-        "role": "system",
-        "content": `Your Job is to convert the given Json object in fact based paragraph from the perspective of the victim which can be read by a LLM model`
-      },
-      {
         "role": "user",
-        "content": `Given the following details about a financial fraud incident, generate a fact-based paragraph from the perspective of me:
+        "content": `Your Job is to convert the given Json objects in a simple textual paragraph without sounding like a storyboard:
         ${JSON.stringify(updatedUserData, null, 2)}`
       }
     ];
     /* console.log(`JSON: ${JSON.stringify(userInputData, null, 2)}
     JsonAfterRemovedKeys: ${JSON.stringify(updatedUserData, null, 2)})`); */
-      const GPT3_5Response = await openAiCompletionWithGPT3_5(userInputMessage, 0.8, 0.8);
-      processDocx(`JSON: ${JSON.stringify(userInputData, null, 2)}
+    const GPT4Response = await openAiCompletionWithGPT4(userInputMessage, 0.8, 0.8);
+   /*  processDocx(`JSON: ${JSON.stringify(userInputData, null, 2)}
       JsonAfterRemovedKeys: ${JSON.stringify(updatedUserData, null, 2)}
-      Paragraph: ${JSON.stringify(GPT3_5Response, null, 2)}`, threadId, threadId+constants.GPT3_5_RESPONSE_JSON + 'UserInputPara');
-     return GPT3_5Response.choices[0].message.content; 
+      Paragraph: ${JSON.stringify(GPT4Response, null, 2)}`, threadId, threadId + constants.GPT4_RESPONSE_JSON + 'UserInputPara'); */
+    return GPT4Response.choices[0].message.content;
   }
   catch (error) {
     error
@@ -92,19 +88,20 @@ async function removeKeys(jsonData) {
         Object.keys(obj).forEach(key => {
           if (obj[key] && typeof obj[key] === 'object') {
             obj[key] = _clean(obj[key]); // Recurse if the value is an object
-          } else if (['Senior_citizen', 'pension_savings_account',
-          'withdrawn_amount_exceed_daily_limit', 'transaction_happen_after_informed_bank_of_previous_fraud']
-          .includes(key) && String(obj[key]).toLowerCase() === 'no') {
+          } else if (['Senior_citizen', 'pension_savings_account', 'lost_atm',
+            'withdrawn_amount_exceed_daily_limit', 'transaction_happen_after_informed_bank_of_previous_fraud']
+            .includes(key) && String(obj[key]).toLowerCase() === 'no') {
             delete obj[key];
           } else if (['applied_for_atmcard', 'withdrawing_regularly_from_atm',
-          'refund_compensesion_expected',
-          'transaction_sms_recieved', 'transaction_sms_recieved_within_one_hour',
-          'transaction_email_recieved', 'transaction_email_recieved_within_one_hour',
-          'transaction_from_ATM_in_home_city_or_work_city',
-          'transaction_from_ATM_in_home_city_or_work_city_regularly_withdrawing']
-          .includes(key) && String(obj[key]).toLowerCase() === 'yes') {
+            'refund_compensesion_expected',
+            'transaction_sms_recieved', 'transaction_sms_recieved_within_one_hour',
+            'transaction_email_recieved', 'transaction_email_recieved_within_one_hour',
+            'transaction_from_ATM_in_home_city_or_work_city',
+            'transaction_from_ATM_in_home_city_or_work_city_regularly_withdrawing']
+            .includes(key) && String(obj[key]).toLowerCase() === 'yes') {
             delete obj[key]; // Delete the key if the value is 'yes' 
           }
+          else if (key === 'area_of_user' && String(obj[key]).toLowerCase() === 'urban') { delete obj[key]; }
         });
       }
     }
@@ -116,7 +113,7 @@ async function removeKeys(jsonData) {
 export async function createLetterWithGPT4(prompttype, userInputData, threadId) {
   try {
 
-    message = message != null ? message : await createMessageContent(prompttype, userInputData, threadId);
+    const message = await createMessageContent(prompttype, userInputData, threadId);
     const GPT4Response = await openAiCompletionWithGPT4(message);
     // processDocx(JSON.stringify(GPT4Response, null, 2), threadId, threadId+constants.GPT4_RESPONSE_JSON + prompttype);
     processDocx(GPT4Response.choices[0].message.content, threadId, threadId + constants.GPT4 + prompttype);
@@ -142,6 +139,7 @@ async function openAiCompletionWithFineTunedATMBank(message, temperature = 0.5, 
   });
   return completionResponse;
 }
+
 async function openAiCompletionWithGPT3_5(message, temperature = 0.5, top_p = 0.9, frequency_penalty = 0.2, presence_penalty = 0) {
   const openai = new OpenAI(process.env.OPENAI_API_KEY);
   const completionResponse = await openai.chat.completions.create({

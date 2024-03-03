@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { openQnA, createDocWithAssistant, createDocWithFineTuned } from './Dialogflow-webhook/finFraudwebhooks.js';
+import { openQnAFineTuned } from './chatGPT/qnaCompletion.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/atmfraud', getQuestionJson);
@@ -14,6 +15,7 @@ APIrouter.use('/getStates', getStates);
 APIrouter.use('/getCities/:stateCode', getCities);
 APIrouter.use('/getBanks', getBanks);
 APIrouter.post('/webhook_QnA', openQnA);
+APIrouter.post('/webhook_QnAFineTuned', openQnAFineTuned);
 APIrouter.post('/webhook_createDoc', createDocWithAssistant);
 APIrouter.post('/webhook_createDocWithFineTuned', createDocWithFineTuned);
 APIrouter.get('1/:session', (req, res) => {

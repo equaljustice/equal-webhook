@@ -67,7 +67,7 @@
         "Question": "whether the website was in the name of your bank with website address of the bank",
         "Parameter": "website_in_bank_name",
         "Condition": "No",
-        "LegalTrainingMaterial": "The bank did not properly implement robust surveillance / monitoring of card transactions and related technologies including geo tagging and IP address mapping and CCTV related intelligence to verify whether it is the customer who is withdrawing from the ATM or someone else. The bank should also demonstrate whether similar cases where the customers are targeted on a different webstie / mobile app (maybe through phishing or social media engineering attacks) appeared in the consolidated review of fraud cases detected during any previous period, and if yes, whether the bank has put any new processes and procedures to combat or mitigate such fraud attempts, and the results of the audit of its effectiveness with any advised for change in the processes and procedures. As per the RBI guidelines and settled legal principles, even if there is contributory negligence by the customer, the bank is still fully liable to compensate the customer if the bank has been found negligent or there is a deficiency in service by the bank to protect the account of the customer."
+        "LegalTrainingMaterial": "The bank did not properly implement robust surveillance / monitoring of card transactions and related technologies including geo tagging and IP address mapping and CCTV related intelligence to verify whether it is the customer who is withdrawing from the ATM or someone else. The bank should also demonstrate whether similar cases where the customers are targeted on a different website (maybe through phishing or social media engineering attacks) appeared in the consolidated review of fraud cases detected during any previous period, and if yes, whether the bank has put any new processes and procedures to combat or mitigate such fraud attempts, and the results of the audit of its effectiveness with any advised for change in the processes and procedures. As per the RBI guidelines and settled legal principles, even if there is contributory negligence by the customer, the bank is still fully liable to compensate the customer if the bank has been found negligent or there is a deficiency in service by the bank to protect the account of the customer."
     },
     {
         "qId": "9a",
@@ -234,7 +234,7 @@
         "qId": "30",
         "Question": "Did the fraudulent transaction happen from the ATM within the same city where you live or work?",
         "Parameter": "transaction_from_ATM_in_home_city_or_work_city",
-        "Condition": "NA",
+        "Condition": "Not Aware",
         "LegalTrainingMaterial": "As I am not aware whether the fraudulent ATM withdrawal occurred within the city where I live or work, it is incumbent on the bank to demonstrate that bank has complied with the RBI guidelines to implement robust surveillance / monitoring of card transactions and transaction velocity and transaction behavior including geotagging and IP address mapping to have prevented this fraudulent transaction, irrespective where it may have happened. RBI has mandated the bank to implement security measures including CCTV surveillance to ensure no fraudulent and unauthorized transactions are carried out from the ATMs. Bank failed to implement adequate monitoring / surveillance technologies to identify that a person other than me is withdrawing money from the ATM and have immediately blocked the ATM to dispense the money."
     },
     {
@@ -275,7 +275,7 @@
     {
         "qId": "36",
         "Question": "Did you undertake any banking transaction i.e. use netbanking  mobile banking  debit card  ATM card around the time of the ATM fraud in that different city or other country.",
-        "Parameter": "did_transaction_from_that_different_city_or_different_country",
+        "Parameter": "user_did_transaction_from_that_different_city_or_different_country",
         "Condition": "No",
         "LegalTrainingMaterial": "It is very clear that I never undertook any ATM transaction during the period of fraud in that city or country (as per the user’s response)and therefore any isolated transaction in a different city or a different country (as per the user’s response) should have been flagged for verification  which the bank failed to do so  and thereby was negligent in protecting my account and my money. The bank also did not follow RBI guidelines to protect the customer's account properly."
     }
