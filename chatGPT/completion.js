@@ -4,10 +4,11 @@ import * as constants from '../constants.js';
 import LegalTrainingATM from '../JSONs/LegalTrainingATM.json' assert {type: "json"};
 import { processDocx } from '../CloudStorage/processDocs.js';
 
-async function createMessageContent(prompttype, userInputData, threadId) {
-  const legalTraining = await getLegalTrainingMaterials(userInputData);
+export async function createMessageContent(prompttype, userInputData, threadId) {
+
+  const legalTraining = prompttype != 'RTI' ? await getLegalTrainingMaterials(userInputData) : '';
   const userInputPara = await createUserInputParagraph(userInputData, threadId);
- const message = [
+  const message = [
     {
       "role": "system",
       "content": `${prompts[prompttype]}`
@@ -16,7 +17,7 @@ async function createMessageContent(prompttype, userInputData, threadId) {
       "role": "user",
       "content": `User's inputs and response is given below:
       ${userInputPara}
-      Guiding RBI guidelines and legal framework is given below:
+      
       ${legalTraining}`
     }
   ]
@@ -66,9 +67,9 @@ export async function createUserInputParagraph(userInputData, threadId) {
     /* console.log(`JSON: ${JSON.stringify(userInputData, null, 2)}
     JsonAfterRemovedKeys: ${JSON.stringify(updatedUserData, null, 2)})`); */
     const GPT4Response = await openAiCompletionWithGPT4(userInputMessage, 1, 1);
-   /*  processDocx(`JSON: ${JSON.stringify(userInputData, null, 2)}
-      JsonAfterRemovedKeys: ${JSON.stringify(updatedUserData, null, 2)}
-      Paragraph: ${JSON.stringify(GPT4Response, null, 2)}`, threadId, threadId + constants.GPT4_RESPONSE_JSON + 'UserInputPara'); */
+    /*  processDocx(`JSON: ${JSON.stringify(userInputData, null, 2)}
+       JsonAfterRemovedKeys: ${JSON.stringify(updatedUserData, null, 2)}
+       Paragraph: ${JSON.stringify(GPT4Response, null, 2)}`, threadId, threadId + constants.GPT4_RESPONSE_JSON + 'UserInputPara'); */
     return GPT4Response.choices[0].message.content;
   }
   catch (error) {
