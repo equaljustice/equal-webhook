@@ -17,10 +17,14 @@
 # Exclude locally installed dependencies
 node_modules/
 npm-debug.log
-
+.env
 # Exclude local IDE settings
 .idea/
 .vscode/
 
 # macOS
 **/.DS_Store
+testingThread.docx
+thread_**
+emboutput.csv
+localtestingchetan.docx
