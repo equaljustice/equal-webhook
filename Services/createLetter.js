@@ -1,26 +1,24 @@
-import { createLetterWithGPT3_5, createLetterWithGPT4, createLetterwithFineTuned, createUserInputParagraph } from "../chatGPT/completion.js";
+import { createLetterWithGPT3_5, createLetterWithGPT4, createLetterwithFineTuned, createMessageContent } from "../chatGPT/completion.js";
 
 
 export async function createLetter(fraudType, letterOption, userInputData, threadId) {
     try {
         console.log("user Input json", userInputData);
-        let letterType = 'ATMFraudBank';
-        let textResponse = '';
+        let promptType = 'ATMFraudBank';
+        let textResponse = 'Invalid fraudType or letterOption';
         switch (fraudType) {
             case "ATM":
                 switch (letterOption) {
                     case "Bank":
-                        letterType = "ATMFraudBank";
-                        createLetterwithFineTuned(letterType, userInputData, threadId);
-                        createLetterWithGPT3_5(letterType, userInputData, threadId)
-                        textResponse = 'Creating Document'
+                        promptType = "ATMFraudBank";
+                        createMessageContent(promptType, userInputData, threadId);
 
                         break;
                     case "Banking Ombudsman":
-                        letterType = "ATMOmbudsman";
-                        createLetterWithGPT3_5(letterType, userInputData, threadId)
+                        promptType = "ATMOmbudsman";
+                        createMessageContent(promptType, userInputData, threadId)
                         //  createUserInputParagraph(userInputData,threadId);
-                        textResponse = 'Creating Document'
+
 
                         break;
                     case "Police Complaint":
@@ -30,8 +28,8 @@ export async function createLetter(fraudType, letterOption, userInputData, threa
                         //assi_id = assistant_id_atm_consumer_court;
                         break;
                     case "RTI Application":
-                        
-                        textResponse = await createUserInputParagraph(userInputData,threadId);
+                    promptType = "RTI";
+                    createMessageContent(promptType, userInputData, threadId);
                         break;
                 }
                 break;
@@ -73,20 +71,18 @@ export async function createLetter(fraudType, letterOption, userInputData, threa
                         break;
                 }
             case "ATMGPT4BANK":
-                letterType = "ATMFraudBank";
-                createLetterWithGPT4(letterType, userInputData, threadId);
-                textResponse = 'Creating Document'
+                promptType = "ATMFraudBank";
+                createLetterWithGPT4(promptType, userInputData, threadId);
+
 
                 break;
             case "ATMGPT4BANKOmbudsman":
-                letterType = "ATMOmbudsman";
-                createLetterWithGPT4(letterType, userInputData, threadId);
-                textResponse = 'Creating Document'
+                promptType = "ATMOmbudsman";
+                createLetterWithGPT4(promptType, userInputData, threadId);
+
                 break;
         }
-
-
-        return textResponse;
+       return textResponse;
     } catch (err) {
         console.log(err);
     }
