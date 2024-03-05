@@ -65,7 +65,7 @@ export async function createUserInputParagraph(userInputData, threadId) {
     ];
     /* console.log(`JSON: ${JSON.stringify(userInputData, null, 2)}
     JsonAfterRemovedKeys: ${JSON.stringify(updatedUserData, null, 2)})`); */
-    const GPT4Response = await openAiCompletionWithGPT4(userInputMessage, 0.8, 0.8);
+    const GPT4Response = await openAiCompletionWithGPT4(userInputMessage, 1, 1);
    /*  processDocx(`JSON: ${JSON.stringify(userInputData, null, 2)}
       JsonAfterRemovedKeys: ${JSON.stringify(updatedUserData, null, 2)}
       Paragraph: ${JSON.stringify(GPT4Response, null, 2)}`, threadId, threadId + constants.GPT4_RESPONSE_JSON + 'UserInputPara'); */
