@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
-import { createUserInputParagraph } from './completion.js';
-import { cleanJson } from '../Dialogflow-webhook/finFraudwebhooks.js';
+import { createUserInputParagraph } from '../chatGPT/completion.js';
+import { cleanJson } from './finFraudwebhooks.js';
 import urbanPincodes from '../JSONs/urbanPincodes.json' assert {type: "json"};
 export const openQnAFineTuned = async (req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
