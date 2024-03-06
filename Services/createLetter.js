@@ -1,4 +1,4 @@
-import { createLetterWithGPT3_5, createLetterWithGPT4, createLetterwithFineTuned, createMessageContent } from "../chatGPT/completion.js";
+import { createLetterWithGPT3_5, createLetterWithGPT4, createBankLetterwithFineTuned, createMessageContent } from "../chatGPT/completion.js";
 
 
 export async function createLetter(fraudType, letterOption, userInputData, threadId) {

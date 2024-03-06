@@ -1,6 +1,7 @@
 import { createAssistantThread, interactWithAssistant } from "../chatGPT/assistant-api.js";
 import { processDocx } from "../CloudStorage/processDocs.js";
-import { createLetterWithGPT3_5, createLetterWithGPT4, createLetterwithFineTuned, createUserInputParagraph } from "../chatGPT/completion.js";
+import { createLetterWithGPT3_5, createLetterWithGPT4, 
+    createBankLetterwithFineTuned, createUserInputParagraph, createOmbudsmanLetterwithFineTuned } from "../chatGPT/completion.js";
 import urbanPincodes from '../JSONs/urbanPincodes.json' assert {type: "json"};
 import * as constants from '../constants.js';
 let assi_id = "";
@@ -50,7 +51,7 @@ export const openQnA = async (req, res) => {
             let response = "Your 10 questions are over, Thank you for using our service, hope your issue will be resolved"
             responseMessage = { response, threadId };
         }
-       // console.log("Response from Assistant:", JSON.stringify(responseMessage));
+        // console.log("Response from Assistant:", JSON.stringify(responseMessage));
         responseJson = {
             fulfillment_response: {
                 messages: [{
@@ -198,9 +199,9 @@ export const createDocWithFineTuned = async (req, res) => {
                     letterType = "ATMFraudBank";
                     try {
                         //console.log("user Input json", userInputData);
-                        createLetterwithFineTuned(letterType, userInputData, threadId);
-                        createLetterWithGPT3_5(letterType, userInputData, threadId)
-                        textResponse = 'Creating Document'
+                        createBankLetterwithFineTuned(letterType, userInputData, threadId);
+                        createLetterWithGPT3_5(letterType, userInputData, threadId);
+                        textResponse = 'Creating Bank Letter';
                     } catch (err) {
                         console.log(err);
                     }
@@ -208,10 +209,10 @@ export const createDocWithFineTuned = async (req, res) => {
                 case "Banking Ombudsman":
                     letterType = "ATMOmbudsman";
                     try {
-                       // console.log("user Input json", userInputData);
-                       createLetterWithGPT3_5(letterType, userInputData, threadId)
-                     //  createUserInputParagraph(userInputData,threadId);
-                        textResponse = 'Creating Document'
+                        // console.log("user Input json", userInputData);
+                        createLetterWithGPT3_5(letterType, userInputData, threadId);
+                        createOmbudsmanLetterwithFineTuned(letterType, userInputData, threadId);
+                        textResponse = 'Creating Banking Ombudsman letter'
                     } catch (err) {
                         console.log(err);
                     }
@@ -223,7 +224,24 @@ export const createDocWithFineTuned = async (req, res) => {
                     assi_id = assistant_id_atm_consumer_court;
                     break;
                 case "RTI Application":
-                    assi_id = assistant_id_atm_RTI;
+                    if (["Bank of Baroda",
+                        "Bank of India",
+                        "Bank of Maharashtra",
+                        "Canara Bank",
+                        "Central Bank of India",
+                        "Indian Bank",
+                        "Indian Overseas Bank",
+                        "Punjab & Sind Bank",
+                        "Punjab National Bank",
+                        "State Bank of India",
+                        "UCO Bank",
+                        "Union Bank of India"].includes(generalData.bank_name)) {
+                        letterType = 'RTI'
+                        createLetterWithGPT4(letterType, userInputData, threadId)
+                        textResponse = 'Creating RTI Application'
+                        
+                    }
+                    else textResponse = 'RTI Application is applicable only for Public Sector Banks';
                     break;
             }
             break;
@@ -274,13 +292,13 @@ export const createDocWithFineTuned = async (req, res) => {
             }
             break;
         case "ATMGPT4BANKOmbudsman":
-                letterType = "ATMOmbudsman";
-                try {
-                    createLetterWithGPT4(letterType, userInputData, threadId);
-                    textResponse = 'Creating Document'
-                } catch (err) {
-                    console.log(err);
-                }
+            letterType = "ATMOmbudsman";
+            try {
+                createLetterWithGPT4(letterType, userInputData, threadId);
+                textResponse = 'Creating Document'
+            } catch (err) {
+                console.log(err);
+            }
     }
 
 
