@@ -3,31 +3,43 @@ import { createAssistantThread } from "../chatGPT/assistant-api.js";
 import urbanPincodes from '../JSONs/urbanPincodes.json' assert {type: "json"};
 
 const postUserAnswers = async (req, res) => {
-    // console.log('Input from API', JSON.stringify(req.body, null, 2));
-    let userInputData = convertToKeyValue(req.body.data);
+     console.log('Input from API', JSON.stringify(req.body, null, 2));
+    let userInputData = prepareInputData(req.body.data);
     userInputData.area_of_user = urbanPincodes.includes(Number(userInputData.area_of_user.slice(0, 3))) ? "urban" : "rural";
-    var threadId = req.body.threadId != null ?
-        req.body.threadId
-        : await createAssistantThread();
-    createLetter(req.body.fraudType, req.body.letterOption, userInputData, threadId)
-    res.send('https://equal-webhook-nh3rcdoxhq-el.a.run.app/' + threadId);
+     var threadId = generateSessionId(15);
+    console.log('Prepared Data', JSON.stringify(userInputData, null, 2));
+    createLetter(req.body.fraudType, req.body.letterOption, userInputData, threadId) 
+    res.send({downloadLink:'https://equal-webhook-nh3rcdoxhq-el.a.run.app/' + threadId});
 }
-const convertToKeyValue = (jsonArray) => {
-    const result = {};
-
-    jsonArray.forEach((item) => {
-        const { parameter, answer } = item;
-        result[parameter] = answer;
-
-        if (item.transactions) {
-            const transactions = item.transactions.T0;
-            transactions.forEach((transaction) => {
-                const { parameter, answer } = transaction;
-                result[parameter] = answer;
+const prepareInputData = (inputJson) => {
+    const outputJson = {}
+    inputJson.forEach(item => {
+        if (item.parameter === 'fraud_transactions_count') {
+          outputJson['transactions'] = [];
+          for (const key in item.transactions) {
+            const transactionObj = {};
+            item.transactions[key].forEach(transaction => {
+             
+              transactionObj[transaction.parameter] = transaction.answer;
+              
             });
+            outputJson['transactions'].push(transactionObj);
+          }
+        } else {
+          outputJson[item.parameter] = item.answer;
         }
-    });
-
-    return result;
+      });
+    return outputJson;
 };
+function generateSessionId(length) {
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let sessionId = '';
+
+  for (let i = 0; i < length; i++) {
+    const randomIndex = Math.floor(Math.random() * charset.length);
+    sessionId += charset.charAt(randomIndex);
+  }
+
+  return sessionId;
+}
 export { postUserAnswers };

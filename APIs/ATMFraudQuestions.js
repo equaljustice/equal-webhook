@@ -1,4 +1,4 @@
-import qjson  from "../JSONs/section-group-format.json" assert {type: "json"}; 
+import qjson  from "../JSONs/allQustions.json" assert {type: "json"}; 
 const getQuestionJson = async(req, res) => {
     res.send(qjson);
 }

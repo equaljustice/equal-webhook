@@ -24,11 +24,25 @@ export async function createMessageContent(prompttype, userInputData, threadId) 
   processDocx(message[0].content + '\n' + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
   return message;
 }
-export async function createLetterwithFineTuned(prompttype, userInputData, threadId) {
+export async function createBankLetterwithFineTuned(prompttype, userInputData, threadId) {
   try {
 
     const message = await createMessageContent(prompttype, userInputData, threadId);
     const FineTunedModelResponse = await openAiCompletionWithFineTunedATMBank(message);
+    processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
+    // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
+
+    return;
+  }
+  catch (error) {
+    error
+  }
+}
+export async function createOmbudsmanLetterwithFineTuned(prompttype, userInputData, threadId) {
+  try {
+
+    const message = await createMessageContent(prompttype, userInputData, threadId);
+    const FineTunedModelResponse = await openAiCompletionWithFineTunedATMBankOmbudsman(message);
     processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
     // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
 
@@ -59,8 +73,12 @@ export async function createUserInputParagraph(userInputData, threadId) {
     let updatedUserData = await removeKeys(userInputData);
     let userInputMessage = [
       {
+        "role": "system",
+        "content": "Your Job is to convert the given Json objects in a simple textual paragraph without sounding like a storyboard"
+      },
+      {
         "role": "user",
-        "content": `Your Job is to convert the given Json objects in a simple textual paragraph without sounding like a storyboard:
+        "content": `Here is the JSON data related to financeial fraud happend to me. All the transaction amounts are in rupees describe this in simple english language not more than 200 words,
         ${JSON.stringify(updatedUserData, null, 2)}`
       }
     ];
@@ -130,6 +148,21 @@ async function openAiCompletionWithFineTunedATMBank(message, temperature = 0.5, 
   //console.log("input to openAI", message);
   const completionResponse = await openai.chat.completions.create({
     model: "ft:gpt-3.5-turbo-0613:personal::8twTZDyP",
+    messages: message,
+    temperature: temperature,
+    max_tokens: 1500,
+    n: 1,
+    top_p: top_p,
+    frequency_penalty: frequency_penalty,
+    presence_penalty: presence_penalty,
+  });
+  return completionResponse;
+}
+async function openAiCompletionWithFineTunedATMBankOmbudsman(message, temperature = 0.5, top_p = 0.9, frequency_penalty = 0.2, presence_penalty = 0) {
+  const openai = new OpenAI(process.env.OPENAI_API_KEY);
+  //console.log("input to openAI", message);
+  const completionResponse = await openai.chat.completions.create({
+    model: "ft:gpt-3.5-turbo-1106:ashish-chandra:atmombudsman:8zov1AhH",
     messages: message,
     temperature: temperature,
     max_tokens: 1500,
