@@ -314,7 +314,7 @@
       },
       "answerType": "datetime",
       "validation": {
-        "regex": "^\\d{4}-\\d{2}-\\d{2}$",
+        "regex": "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}$",
         "errorMessage": "Please enter a valid date in YYYY-MM-DD format"
       },
       "parameter": "transaction_date",
@@ -453,15 +453,15 @@
     {
       "qid": 34,
       "question": {
-        "text": "Did you get received the SMS within one hour of the transaction?",
+        "text": "Did you received SMS within one hour of the transaction?",
         "audioUrl": ""
       },
       "question_help": {
-        "text": "Did you get received the SMS within one hour of the transaction?",
+        "text": "Did you received SMS within one hour of the transaction?",
         "audioUrl": "https://equaljustice.ai/assest/recordings/audio/sms-from-bank-question-help.mp3"
       },
       "question_alt": {
-        "text": "Did you get received the SMS within one hour of the transaction?",
+        "text": "Did you received SMS within one hour of the transaction?",
         "audioUrl": "https://equaljustice.ai/assest/recordings/audio/sms-from-bank-question.mp3"
       },
       "answerType": "choice",
@@ -475,7 +475,7 @@
     {
       "qid": 35,
       "question": {
-        "text": "Did you get received the Email of the transaction?",
+        "text": "Did you received Email of the transaction?",
         "audioUrl": ""
       },
       "question_help": {
@@ -497,7 +497,7 @@
     {
       "qid": 36,
       "question": {
-        "text": "Did you get received the Email within one hour of the transaction?",
+        "text": "Did you received Email within one hour of the transaction?",
         "audioUrl": ""
       },
       "question_help": {
