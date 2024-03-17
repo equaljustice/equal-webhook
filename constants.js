@@ -6,4 +6,5 @@ FINE_TUNED_RESPONSE_JSON = 'FineTunedJson',
 GPT3_5_RESPONSE_JSON = 'GPT3_5Json',
 GPT4= 'GPT4',
 GPT4_RESPONSE_JSON = 'GPT4Json',
-ASSISTANT = 'Assistant'
+ASSISTANT = 'Assistant',
+PUBLIC_BUCKET_URL = 'https://storage.googleapis.com/ejustice-public-bucket'
