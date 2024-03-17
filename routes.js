@@ -9,6 +9,8 @@ import { dirname } from 'path';
 import { openQnA, createDocWithAssistant, createDocWithFineTuned } from './Dialogflow-webhook/finFraudwebhooks.js';
 import { openQnAFineTuned } from './Dialogflow-webhook/qnaCompletion.js';
 import {postUserAnswers} from './APIs/getUserData.js'
+import { authenticate, authenticateToken } from './Services/authenticate.js';
+import { listFiles, downloadFile } from './APIs/getGCSFiles.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/getATMfraudQuestions', getQuestionJson);
@@ -79,6 +81,8 @@ APIrouter.get('/download/:threadId/:filename', (req, res) => {
   
   res.redirect(`https://storage.googleapis.com/ejustice-public-bucket/${req.params.threadId}/${req.params.filename}.docx?time=${new Date().getTime()}`);
 });
-
+APIrouter.get('/list-files/:folder', authenticateToken, listFiles);
+APIrouter.get('/downloadFile/:folder/:filename', downloadFile);
+APIrouter.post('/login', authenticate);
 // Export the router
 export default APIrouter;
