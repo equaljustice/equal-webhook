@@ -197,15 +197,16 @@ export const createDocWithFineTuned = async(req, res) => {
             let textResponse = 'Not valid request';
             let fileURL = '';
             let docName = '';
-
+            let generalData = sessionInfo.parameters.generalData ?
+                    cleanJson(sessionInfo.parameters.generalData) :
+                    "";
+            console.log(userInputData);
             switch (tag) {
                 case "ATM":
                     let transactionArray = sessionInfo.parameters.transactionArray ?
                         cleanJson(sessionInfo.parameters.transactionArray) :
                         "";
-                    let generalData = sessionInfo.parameters.generalData ?
-                    cleanJson(sessionInfo.parameters.generalData) :
-                    "";
+                    
                     generalData.area_of_user = urbanPincodes.includes(Number(generalData.area_of_user.slice(0, 3))) ? "urban" : "rural";
                     userInputData = {...generalData, transactionArray: [...transactionArray] };
                     
@@ -309,7 +310,10 @@ export const createDocWithFineTuned = async(req, res) => {
                     }
                     break;
                 case "FAILED_TXN":
+                    generalData.area_of_user = urbanPincodes.includes(Number(generalData.area_of_user.slice(0, 3))) ? "urban" : "rural";
+                    console.log(generalData.area_of_user);
                     switch (option) {
+
                         case "Bank":
                             letterType = "Failed_txn_Bank";
 
