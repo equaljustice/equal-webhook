@@ -14,19 +14,23 @@
 
 import express from 'express';
 import {pinoHttp, logger} from './utils/logging.js';
-
+import APIrouter from './routes.js';
 const app = express();
-
+app.use(express.json())
 // Use request-based logger for log correlation
+app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, GET, PUT");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    next();
+  })
 app.use(pinoHttp);
-
+app.use("/", APIrouter);
+//app.use('/', APIrouter(req,res));
 // Example endpoint
-app.get('/', async (req, res) => {
-  // Use basic logger without HTTP request info
-  logger.info({logField: 'custom-entry', arbitraryField: 'custom-entry'}); // Example of structured logging
-  // Use request-based logger with log correlation
-  req.log.info('Child logger with trace Id.'); // https://cloud.google.com/run/docs/logging#correlate-logs
-  res.send('Hello World!');
-});
 
+
+//app.get('/ATMFraudQuestions', async (req, res) => {
+
+//})
 export default app;

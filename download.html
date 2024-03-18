@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Banke letter</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            padding: 50px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        a {
+            text-decoration: none;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .loader {
+            border: 8px solid #f3f3f3;
+            /* Light grey */
+            border-top: 8px solid #3498db;
+            /* Blue */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Welcome to equaljustice.ai! Kindly download your file and go back to the previous tab.</h1>
+    <div id="loader" style="display: none;">
+        <div class="loader"></div>
+    </div>
+    <!-- <div>
+    <div id="downloadUserInput" style="display: none;">
+        <p><a id="downloadUserInputLink" href="#" download>
+                <button id="downloadButton">Input content</button>
+            </a></p>
+    </div>
+    
+    <div id="downloadGPT3_5FineTuned" style="display: none;">
+       
+        <p><a id="downloadGPT3_5FineTunedLink" href="#" download>
+                <button id="downloadButton">Bank letter- 3.5 Fine Tuned</button>
+            </a></p>
+    </div>
+    <div id="downloadGPT3_5" style="display: none;">
+        
+        <p><a id="downloadGPT3_5Link" href="#" download>
+                <button id="downloadButton">Bank letter- GPT3.5</button>
+            </a></p>
+    </div>
+    <div id="downloadGPT4" style="display: none;">
+      
+        <p><a id="downloadGPT4Link" href="#" download>
+                <button id="downloadButton">Bank letter- GPT4</button>
+            </a></p>
+    </div>
+</div> -->
+    <script>
+        var ModelsList = ['GPT3_5FineTuned', 'GPT3_5', 'GPT4', 'UserInput'];
+        var LetterTypes = ['ATMFraudBank', 'ATMOmbudsman'];
+
+        for (var i = 0; i < ModelsList.length; i++) {
+            var model = ModelsList[i];
+
+            for (var j = 0; j < LetterTypes.length; j++) {
+                var letter = LetterTypes[j];
+                var div = document.createElement('div');
+                div.id = 'download' + model + letter;
+                div.style = 'display:none';
+
+                var p = document.createElement('p');
+                var a = document.createElement('a');
+                a.id = 'download' + model + letter + 'Link';
+                a.href = '#';
+                a.download = '';
+
+                var button = document.createElement('button');
+                button.id = 'downloadButton' + model + letter;
+                button.textContent = model + ' ' + letter;
+
+                a.appendChild(button);
+                p.appendChild(a);
+                div.appendChild(p);
+
+                document.body.appendChild(div);
+            }
+        }
+
+        // Function to check if the file is available at the specified URL
+        async function checkFileAvailability(folder, fileName, buttonId) {
+            const fileURL = `https://storage.googleapis.com/ejustice-public-bucket/${folder}/${fileName}.docx`;
+
+            try {
+                // Make a fetch request to the file URL
+                const response = await fetch(fileURL);
+
+                if (response.ok) {
+                    // File is available, display download button
+                    displayDownloadButton(folder, fileName, buttonId);
+                    return true;
+                    // break;  // exit the loop when the file is available
+                } else {
+                    // File is not available yet
+                    console.log('File is not available yet. Retrying...');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error checking file availability:', error);
+                return false;
+            }
+
+            // Adjust the delay (in milliseconds) based on your requirements
+            // new Promise(resolve => setTimeout(resolve, 10000));  // 10 seconds delay
+        }
+
+        // Function to display loader and check file availability after 10 seconds
+        async function displayLoaderAndCheckAvailability() {
+            // Display loader
+            document.getElementById('loader').style.display = 'block';
+            const pathSegments = window.location.pathname.split('/');
+            const folder = pathSegments[pathSegments.length - 1];
+            var loop =0;
+    
+            do{ 
+                for (var i = 0; i < ModelsList.length; i++) {
+                    var model = ModelsList[i];
+                    for (var j = 0; j < LetterTypes.length; j++) {
+                        var letter = LetterTypes[j];
+                        checkFileAvailability(folder, folder + model + letter, "download" + model + letter);
+                    }
+                }
+                await new Promise(resolve => setTimeout(resolve, 10000));  // 10 seconds delay
+                loop++;
+            }while(loop<3); 
+            
+        }
+
+
+        // Function to display download button
+        function displayDownloadButton(folder, fileName, buttonId) {
+            // Hide loader
+            document.getElementById('loader').style.display = 'none';
+
+            // Display download button
+            document.getElementById(buttonId).style.display = 'block';
+
+            // Update the href attribute with the actual file URL
+            document.getElementById(buttonId + 'Link').href = `/download/${folder}/${fileName}`;
+        }
+
+        // Initial call to start the process
+        displayLoaderAndCheckAvailability();
+    </script>
+</body>
+
+</body>
+
+</html>
