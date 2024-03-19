@@ -360,7 +360,7 @@ async function getLegalTrainingMaterials(userInputData,promttype) {
 
 async function getLegalTrainingMaterialsFailed_txn(userInputData,promttype) {
     const result = [];
-    console.log("3");
+    
     const processValue = async(key, value) => {
         if (typeof value === 'object') {
          
@@ -371,9 +371,14 @@ async function getLegalTrainingMaterialsFailed_txn(userInputData,promttype) {
             }
         } else {
             // If the value is not an object, find matching questions
-            console.log("here");
+            console.log(key);
+            console.log(value);
             const matchingQuestions = RBI_laws_failed_txn.filter(item => item.Parameters.toLowerCase() === key.toLowerCase() && item.Condition.toLowerCase() === value.toLowerCase());
-            console.log("here2");
+            //console.log(Parameters.toLowerCase());
+            //console.log(key.toLowerCase());
+            //console.log(Condition.toLowerCase());
+            //console.log(value.toLowerCase());
+
             matchingQuestions.forEach(matchingQuestion => {
                 result.push(matchingQuestion.LegalTrainingMaterial + `\n\n`);
             });
