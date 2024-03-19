@@ -2,7 +2,7 @@ import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import fs from 'fs';
 import path from 'path';
-import {Storage} from '@google-cloud/storage';
+import { Storage } from '@google-cloud/storage';
 import * as constants from '../constants.js';
 
 export function processDocx(information, folder, fileName) {
@@ -29,7 +29,7 @@ export function processDocx(information, folder, fileName) {
             info: information
         });
     }
-   
+
     const buf = doc.getZip().generate({
         type: "nodebuffer",
         compression: "DEFLATE",
@@ -38,40 +38,39 @@ export function processDocx(information, folder, fileName) {
     // buf is a nodejs Buffer, you can either write it to a
     // file or res.send it with express for example.
     fs.writeFileSync(`${fileName}.docx`, buf);
-    return uploadToCloudBucket(folder,`${fileName}.docx`);
+    return uploadToCloudBucket(folder, `${fileName}.docx`);
 }
 
-function uploadToCloudBucket(folder, destinationFile){
+function uploadToCloudBucket(folder, destinationFile) {
 
-// Initialize storage
-const storage = new Storage();
+    // Initialize storage
+    const storage = new Storage();
 
-const bucketName = constants.PUBLIC_BUCKET_DEV;
-const bucket = storage.bucket(bucketName)
+    const bucketName = constants.PUBLIC_BUCKET_DEV;
+    const bucket = storage.bucket(bucketName)
 
-// Sending the upload request
-bucket.upload(
-    path.resolve(destinationFile),
-  {
-    destination: `${folder}/${destinationFile}`,
-  },
-  function (err, file) {
-    if (err) {
-      console.error(`Error uploading ${destinationFile}: ${err}`)
-    } else {
-        file.makePublic(async function (err) {
-        if (err) {
-          console.error(`Error making file public: ${err}`)
-          return err.message;
-        } else {
-          const publicUrl = file.publicUrl()
-          console.log(`Public URL for ${file.name}: ${publicUrl}`)
-          return publicUrl;
+    // Sending the upload request
+    bucket.upload(
+        path.resolve(destinationFile), {
+            destination: `${folder}/${destinationFile}`,
+        },
+        function(err, file) {
+            if (err) {
+                console.error(`Error uploading ${destinationFile}: ${err}`)
+            } else {
+                file.makePublic(async function(err) {
+                    if (err) {
+                        console.error(`Error making file public: ${err}`)
+                        return err.message;
+                    } else {
+                        const publicUrl = file.publicUrl()
+                        console.log(`Public URL for ${file.name}: ${publicUrl}`)
+                        return publicUrl;
+                    }
+                })
+
+            }
         }
-       })
-
-    }
-  }
-)
-
+    )
+    console.log("8");
 }

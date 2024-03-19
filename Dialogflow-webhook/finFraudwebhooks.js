@@ -6,7 +6,10 @@ import {
     createBankLetterwithFineTuned,
     createUserInputParagraph,
     createOmbudsmanLetterwithFineTuned,
-    createConsumerCourtLetterwithFineTuned
+    createConsumerCourtLetterwithFineTuned,
+    createBankLetterwithFineTunedFailedtxnbank,
+    createOmbudsmanLetterwithFineTunedFailedtxnOmbudsman,
+    createLetterWithGPT3_5_Failed_txn
 } from "../chatGPT/completion.js";
 import urbanPincodes from '../JSONs/urbanPincodes.json' assert { type: "json" };
 import * as constants from '../constants.js';
@@ -33,7 +36,6 @@ var assistant_id_atm_bank = "asst_JXg4cxpxQo0ZukFcQuNs2229";
 var assistant_id_atm_RTI = "aasst_cYcV9lF2cCydoSFrv14Iozl7";
 var assistant_id_atm_consumer_court = "asst_AC6SXOaB2PgjyaTMF8YlarTh";
 var query = "";
-export var tag = "";
 export const openQnA = async(req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     try {
@@ -193,7 +195,7 @@ export const createDocWithFineTuned = async(req, res) => {
                 sessionInfo.parameters.threadId :
                 await createAssistantThread();
             let userInputData = sessionInfo.parameters;
-            tag = req.body.fulfillmentInfo.tag;
+            const tag = req.body.fulfillmentInfo.tag;
             let textResponse = 'Not valid request';
             let fileURL = '';
             let docName = '';
@@ -201,6 +203,7 @@ export const createDocWithFineTuned = async(req, res) => {
                     cleanJson(sessionInfo.parameters.generalData) :
                     "";
             console.log(userInputData);
+            console.log(tag);
             switch (tag) {
                 case "ATM":
                     let transactionArray = sessionInfo.parameters.transactionArray ?
@@ -315,10 +318,11 @@ export const createDocWithFineTuned = async(req, res) => {
                     switch (option) {
 
                         case "Bank":
+                            
                             letterType = "Failed_txn_Bank";
 
                             //console.log("user Input json", userInputData);
-                            createBankLetterwithFineTuned(letterType, userInputData, threadId);
+                            createBankLetterwithFineTunedFailedtxnbank(letterType, userInputData, threadId);
                             //createLetterWithGPT3_5(letterType, userInputData, threadId);
                             textResponse = 'Creating Bank Letter, Please wait';
                             docName = 'Bank letter';
@@ -328,7 +332,7 @@ export const createDocWithFineTuned = async(req, res) => {
                         case "Banking Ombudsman":
                             letterType = "Failed_txn_Ombudsman";
 
-                            createOmbudsmanLetterwithFineTuned(letterType, userInputData, threadId);
+                            createOmbudsmanLetterwithFineTunedFailedtxnOmbudsman(letterType, userInputData, threadId);
                             textResponse = 'Creating Banking Ombudsman letter, Please wait'
                             docName = 'Banking Ombudsman letter';
                             fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
@@ -336,7 +340,7 @@ export const createDocWithFineTuned = async(req, res) => {
                             break;
                         case "Police Complaint":
                             letterType = "PoliceComplaint";
-                            createLetterWithGPT3_5(letterType, userInputData, threadId);
+                            createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId);
                             textResponse = 'Creating Police Complaint, Please wait'
                             docName = 'Police Complaint letter';
                             fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5 + letterType + '.docx';
@@ -365,7 +369,7 @@ export const createDocWithFineTuned = async(req, res) => {
                                     "Union Bank of India"
                                 ].includes(sessionInfo.parameters.name_of_bank)) {
                                 letterType = 'RTI'
-                                createLetterWithGPT3_5(letterType, userInputData, threadId)
+                                createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId)
                                 textResponse = 'Creating RTI Application, Please wait'
                                 docName = 'RTI letter';
                                 fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5 + letterType + '.docx';
