@@ -202,8 +202,8 @@ export const createDocWithFineTuned = async(req, res) => {
             let generalData = sessionInfo.parameters.generalData ?
                     cleanJson(sessionInfo.parameters.generalData) :
                     "";
-            console.log(userInputData);
-            console.log(tag);
+            
+            
             switch (tag) {
                 case "ATM":
                     let transactionArray = sessionInfo.parameters.transactionArray ?
@@ -314,7 +314,9 @@ export const createDocWithFineTuned = async(req, res) => {
                     break;
                 case "FAILED_TXN":
                     generalData.area_of_user = urbanPincodes.includes(Number(generalData.area_of_user.slice(0, 3))) ? "urban" : "rural";
+                    userInputData.area_of_user = generalData.area_of_user;
                     console.log(generalData.area_of_user);
+                    console.log(userInputData);
                     switch (option) {
 
                         case "Bank":

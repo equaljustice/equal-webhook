@@ -26,11 +26,11 @@ export async function createMessageContent(prompttype, userInputData, threadId) 
     return message;
 }
 export async function createMessageContentFailed_txn(prompttype, userInputData, threadId) {
-  console.log("2");
+  
   const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterialsFailed_txn(userInputData);
-  console.log("4");
+ 
   const userInputPara = await createUserInputParagraph(userInputData, threadId);
-  console.log("6");
+ 
   const message = [{
           "role": "system",
           "content": `${prompts[prompttype]}`
@@ -43,7 +43,7 @@ export async function createMessageContentFailed_txn(prompttype, userInputData, 
     ${legalTraining}`
       }
   ]
-  console.log("7");
+  //console.log("7");
   processDocx(message[0].content + '\n' + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
   return message;
 }
@@ -59,7 +59,7 @@ export async function createBankLetterwithFineTuned(prompttype, userInputData, t
 }
 }
 export async function createBankLetterwithFineTunedFailedtxnbank(prompttype, userInputData, threadId) {
-    try { console.log("1");
+    try { 
         const message = await createMessageContentFailed_txn(prompttype, userInputData, threadId);
         const  FineTunedModelResponse = await openAiCompletionWithFineTunedATMBank(message);
         processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
@@ -136,7 +136,7 @@ export async function createLetterWithGPT3_5_Failed_txn(prompttype, userInputDat
 
 export async function createUserInputParagraph(userInputData, threadId) {
     try {
-      console.log("5");
+     
         let updatedUserData = await removeKeys(userInputData);
         let userInputMessage = [{
                 "role": "system",
@@ -211,7 +211,7 @@ export async function createLetterWithGPT4(prompttype, userInputData, threadId) 
 
 async function openAiCompletionWithFineTunedATMBank(message, temperature = 0.5, top_p = 0.9, frequency_penalty = 0.2, presence_penalty = 0) {
     const openai = new OpenAI(process.env.OPENAI_API_KEY);
-    console.log("here");
+    
     //console.log("input to openAI", message);
     const completionResponse = await openai.chat.completions.create({
         model: "ft:gpt-3.5-turbo-1106:ashish-chandra:bankatmletter:90dP3i8f",
@@ -343,7 +343,7 @@ async function getLegalTrainingMaterials(userInputData,promttype) {
             }
         } else {
             // If the value is not an object, find matching questions
-            console.log("here");
+           
             const matchingQuestions = LegalTrainingATM.filter(item => item.Parameter.toLowerCase() === key.toLowerCase() && item.Condition.toLowerCase() === value.toLowerCase());
             matchingQuestions.forEach(matchingQuestion => {
                 result.push(matchingQuestion.LegalTrainingMaterial + `\n\n`);
@@ -371,8 +371,7 @@ async function getLegalTrainingMaterialsFailed_txn(userInputData,promttype) {
             }
         } else {
             // If the value is not an object, find matching questions
-            console.log(key);
-            console.log(value);
+            
             const matchingQuestions = RBI_laws_failed_txn.filter(item => item.Parameters.toLowerCase() === key.toLowerCase() && item.Condition.toLowerCase() === value.toLowerCase());
             //console.log(Parameters.toLowerCase());
             //console.log(key.toLowerCase());
