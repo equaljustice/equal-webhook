@@ -5,9 +5,9 @@ import LegalTrainingATM from '../JSONs/LegalTrainingATM.json' assert { type: "js
 import RBI_laws_failed_txn from '../JSONs/RBI_laws_failed_txn.json' assert { type: "json" };
 import { processDocx } from '../CloudStorage/processDocs.js';
 export async function createMessageContent(prompttype, userInputData, threadId) {
-  
+
     const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
-    
+
     const userInputPara = await createUserInputParagraph(userInputData, threadId);
     const message = [{
             "role": "system",
@@ -21,57 +21,57 @@ export async function createMessageContent(prompttype, userInputData, threadId) 
       ${legalTraining}`
         }
     ]
-   
+
     processDocx(message[0].content + '\n' + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
     return message;
 }
 export async function createMessageContentFailed_txn(prompttype, userInputData, threadId) {
-  
-  const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterialsFailed_txn(userInputData);
- 
-  const userInputPara = await createUserInputParagraph(userInputData, threadId);
- 
-  const message = [{
-          "role": "system",
-          "content": `${prompts[prompttype]}`
-      },
-      {
-          "role": "user",
-          "content": `User's inputs and response is given below:
+
+    const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterialsFailed_txn(userInputData);
+
+    const userInputPara = await createUserInputParagraph(userInputData, threadId);
+
+    const message = [{
+                "role": "system",
+                "content": `${prompts[prompttype]}`
+            },
+            {
+                "role": "user",
+                "content": `User's inputs and response is given below:
     ${userInputPara}
     
     ${legalTraining}`
-      }
-  ]
-  //console.log("7");
-  processDocx(message[0].content + '\n' + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
-  return message;
+            }
+        ]
+        //console.log("7");
+    processDocx(message[0].content + '\n' + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
+    return message;
 }
 export async function createBankLetterwithFineTuned(prompttype, userInputData, threadId) {
     try {
         const message = await createMessageContent(prompttype, userInputData, threadId);
-        const  FineTunedModelResponse = await openAiCompletionWithFineTunedATMBank(message);
+        const FineTunedModelResponse = await openAiCompletionWithFineTunedATMBank(message);
         processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
         // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
         return;
     } catch (error) {
-            error;
-}
+        error;
+    }
 }
 export async function createBankLetterwithFineTunedFailedtxnbank(prompttype, userInputData, threadId) {
-    try { 
+    try {
         const message = await createMessageContentFailed_txn(prompttype, userInputData, threadId);
-        const  FineTunedModelResponse = await openAiCompletionWithFineTunedATMBank(message);
+        const FineTunedModelResponse = await openAiCompletionWithFineTunedATMBank(message);
         processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
         // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
         return;
     } catch (error) {
-            error;
-}
+        error;
+    }
 }
 export async function createOmbudsmanLetterwithFineTunedFailedtxnOmbudsman(prompttype, userInputData, threadId) {
     try {
-       
+
         const message = await createMessageContentFailed_txn(prompttype, userInputData, threadId);
         const FineTunedModelResponse = await openAiCompletionWithFineTunedFailedtxnBankOmbudsman(message);
         processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
@@ -136,7 +136,7 @@ export async function createLetterWithGPT3_5_Failed_txn(prompttype, userInputDat
 
 export async function createUserInputParagraph(userInputData, threadId) {
     try {
-     
+
         let updatedUserData = await removeKeys(userInputData);
         let userInputMessage = [{
                 "role": "system",
@@ -211,7 +211,7 @@ export async function createLetterWithGPT4(prompttype, userInputData, threadId) 
 
 async function openAiCompletionWithFineTunedATMBank(message, temperature = 0.5, top_p = 0.9, frequency_penalty = 0.2, presence_penalty = 0) {
     const openai = new OpenAI(process.env.OPENAI_API_KEY);
-    
+
     //console.log("input to openAI", message);
     const completionResponse = await openai.chat.completions.create({
         model: "ft:gpt-3.5-turbo-1106:ashish-chandra:bankatmletter:90dP3i8f",
@@ -303,7 +303,7 @@ async function openAiCompletionWithFineTunedFailedtxnBank(message, temperature =
     const openai = new OpenAI(process.env.OPENAI_API_KEY);
     //console.log("input to openAI", message);
     const completionResponse = await openai.chat.completions.create({
-        model: "ft:gpt-3.5-turbo-1106:ashish-chandra:bankatmletter:90dP3i8f",
+        model: "gpt-3.5-turbo-16k",
         messages: message,
         temperature: temperature,
         max_tokens: 1500,
@@ -319,7 +319,7 @@ async function openAiCompletionWithFineTuneFailedBankOmbudsmanCommon(message, te
     const openai = new OpenAI(process.env.OPENAI_API_KEY);
     //console.log("input to openAI", message);
     const completionResponse = await openai.chat.completions.create({
-        model: "ft:gpt-3.5-turbo-1106:ashish-chandra:bnkltrandobdsuman:90dcJiEd",
+        model: "gpt-3.5-turbo-16k",
         messages: message,
         temperature: temperature,
         max_tokens: 1500,
@@ -330,12 +330,12 @@ async function openAiCompletionWithFineTuneFailedBankOmbudsmanCommon(message, te
     });
     return completionResponse;
 }
-async function getLegalTrainingMaterials(userInputData,promttype) {
+async function getLegalTrainingMaterials(userInputData, promttype) {
     const result = [];
-    
+
     const processValue = async(key, value) => {
         if (typeof value === 'object') {
-         
+
             // If the value is an object (either JSON object or array), process recursively
             for (const key in value) {
                 const nestedResult = await getLegalTrainingMaterials(value[key]);
@@ -343,7 +343,7 @@ async function getLegalTrainingMaterials(userInputData,promttype) {
             }
         } else {
             // If the value is not an object, find matching questions
-           
+
             const matchingQuestions = LegalTrainingATM.filter(item => item.Parameter.toLowerCase() === key.toLowerCase() && item.Condition.toLowerCase() === value.toLowerCase());
             matchingQuestions.forEach(matchingQuestion => {
                 result.push(matchingQuestion.LegalTrainingMaterial + `\n\n`);
@@ -358,12 +358,12 @@ async function getLegalTrainingMaterials(userInputData,promttype) {
     return result;
 }
 
-async function getLegalTrainingMaterialsFailed_txn(userInputData,promttype) {
+async function getLegalTrainingMaterialsFailed_txn(userInputData, promttype) {
     const result = [];
-    
+
     const processValue = async(key, value) => {
         if (typeof value === 'object') {
-         
+
             // If the value is an object (either JSON object or array), process recursively
             for (const key in value) {
                 const nestedResult = await getLegalTrainingMaterialsFailed_txn(value[key]);
@@ -371,7 +371,7 @@ async function getLegalTrainingMaterialsFailed_txn(userInputData,promttype) {
             }
         } else {
             // If the value is not an object, find matching questions
-            
+
             const matchingQuestions = RBI_laws_failed_txn.filter(item => item.Parameters.toLowerCase() === key.toLowerCase() && item.Condition.toLowerCase() === value.toLowerCase());
             //console.log(Parameters.toLowerCase());
             //console.log(key.toLowerCase());

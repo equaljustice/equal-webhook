@@ -36,7 +36,7 @@ var assistant_id_atm_bank = "asst_JXg4cxpxQo0ZukFcQuNs2229";
 var assistant_id_atm_RTI = "aasst_cYcV9lF2cCydoSFrv14Iozl7";
 var assistant_id_atm_consumer_court = "asst_AC6SXOaB2PgjyaTMF8YlarTh";
 var query = "";
-export const openQnA = async (req, res) => {
+export const openQnA = async(req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     try {
         let sessionInfo = req.body.sessionInfo;
@@ -82,7 +82,7 @@ export const openQnA = async (req, res) => {
     }
 };
 
-export const createDocWithAssistant = async (req, res) => {
+export const createDocWithAssistant = async(req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     let sessionInfo = req.body.sessionInfo;
     option = sessionInfo.parameters.option_for_compliant;
@@ -181,7 +181,7 @@ export const createDocWithAssistant = async (req, res) => {
         console.log(err);
     }
 };
-export const createDocWithFineTuned = async (req, res) => {
+export const createDocWithFineTuned = async(req, res) => {
     try {
         //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
         let sessionInfo = req.body.sessionInfo;
@@ -211,7 +211,7 @@ export const createDocWithFineTuned = async (req, res) => {
                     "";
 
                 generalData.area_of_user = urbanPincodes.includes(Number(generalData.area_of_user.slice(0, 3))) ? "urban" : "rural";
-                userInputData = { ...generalData, transactionArray: [...transactionArray] };
+                userInputData = {...generalData, transactionArray: [...transactionArray] };
 
                 switch (option) {
                     case "Bank":
@@ -253,18 +253,18 @@ export const createDocWithFineTuned = async (req, res) => {
                         break;
                     case "RTI Application":
                         if (["Bank of Baroda",
-                            "Bank of India",
-                            "Bank of Maharashtra",
-                            "Canara Bank",
-                            "Central Bank of India",
-                            "Indian Bank",
-                            "Indian Overseas Bank",
-                            "Punjab and Sind Bank",
-                            "Punjab National Bank",
-                            "State Bank of India",
-                            "UCO Bank",
-                            "Union Bank of India"
-                        ].includes(generalData.bank_name)) {
+                                "Bank of India",
+                                "Bank of Maharashtra",
+                                "Canara Bank",
+                                "Central Bank of India",
+                                "Indian Bank",
+                                "Indian Overseas Bank",
+                                "Punjab and Sind Bank",
+                                "Punjab National Bank",
+                                "State Bank of India",
+                                "UCO Bank",
+                                "Union Bank of India"
+                            ].includes(generalData.bank_name)) {
                             letterType = 'RTI'
                             createLetterWithGPT3_5(letterType, userInputData, threadId)
                             textResponse = 'Creating RTI Application, Please wait'
@@ -322,23 +322,23 @@ export const createDocWithFineTuned = async (req, res) => {
                     case "Bank":
 
                         letterType = "Failed_txn_Bank";
-                        createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId);
+                        //createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId);
                         //console.log("user Input json", userInputData);
-                        //createBankLetterwithFineTunedFailedtxnbank(letterType, userInputData, threadId);
+                        createBankLetterwithFineTunedFailedtxnbank(letterType, userInputData, threadId);
                         //createLetterWithGPT3_5(letterType, userInputData, threadId);
                         textResponse = 'Creating Bank Letter, Please wait';
                         docName = 'Bank letter';
-                        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
-
+                        //fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
+                        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5 + letterType + '.docx';
                         break;
                     case "Banking Ombudsman":
                         letterType = "Failed_txn_Ombudsman";
-                        createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId);
-                        //createOmbudsmanLetterwithFineTunedFailedtxnOmbudsman(letterType, userInputData, threadId);
+                        //createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId);
+                        createOmbudsmanLetterwithFineTunedFailedtxnOmbudsman(letterType, userInputData, threadId);
                         textResponse = 'Creating Banking Ombudsman letter, Please wait'
                         docName = 'Banking Ombudsman letter';
-                        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
-
+                        //fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
+                        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5+ letterType + '.docx';
                         break;
                     case "Police Complaint":
                         letterType = "PoliceComplaint";
@@ -358,18 +358,18 @@ export const createDocWithFineTuned = async (req, res) => {
                         break;
                     case "RTI Application":
                         if (["Bank of Baroda",
-                            "Bank of India",
-                            "Bank of Maharashtra",
-                            "Canara Bank",
-                            "Central Bank of India",
-                            "Indian Bank",
-                            "Indian Overseas Bank",
-                            "Punjab and Sind Bank",
-                            "Punjab National Bank",
-                            "State Bank of India",
-                            "UCO Bank",
-                            "Union Bank of India"
-                        ].includes(sessionInfo.parameters.name_of_bank)) {
+                                "Bank of India",
+                                "Bank of Maharashtra",
+                                "Canara Bank",
+                                "Central Bank of India",
+                                "Indian Bank",
+                                "Indian Overseas Bank",
+                                "Punjab and Sind Bank",
+                                "Punjab National Bank",
+                                "State Bank of India",
+                                "UCO Bank",
+                                "Union Bank of India"
+                            ].includes(sessionInfo.parameters.name_of_bank)) {
                             letterType = 'RTI'
                             createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId)
                             textResponse = 'Creating RTI Application, Please wait'
@@ -433,8 +433,7 @@ export const createDocWithFineTuned = async (req, res) => {
             }
         };
         res.json(responseJson);
-    }
-    catch (error) {
+    } catch (error) {
         console.log("error in catch", error);
         res.json({
             fulfillment_response: {
