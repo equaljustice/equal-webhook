@@ -322,9 +322,9 @@ export const createDocWithFineTuned = async(req, res) => {
                         case "Bank":
                             
                             letterType = "Failed_txn_Bank";
-
+                            createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId);
                             //console.log("user Input json", userInputData);
-                            createBankLetterwithFineTunedFailedtxnbank(letterType, userInputData, threadId);
+                            //createBankLetterwithFineTunedFailedtxnbank(letterType, userInputData, threadId);
                             //createLetterWithGPT3_5(letterType, userInputData, threadId);
                             textResponse = 'Creating Bank Letter, Please wait';
                             docName = 'Bank letter';
@@ -333,8 +333,8 @@ export const createDocWithFineTuned = async(req, res) => {
                             break;
                         case "Banking Ombudsman":
                             letterType = "Failed_txn_Ombudsman";
-
-                            createOmbudsmanLetterwithFineTunedFailedtxnOmbudsman(letterType, userInputData, threadId);
+                            createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId);
+                            //createOmbudsmanLetterwithFineTunedFailedtxnOmbudsman(letterType, userInputData, threadId);
                             textResponse = 'Creating Banking Ombudsman letter, Please wait'
                             docName = 'Banking Ombudsman letter';
                             fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
