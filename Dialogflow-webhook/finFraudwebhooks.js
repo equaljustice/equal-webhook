@@ -396,6 +396,8 @@ export const createDocWithFineTuned = async(req, res) => {
                                 return;
                             }
                             break;
+                        }
+                        break;
                         case "ATMGPT4BANK":
                             letterType = "ATMFraudBank";
                             createLetterWithGPT4(letterType, userInputData, threadId);
@@ -406,12 +408,12 @@ export const createDocWithFineTuned = async(req, res) => {
                             createLetterWithGPT4(letterType, userInputData, threadId);
                             textResponse = 'Creating Document'
                             break;
-                        case "ATMGPT4BANK":
+                        case "FAILEDTXNBANK":
                             letterType = "Failed_txn_Bank";
                             createLetterWithGPT4(letterType, userInputData, threadId);
                             textResponse = 'Creating Document'
                             break;
-                        case "ATMGPT4BANKOmbudsman":
+                        case "FAILEDTXNBANKINGOMBUDSMAN":
                             letterType = "Failed_txn_Ombudsman";
                             createLetterWithGPT4(letterType, userInputData, threadId);
                             textResponse = 'Creating Document'
