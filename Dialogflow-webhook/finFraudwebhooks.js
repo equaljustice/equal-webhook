@@ -194,23 +194,20 @@ export const createDocWithFineTuned = async(req, res) => {
         var threadId = sessionInfo.parameters.threadId != null ?
             sessionInfo.parameters.threadId :
             await createAssistantThread();
-        let userInputData = sessionInfo.parameters;
+        let userInputData;
         const tag = req.body.fulfillmentInfo.tag;
         let textResponse = 'Not valid request';
         let fileURL = '';
         let docName = '';
         let generalData = sessionInfo.parameters.generalData ?
-            cleanJson(sessionInfo.parameters.generalData) :
+            await cleanJson(JSON.parse(sessionInfo.parameters.generalData)) :
             "";
-
-
+            generalData.area_of_user = await pincodeToArea(generalData.area_of_user);
         switch (tag) {
             case "ATM":
                 let transactionArray = sessionInfo.parameters.transactionArray ?
                     cleanJson(sessionInfo.parameters.transactionArray) :
                     "";
-
-                generalData.area_of_user = urbanPincodes.includes(Number(generalData.area_of_user.slice(0, 3))) ? "urban" : "rural";
                 userInputData = {...generalData, transactionArray: [...transactionArray] };
 
                 switch (option) {
@@ -313,10 +310,7 @@ export const createDocWithFineTuned = async(req, res) => {
                 }
                 break;
             case "FAILED_TXN":
-                generalData.area_of_user = urbanPincodes.includes(Number(generalData.area_of_user.slice(0, 3))) ? "urban" : "rural";
-                userInputData.area_of_user = generalData.area_of_user;
-                console.log(generalData.area_of_user);
-                console.log(userInputData);
+                userInputData = generalData;
                 switch (option) {
 
                     case "Bank":
@@ -329,7 +323,7 @@ export const createDocWithFineTuned = async(req, res) => {
                         textResponse = 'Creating Bank Letter, Please wait';
                         docName = 'Bank letter';
                         //fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
-                        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5 + letterType + '.docx';
+                        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
                         break;
                     case "Banking Ombudsman":
                         letterType = "Failed_txn_Ombudsman";
@@ -338,7 +332,7 @@ export const createDocWithFineTuned = async(req, res) => {
                         textResponse = 'Creating Banking Ombudsman letter, Please wait'
                         docName = 'Banking Ombudsman letter';
                         //fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
-                        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5+ letterType + '.docx';
+                        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED+ letterType + '.docx';
                         break;
                     case "Police Complaint":
                         letterType = "PoliceComplaint";
@@ -379,7 +373,7 @@ export const createDocWithFineTuned = async(req, res) => {
 
                         } else {
                             textResponse = 'RTI Application is applicable only for Public Sector Banks';
-                            let targetPage = "projects/atmprebuiltagent/locations/us-central1/agents/7f79f692-4e94-4d04-9bf1-203e68b815dc/flows/10d45ea1-8174-4894-96ed-0bbfb9b802ae/pages/da7dcf0d-869e-4472-b252-ccdaaef83101";
+                            let targetPage = "projects/atmprebuiltagent/locations/us-central1/agents/7f79f692-4e94-4d04-9bf1-203e68b815dc/flows/10d45ea1-8174-4894-96ed-0bbfb9b802ae/pages/43328113-8eb4-4cd5-911a-40700ad78d5c";
                             res.json({
                                 fulfillment_response: {
                                     messages: [{
@@ -482,9 +476,18 @@ export function cleanJson(jsonData) {
                 }
             }
             if (obj[key] === 'NA' || String(obj[key]).includes('$')) {
+                console.log('deleted keys:',obj[key]);
                 delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
             }
         });
     })(cleanedJson);
     return cleanedJson;
+}
+function pincodeToArea(pincode){
+    try{
+    const area = urbanPincodes.includes(pincode.slice(0, 3)) ? "urban" : "rural";
+    return area;
+    }catch(err){
+        return pincode;
+    }
 }

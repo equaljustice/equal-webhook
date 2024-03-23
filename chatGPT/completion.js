@@ -44,7 +44,9 @@ export async function createMessageContentFailed_txn(prompttype, userInputData, 
             }
         ]
         //console.log("7");
-    processDocx(message[0].content + '\n' + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
+    processDocx(message[0].content + '\n Json generated from Dialogflow: '
+             + JSON.stringify(userInputData,2) + '\n\n' 
+             + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
     return message;
 }
 export async function createBankLetterwithFineTuned(prompttype, userInputData, threadId) {
@@ -197,14 +199,14 @@ async function removeKeys(jsonData) {
                 Object.keys(obj).forEach(key => {
                     if (obj[key] && typeof obj[key] === 'object') {
                         obj[key] = _clean(obj[key]); // Recurse if the value is an object
-                    } else if (['Senior_citizen', 'pension_savings_account', 'lost_atm',
+                    } else if (['senior_citizen', 'pension_savings_account', 'lost_atm',
                             'withdrawn_amount_exceed_daily_limit', 'prior_police_complaint',
                             'transaction_happen_after_informed_bank_of_previous_fraud'
                         ]
                         .includes(key) && String(obj[key]).toLowerCase() === 'no') {
                         delete obj[key];
                     } else if (['applied_for_atmcard', 'withdrawing_regularly_from_atm',
-                            'refund_compensesion_expected',
+                            'refund_compensesion_expected', 'domestic_transaction',
                             'transaction_sms_recieved', 'transaction_sms_recieved_within_one_hour',
                             'transaction_email_recieved', 'transaction_email_recieved_within_one_hour',
                             'transaction_from_ATM_in_home_city_or_work_city',
@@ -213,6 +215,9 @@ async function removeKeys(jsonData) {
                         .includes(key) && String(obj[key]).toLowerCase() === 'yes') {
                         delete obj[key]; // Delete the key if the value is 'yes' 
                     } else if (key === 'area_of_user' && String(obj[key]).toLowerCase() === 'urban') { delete obj[key]; }
+                    else if(['option_for_compliant'].includes(key)){
+                        delete obj[key];
+                    }
                 });
             }
         }
