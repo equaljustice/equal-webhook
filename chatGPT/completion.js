@@ -29,7 +29,7 @@ export async function createMessageContentFailed_txn(prompttype, userInputData, 
 
     const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterialsFailed_txn(userInputData);
 
-    const userInputPara = await createUserInputParagraph(userInputData, threadId);
+    const userInputPara = await createUserInputParagraphFailed_txn(userInputData, threadId);
 
     const message = [{
                 "role": "system",
@@ -144,7 +144,32 @@ export async function createUserInputParagraph(userInputData, threadId) {
             },
             {
                 "role": "user",
-                "content": `Here is the JSON data related to financeial fraud happend to me. All the transaction amounts are in rupees describe this in simple english language not more than 200 words,
+                "content": `Here is the JSON data related Financial Fraud happend to me. All the transaction amounts are in rupees describe this in simple english language not more than 200 words,
+        ${JSON.stringify(updatedUserData, null, 2)}`
+            }
+        ];
+        /* console.log(`JSON: ${JSON.stringify(userInputData, null, 2)}
+        JsonAfterRemovedKeys: ${JSON.stringify(updatedUserData, null, 2)})`); */
+        const GPT4Response = await openAiCompletionWithGPT4(userInputMessage, 1, 1);
+        /*  processDocx(`JSON: ${JSON.stringify(userInputData, null, 2)}
+           JsonAfterRemovedKeys: ${JSON.stringify(updatedUserData, null, 2)}
+           Paragraph: ${JSON.stringify(GPT4Response, null, 2)}`, threadId, threadId + constants.GPT4_RESPONSE_JSON + 'UserInputPara'); */
+        return GPT4Response.choices[0].message.content;
+    } catch (error) {
+        error
+    }
+}
+export async function createUserInputParagraphFailed_txn(userInputData, threadId) {
+    try {
+
+        let updatedUserData = await removeKeys(userInputData);
+        let userInputMessage = [{
+                "role": "system",
+                "content": "Your Job is to convert the given Json objects in a simple textual paragraph without sounding like a storyboard"
+            },
+            {
+                "role": "user",
+                "content": `Here is the JSON data related Failed Transaction(not fraud) happend to me. All the transaction amounts are in rupees describe this in simple english language not more than 200 words,
         ${JSON.stringify(updatedUserData, null, 2)}`
             }
         ];

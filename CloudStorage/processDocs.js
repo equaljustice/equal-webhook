@@ -72,5 +72,4 @@ function uploadToCloudBucket(folder, destinationFile) {
             }
         }
     )
-    console.log("8");
 }
