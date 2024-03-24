@@ -87,7 +87,7 @@
         "Questions": "Is this an: (a) Off-Us transaction? i.e. you and the beneficiary (i.e. recipient) hold accounts with different banks, or (b) On-Us transaction? i.e. you and the beneficiary (i.e. recipient) hold accounts with same bank.",
         "Parameters": "prepaid_payment_instruments",
         "Condition": "customer beneficiary hold different bank",
-        "LegalTrainingMaterial": "RBI has mandated the wallet provider to immediately reverse the failed transactions within a maximum turn around time of T+5 days, and pay Rs. 100\/- per day as compensation for the delay. The wallet has failed to comply with its obligations.\nThe wallet provider should also be asked to provide adequate proof of reconciliation and settlement records of the debit instructions with the actual credit along with the relevant electronic records. \nIn addition to the reversal and compensation for the delay, the wallet provider should also be asked to pay an additional compensation for the interest that I have lost on the amount debited but beneficiary account not credited plus compensation for the harassment, fees I incurred in seeking the grievance redressal and for the mental agony.\n"
+        "LegalTrainingMaterial": "RBI has mandated the wallet provider to immediately reverse the failed transactions within a maximum turn around time of T+5 days, and pay Rs. 100\/- per day as compensation for the delay. The wallet has failed to comply with its obligations.\nThe wallet provider should also be asked to provide adequate proof of reconciliation and settlement records of the debit instructions with the actual credit along with the relevant electronic records. \nIn addition to the reversal and compensation for the delay, the wallet provider should also be asked to pay an additional compensation for the interest that I have lost on the amount debited but beneficiary account not credited plus compensation for the harassment, fees I incurred in seeking the grievance redressal and for the mental agony.\n For drafting the document, wherever you see the reference to banks in these instructions replace the same with the reference to PPI Issuer. The document should also be addressed to the PPI Issuer and not to the bank."
     },
     {
         "qId": 15,
@@ -98,13 +98,6 @@
     },
     {
         "qId": 16,
-        "Questions": "PPI debited but transaction confirmation not received at merchant location?",
-        "Parameters": "prepaid_payment_instrument_debited_but_confirmation_not_received_at_merchant_location",
-        "Condition": "Yes",
-        "LegalTrainingMaterial": "RBI has mandated the wallet provider to immediately reverse the failed transactions within a maximum turn around time of T+1 days, and pay Rs. 100\/- per day as compensation for the delay. The wallet has failed to comply with its obligations.\nThe wallet provider should also be asked to provide adequate proof of reconciliation and settlement records of the debit instructions with the actual credit along with the relevant electronic records. \nIn addition to the reversal and compensation for the delay, the wallet provider should also be asked to pay an additional compensation for the interest that I have lost on the amount debited but beneficiary account not credited plus compensation for the harassment, fees I incurred in seeking the grievance redressal and for the mental agony."
-    },
-    {
-        "qId": 17,
         "Question": "Total amount of refund and compensation you wish to claim from the Bank? You may note that in addition to refund of the defrauded amount  the Banking Ombudsman can also provide compensation upto ₹1 lakh for mental agony/ harassment/costs/fees etc. suffered by the complainant  and consumer Courts may even provide higher compensation.",
         "Parameters": "refund_compensesion_expected",
         "Condition": "yes",

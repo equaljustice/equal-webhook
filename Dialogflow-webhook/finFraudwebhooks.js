@@ -36,7 +36,7 @@ var assistant_id_atm_bank = "asst_JXg4cxpxQo0ZukFcQuNs2229";
 var assistant_id_atm_RTI = "aasst_cYcV9lF2cCydoSFrv14Iozl7";
 var assistant_id_atm_consumer_court = "asst_AC6SXOaB2PgjyaTMF8YlarTh";
 var query = "";
-export const openQnA = async(req, res) => {
+export const openQnA = async (req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     try {
         let sessionInfo = req.body.sessionInfo;
@@ -82,7 +82,7 @@ export const openQnA = async(req, res) => {
     }
 };
 
-export const createDocWithAssistant = async(req, res) => {
+export const createDocWithAssistant = async (req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     let sessionInfo = req.body.sessionInfo;
     option = sessionInfo.parameters.option_for_compliant;
@@ -181,35 +181,33 @@ export const createDocWithAssistant = async(req, res) => {
         console.log(err);
     }
 };
-export const createDocWithFineTuned = async(req, res) => {
+export const createDocWithFineTuned = async (req, res) => {
     try {
         //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
         let sessionInfo = req.body.sessionInfo;
         let letterType = "";
         let targetPage;
         option = sessionInfo.parameters.option_for_compliant;
-
+        
         var police_investigation = sessionInfo.parameters.police_investigation;
-
+        let userInputData;
         var threadId = sessionInfo.parameters.threadId != null ?
             sessionInfo.parameters.threadId :
             await createAssistantThread();
-        let userInputData;
         const tag = req.body.fulfillmentInfo.tag;
         let textResponse = 'Not valid request';
         let fileURL = '';
         let docName = '';
-        let generalData = sessionInfo.parameters.generalData ?
-            await cleanJson(JSON.parse(sessionInfo.parameters.generalData)) :
-            "";
-            generalData.area_of_user = await pincodeToArea(generalData.area_of_user);
+
         switch (tag) {
             case "ATM":
-                let transactionArray = sessionInfo.parameters.transactionArray ?
-                    cleanJson(sessionInfo.parameters.transactionArray) :
-                    "";
-                userInputData = {...generalData, transactionArray: [...transactionArray] };
+                let generalData = sessionInfo.parameters.generalData ?
+                    await cleanJson(sessionInfo.parameters.generalData) : "";
 
+                let transactionArray = sessionInfo.parameters.transactionArray ?
+                    cleanJson(sessionInfo.parameters.transactionArray) : "";
+                userInputData = { ...generalData, transactionArray: [...transactionArray] };
+                userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.area_of_user);
                 switch (option) {
                     case "Bank":
                         letterType = "ATMFraudBank";
@@ -250,18 +248,18 @@ export const createDocWithFineTuned = async(req, res) => {
                         break;
                     case "RTI Application":
                         if (["Bank of Baroda",
-                                "Bank of India",
-                                "Bank of Maharashtra",
-                                "Canara Bank",
-                                "Central Bank of India",
-                                "Indian Bank",
-                                "Indian Overseas Bank",
-                                "Punjab and Sind Bank",
-                                "Punjab National Bank",
-                                "State Bank of India",
-                                "UCO Bank",
-                                "Union Bank of India"
-                            ].includes(generalData.bank_name)) {
+                            "Bank of India",
+                            "Bank of Maharashtra",
+                            "Canara Bank",
+                            "Central Bank of India",
+                            "Indian Bank",
+                            "Indian Overseas Bank",
+                            "Punjab and Sind Bank",
+                            "Punjab National Bank",
+                            "State Bank of India",
+                            "UCO Bank",
+                            "Union Bank of India"
+                        ].includes(generalData.bank_name)) {
                             letterType = 'RTI'
                             createLetterWithGPT3_5(letterType, userInputData, threadId)
                             textResponse = 'Creating RTI Application, Please wait'
@@ -310,7 +308,8 @@ export const createDocWithFineTuned = async(req, res) => {
                 }
                 break;
             case "FAILED_TXN":
-                userInputData = generalData;
+                userInputData = JSON.parse(sessionInfo.parameters.generalData);
+                userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.area_of_user);
                 switch (option) {
 
                     case "Bank":
@@ -332,7 +331,7 @@ export const createDocWithFineTuned = async(req, res) => {
                         textResponse = 'Creating Banking Ombudsman letter, Please wait'
                         docName = 'Banking Ombudsman letter';
                         //fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
-                        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED+ letterType + '.docx';
+                        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
                         break;
                     case "Police Complaint":
                         letterType = "PoliceComplaint";
@@ -352,18 +351,18 @@ export const createDocWithFineTuned = async(req, res) => {
                         break;
                     case "RTI Application":
                         if (["Bank of Baroda",
-                                "Bank of India",
-                                "Bank of Maharashtra",
-                                "Canara Bank",
-                                "Central Bank of India",
-                                "Indian Bank",
-                                "Indian Overseas Bank",
-                                "Punjab and Sind Bank",
-                                "Punjab National Bank",
-                                "State Bank of India",
-                                "UCO Bank",
-                                "Union Bank of India"
-                            ].includes(sessionInfo.parameters.name_of_bank)) {
+                            "Bank of India",
+                            "Bank of Maharashtra",
+                            "Canara Bank",
+                            "Central Bank of India",
+                            "Indian Bank",
+                            "Indian Overseas Bank",
+                            "Punjab and Sind Bank",
+                            "Punjab National Bank",
+                            "State Bank of India",
+                            "UCO Bank",
+                            "Union Bank of India"
+                        ].includes(sessionInfo.parameters.name_of_bank)) {
                             letterType = 'RTI'
                             createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId)
                             textResponse = 'Creating RTI Application, Please wait'
@@ -393,21 +392,39 @@ export const createDocWithFineTuned = async(req, res) => {
                 }
                 break;
             case "ATMGPT4BANK":
+                generalData = sessionInfo.parameters.generalData ?
+                    await cleanJson(sessionInfo.parameters.generalData) : "";
+
+                transactionArray = sessionInfo.parameters.transactionArray ?
+                    cleanJson(sessionInfo.parameters.transactionArray) : "";
+                userInputData = { ...generalData, transactionArray: [...transactionArray] };
+                userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.area_of_user);
                 letterType = "ATMFraudBank";
                 createLetterWithGPT4(letterType, userInputData, threadId);
                 textResponse = 'Creating Document'
                 break;
             case "ATMGPT4BANKOmbudsman":
+
+                generalData = sessionInfo.parameters.generalData ?
+                    await cleanJson(sessionInfo.parameters.generalData) : "";
+                transactionArray = sessionInfo.parameters.transactionArray ?
+                    cleanJson(sessionInfo.parameters.transactionArray) : "";
+                userInputData = { ...generalData, transactionArray: [...transactionArray] };
+                userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.area_of_user);
                 letterType = "ATMOmbudsman";
                 createLetterWithGPT4(letterType, userInputData, threadId);
                 textResponse = 'Creating Document'
                 break;
             case "FAILEDTXNBANK":
+                userInputData = JSON.parse(sessionInfo.parameters.generalData);
+                userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.area_of_user);
                 letterType = "Failed_txn_Bank";
                 createLetterWithGPT4(letterType, userInputData, threadId);
                 textResponse = 'Creating Document'
                 break;
             case "FAILEDTXNBANKINGOMBUDSMAN":
+                userInputData = JSON.parse(sessionInfo.parameters.generalData);
+                userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.area_of_user);
                 letterType = "Failed_txn_Ombudsman";
                 createLetterWithGPT4(letterType, userInputData, threadId);
                 textResponse = 'Creating Document'
@@ -442,22 +459,6 @@ export const createDocWithFineTuned = async(req, res) => {
 
 };
 
-function cleanJson2(json) {
-    try {
-        //json = json.replace(/\\/g, "");
-        let cleanedJson = JSON.parse(JSON.stringify(json)); // Create a deep copy of the json
-        (function _clean(obj) {
-            Object.keys(obj).forEach(key => {
-                if (obj[key] && typeof obj[key] === 'object' || typeof obj === '') _clean(obj[key]); // Recurse if the value is an object
-                else if (obj[key] === 'NA' || String(obj[key]).includes('$')) delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
-            });
-        })(cleanedJson);
-        return cleanedJson;
-    } catch (err) {
-        return "";
-    }
-}
-
 export function cleanJson(jsonData) {
     let cleanedJson = JSON.parse(JSON.stringify(jsonData)); // Create a deep copy of the json
     (function _clean(obj) {
@@ -476,18 +477,17 @@ export function cleanJson(jsonData) {
                 }
             }
             if (obj[key] === 'NA' || String(obj[key]).includes('$')) {
-                console.log('deleted keys:',obj[key]);
                 delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
             }
         });
     })(cleanedJson);
     return cleanedJson;
 }
-function pincodeToArea(pincode){
-    try{
-    const area = urbanPincodes.includes(Number(pincode.slice(0, 3))) ? "urban" : "rural";
-    return area;
-    }catch(err){
+function pincodeToArea(pincode) {
+    try {
+        const area = urbanPincodes.includes(Number(pincode.slice(0, 3))) ? "urban" : "rural";
+        return area;
+    } catch (err) {
         return pincode;
     }
 }

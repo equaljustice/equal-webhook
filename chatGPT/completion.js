@@ -25,6 +25,28 @@ export async function createMessageContent(prompttype, userInputData, threadId) 
     processDocx(message[0].content + '\n' + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
     return message;
 }
+export async function createMessageContentHindi(prompttype, userInputData, threadId) {
+
+    const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
+
+    const userInputPara = await createUserInputParagraph(userInputData, threadId);
+    const message = [{
+            "role": "system",
+            "content": `${prompts[prompttype]}
+             Generate letter in Hindi Language`
+        },
+        {
+            "role": "user",
+            "content": `User's inputs and response is given below: 
+      ${userInputPara}
+      
+      ${legalTraining}`
+        }
+    ]
+
+    processDocx(message[0].content + '\n' + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
+    return message;
+}
 export async function createMessageContentFailed_txn(prompttype, userInputData, threadId) {
 
     const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterialsFailed_txn(userInputData);
@@ -63,7 +85,7 @@ export async function createBankLetterwithFineTuned(prompttype, userInputData, t
 export async function createBankLetterwithFineTunedFailedtxnbank(prompttype, userInputData, threadId) {
     try {
         const message = await createMessageContentFailed_txn(prompttype, userInputData, threadId);
-        const FineTunedModelResponse = await openAiCompletionWithFineTunedATMBank(message);
+        const FineTunedModelResponse = await openAiCompletionWithFineTunedFailedTrnBankLtr(message);
         processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
         // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
         return;
@@ -243,6 +265,22 @@ async function openAiCompletionWithFineTunedATMBank(message, temperature = 0.5, 
     //console.log("input to openAI", message);
     const completionResponse = await openai.chat.completions.create({
         model: "ft:gpt-3.5-turbo-1106:ashish-chandra:bankatmletter:90dP3i8f",
+        messages: message,
+        temperature: temperature,
+        max_tokens: 1500,
+        n: 1,
+        top_p: top_p,
+        frequency_penalty: frequency_penalty,
+        presence_penalty: presence_penalty,
+    });
+    return completionResponse;
+}
+async function openAiCompletionWithFineTunedFailedTrnBankLtr(message, temperature = 0.5, top_p = 0.9, frequency_penalty = 0.2, presence_penalty = 0) {
+    const openai = new OpenAI(process.env.OPENAI_API_KEY);
+
+    //console.log("input to openAI", message);
+    const completionResponse = await openai.chat.completions.create({
+        model: "ft:gpt-3.5-turbo-1106:ashish-chandra:failed-trn-bankltr:96IUpuRq",
         messages: message,
         temperature: temperature,
         max_tokens: 1500,

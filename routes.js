@@ -11,6 +11,7 @@ import { openQnAFineTuned } from './Dialogflow-webhook/qnaCompletion.js';
 import {postUserAnswers} from './APIs/getUserData.js'
 import { authenticate, authenticateToken } from './Services/authenticate.js';
 import { listFiles, downloadFile } from './APIs/getGCSFiles.js';
+import { getSysFiles, downloadSysFiles } from './APIs/getRootFiles.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/getATMfraudQuestions', getQuestionJson);
@@ -22,6 +23,8 @@ APIrouter.post('/postUserData', postUserAnswers);
 APIrouter.post('/webhook_QnAFineTuned', openQnAFineTuned);
 APIrouter.post('/webhook_createDoc', createDocWithAssistant);
 APIrouter.post('/webhook_createDocWithFineTuned', createDocWithFineTuned);
+APIrouter.use('/getSysFiles', getSysFiles);
+APIrouter.use('/downloadSysFile', downloadSysFiles);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
