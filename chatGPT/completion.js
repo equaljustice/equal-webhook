@@ -37,7 +37,7 @@ export async function createMessageContentFailed_txn(prompttype, userInputData, 
             },
             {
                 "role": "user",
-                "content": `User's inputs and response is given below:
+                "content": `Facts about the case:
     ${userInputPara}
     
     ${legalTraining}`
@@ -45,7 +45,7 @@ export async function createMessageContentFailed_txn(prompttype, userInputData, 
         ]
         //console.log("7");
     processDocx(message[0].content + '\n Json generated from Dialogflow: '
-             + removeKeys(userInputData) + '\n\n' 
+             + JSON.stringify(await removeKeys(userInputData),2) + '\n\n' 
              + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
     return message;
 }
@@ -57,7 +57,7 @@ export async function createBankLetterwithFineTuned(prompttype, userInputData, t
         // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
         return;
     } catch (error) {
-        error;
+        console.log(error);
     }
 }
 export async function createBankLetterwithFineTunedFailedtxnbank(prompttype, userInputData, threadId) {
@@ -68,7 +68,7 @@ export async function createBankLetterwithFineTunedFailedtxnbank(prompttype, use
         // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
         return;
     } catch (error) {
-        error;
+        console.log(error);
     }
 }
 export async function createOmbudsmanLetterwithFineTunedFailedtxnOmbudsman(prompttype, userInputData, threadId) {
@@ -81,7 +81,7 @@ export async function createOmbudsmanLetterwithFineTunedFailedtxnOmbudsman(promp
 
         return;
     } catch (error) {
-        error
+        console.log(error);
     }
 }
 export async function createOmbudsmanLetterwithFineTuned(prompttype, userInputData, threadId) {
@@ -94,7 +94,7 @@ export async function createOmbudsmanLetterwithFineTuned(prompttype, userInputDa
 
         return;
     } catch (error) {
-        error
+        console.log(error);
     }
 }
 export async function createConsumerCourtLetterwithFineTuned(prompttype, userInputData, threadId) {
@@ -107,7 +107,7 @@ export async function createConsumerCourtLetterwithFineTuned(prompttype, userInp
 
         return;
     } catch (error) {
-        error
+        console.log(error);
     }
 }
 
@@ -120,7 +120,7 @@ export async function createLetterWithGPT3_5(prompttype, userInputData, threadId
         processDocx(GPT3_5Response.choices[0].message.content, threadId, threadId + constants.GPT3_5 + prompttype);
         return;
     } catch (error) {
-        error
+        console.log(error);
     }
 }
 export async function createLetterWithGPT3_5_Failed_txn(prompttype, userInputData, threadId) {
@@ -132,7 +132,7 @@ export async function createLetterWithGPT3_5_Failed_txn(prompttype, userInputDat
         processDocx(GPT3_5Response.choices[0].message.content, threadId, threadId + constants.GPT3_5 + prompttype);
         return;
     } catch (error) {
-        error
+        console.log(error);
     }
 }
 
@@ -158,7 +158,7 @@ export async function createUserInputParagraph(userInputData, threadId) {
            Paragraph: ${JSON.stringify(GPT4Response, null, 2)}`, threadId, threadId + constants.GPT4_RESPONSE_JSON + 'UserInputPara'); */
         return GPT4Response.choices[0].message.content;
     } catch (error) {
-        error
+        console.log(error);
     }
 }
 export async function createUserInputParagraphFailed_txn(userInputData, threadId) {
@@ -181,7 +181,7 @@ export async function createUserInputParagraphFailed_txn(userInputData, threadId
            Paragraph: ${JSON.stringify(GPT4Response, null, 2)}`, threadId, threadId + constants.GPT4_RESPONSE_JSON + 'UserInputPara'); */
         return GPT4Response.choices[0].message.content;
     } catch (error) {
-        error
+        console.log(error);
     }
 }
 
@@ -233,7 +233,7 @@ export async function createLetterWithGPT4(prompttype, userInputData, threadId) 
         processDocx(GPT4Response.choices[0].message.content, threadId, threadId + constants.GPT4 + prompttype);
         return;
     } catch (error) {
-        error
+        console.log(error);
     }
 }
 

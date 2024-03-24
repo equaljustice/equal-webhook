@@ -106,7 +106,7 @@
     {
         "qId": 17,
         "Question": "Total amount of refund and compensation you wish to claim from the Bank? You may note that in addition to refund of the defrauded amount  the Banking Ombudsman can also provide compensation upto ₹1 lakh for mental agony/ harassment/costs/fees etc. suffered by the complainant  and consumer Courts may even provide higher compensation.",
-        "Parameter": "refund_compensesion_expected",
+        "Parameters": "refund_compensesion_expected",
         "Condition": "yes",
         "LegalTrainingMaterial": "I am seeking a full refund of the amounts fraudulently withdrawan and additionally a interest of 9% per annunum and reasonable and bona fide compensation as provided in the user's response for the harassment, costs, fees and other grave inconvenience and hardship caused to me due to these negligent and non-compliant acts of the bank. In my belief RBI guidelines and various legal theories permit me to claim such additional compensation and interest. It is also imperative on the bank to seek a claim under any insurance policy for such fraudulent transactions that the bank may have obtained and as per RBI guidelines, the bank should pay the refund, interest and compensation to me while it waits to get the insurance claim."
     }
