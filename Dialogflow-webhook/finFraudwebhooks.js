@@ -485,7 +485,7 @@ export function cleanJson(jsonData) {
 }
 function pincodeToArea(pincode){
     try{
-    const area = urbanPincodes.includes(pincode.slice(0, 3)) ? "urban" : "rural";
+    const area = urbanPincodes.includes(Number(pincode.slice(0, 3))) ? "urban" : "rural";
     return area;
     }catch(err){
         return pincode;

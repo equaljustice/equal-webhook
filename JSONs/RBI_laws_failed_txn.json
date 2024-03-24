@@ -3,7 +3,7 @@
         "Questions": "What is your PINCODE?",
         "Parameters": "area_of_user",
         "Condition": "rural",
-        "LegalTrainingMaterial": "If the pincode belongs to rural semi-urban district, then refer to the following: Bank is well aware that I belong to a rural  semi-urban area where the financial literacy is assumed to be low, and customers from these areas are more susceptible to frauds. There is a heightened duty casted on the banks to implement robust technological solutions to protect the vulnerable customers especially those from rural  semi-urban areas from financial frauds. The bank should be called upon to demonstrate what additional technology and security parameters the bank has put in place to protect the customers from rural  semi-urban areas from the financial frauds."
+        "LegalTrainingMaterial": "Bank is well aware that I belong to a rural semi-urban area where the financial literacy is assumed to be low, and customers from these areas are more susceptible to frauds. There is a heightened duty casted on the banks to implement robust technological solutions to protect the vulnerable customers especially those from rural  semi-urban areas from financial frauds. The bank should be called upon to demonstrate what additional technology and security parameters the bank has put in place to protect the customers from rural  semi-urban areas from the financial frauds."
     },
     {
         "qId": 3,
@@ -15,7 +15,7 @@
     {
         "qId": 4,
         "Questions": "Is the account from which the transaction was failed your pension savings account?",
-        "Parameters": "pensionner",
+        "Parameters": "pension_savings_account",
         "Condition": "Yes",
         "LegalTrainingMaterial": "The duty of the bank gets further heightened when the bank is aware that the account is the pensioner account of a senior citizen, which is usually used by the senior citizens for their livelihood. RBI has time and again emphasised that senior citizens form an important constituent of the bank, and the entire trust of senior citizens in the banking systems will go down if the highly capitalised banks do not implement proactive and preventive technologies to safeguard the bank accounts of senior citizens especially where senior citizens receive their pensions to survive and sustain in the old age."
     },
@@ -71,14 +71,14 @@
     {
         "qId": 12,
         "Questions": "Please select the relevant Aadhaar payment transaction:(a) EBS: Aadhaar Enabled Payment System including Aadhaar Pay i.e. your account is debited but transaction confirmation not received at merchant location or your account is debited but beneficiary account not credited.b) PBS: Aadhaar Payment Bridge System i.e there is a delay in crediting beneficiary's account",
-        "Parameters": "EBS_PBS",
+        "Parameters": "Aadhaar_EBS_PBS",
         "Condition": "Aadhaar EBS account debited but transaction confirmation not received at merchant",
         "LegalTrainingMaterial": "RBI has mandated the banks to immediately reverse the failed transactions within a maximum turn around time of T+5 days, and pay Rs. 100- per day as compensation for the delay. The bank has failed to comply with its obligations.The bank should also be asked to provide adequate proof of reconciliation and settlement records of the debit instructions with the actual credit along with the relevant electronic records. RBI guidelines hold the bank responsible, being regulated by the RBI, for the reversal of the transaction and the bank is not permitted to pass on the onus of responsibility to Aadhaar authority or UIDAI which are not regulated by RBI.In addition to the reversal and compensation for the delay, the bank should also be asked to pay an additional compensation for the interest that I have lost on the amount debited but the merchant account not credited or the transaction confirmation was not received at the merchant location plus compensation for the harassment, fees I incurred in seeking the grievance redressal and for the mental agony."
     },
     {
         "qId": 13,
         "Questions": "Please select the relevant Aadhaar payment transaction:(a) EBS: Aadhaar Enabled Payment System including Aadhaar Pay i.e. your account is debited but transaction confirmation not received at merchant location or your account is debited but beneficiary account not credited.(b) PBS: Aadhaar Payment Bridge System i.e there is a delay in crediting beneficiary\u2019s account",
-        "Parameters": "EBS_PBS",
+        "Parameters": "Aadhaar_EBS_PBS",
         "Condition": "Aadhaar PBS delay in crediting beneficiary account",
         "LegalTrainingMaterial": "RBI has mandated the banks to immediately reverse the failed transactions within a maximum turn around time of T+5 days, and pay Rs. 100- per day as compensation for the delay. The bank has failed to comply with its obligations.\nThe bank should also be asked to provide adequate proof of reconciliation and settlement records of the debit instructions with the actual credit along with the relevant electronic records. RBI guidelines hold the bank responsible, being regulated by the RBI, for the reversal of the transaction and the bank is not permitted to pass on the onus of responsibility to Aadhaar authority or UIDAI which are not regulated by RBI.In addition to the reversal and compensation for the delay, the bank should also be asked to pay an additional compensation for the interest that I have lost on the amount debited but the merchant account not credited or the transaction confirmation was not received at the merchant location plus compensation for the harassment, fees I incurred in seeking the grievance redressal and for the mental agony."
     },
@@ -102,5 +102,12 @@
         "Parameters": "prepaid_payment_instrument_debited_but_confirmation_not_received_at_merchant_location",
         "Condition": "Yes",
         "LegalTrainingMaterial": "RBI has mandated the wallet provider to immediately reverse the failed transactions within a maximum turn around time of T+1 days, and pay Rs. 100\/- per day as compensation for the delay. The wallet has failed to comply with its obligations.\nThe wallet provider should also be asked to provide adequate proof of reconciliation and settlement records of the debit instructions with the actual credit along with the relevant electronic records. \nIn addition to the reversal and compensation for the delay, the wallet provider should also be asked to pay an additional compensation for the interest that I have lost on the amount debited but beneficiary account not credited plus compensation for the harassment, fees I incurred in seeking the grievance redressal and for the mental agony."
+    },
+    {
+        "qId": 17,
+        "Question": "Total amount of refund and compensation you wish to claim from the Bank? You may note that in addition to refund of the defrauded amount  the Banking Ombudsman can also provide compensation upto ₹1 lakh for mental agony/ harassment/costs/fees etc. suffered by the complainant  and consumer Courts may even provide higher compensation.",
+        "Parameter": "refund_compensesion_expected",
+        "Condition": "yes",
+        "LegalTrainingMaterial": "I am seeking a full refund of the amounts fraudulently withdrawan and additionally a interest of 9% per annunum and reasonable and bona fide compensation as provided in the user's response for the harassment, costs, fees and other grave inconvenience and hardship caused to me due to these negligent and non-compliant acts of the bank. In my belief RBI guidelines and various legal theories permit me to claim such additional compensation and interest. It is also imperative on the bank to seek a claim under any insurance policy for such fraudulent transactions that the bank may have obtained and as per RBI guidelines, the bank should pay the refund, interest and compensation to me while it waits to get the insurance claim."
     }
 ]

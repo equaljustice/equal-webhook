@@ -45,7 +45,7 @@ export async function createMessageContentFailed_txn(prompttype, userInputData, 
         ]
         //console.log("7");
     processDocx(message[0].content + '\n Json generated from Dialogflow: '
-             + JSON.stringify(userInputData,2) + '\n\n' 
+             + removeKeys(userInputData) + '\n\n' 
              + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
     return message;
 }
@@ -165,14 +165,12 @@ export async function createUserInputParagraphFailed_txn(userInputData, threadId
     try {
 
         let updatedUserData = await removeKeys(userInputData);
-        let userInputMessage = [{
-                "role": "system",
-                "content": "Your Job is to convert the given Json objects in a simple textual paragraph without sounding like a storyboard"
-            },
+        let userInputMessage = [
             {
                 "role": "user",
-                "content": `Here is the JSON data related Failed Transaction(not fraud) happend to me. All the transaction amounts are in rupees describe this in simple english language not more than 200 words,
-        ${JSON.stringify(updatedUserData, null, 2)}`
+                "content": `convert this json output to a textual summary in a paragraph without sounding like a story. only state the facts,
+        ${JSON.stringify(updatedUserData, null, 2)}
+        All the transaction amounts are in rupees.`
             }
         ];
         /* console.log(`JSON: ${JSON.stringify(userInputData, null, 2)}
