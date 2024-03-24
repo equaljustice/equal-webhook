@@ -6,11 +6,13 @@ import { Storage } from '@google-cloud/storage';
 import * as constants from '../constants.js';
 import OpenAI from 'openai';
 let processDocxCallCount = 0;
-export function processDocx(information, folder, fileName) {
+export async function processDocx(information, folder, fileName) {
     processDocxCallCount++;
+    var hindi_information = "";
     if (processDocxCallCount === 2) {
-        processDocxhindi(information, folder, fileName);
+        hindi_information = await processDocxhindi(information, folder, fileName);
     }
+    information += "\n\n\n" + hindi_information;
     var temp_doc = "./CloudStorage/Bank.docx";
     // Load the docx file as binary content
     const content = fs.readFileSync(
@@ -81,11 +83,12 @@ function uploadToCloudBucket(folder, destinationFile) {
 
 async function processDocxhindi(information, folder, fileName) {
     information = "Translate the following text to Hindi:" + information;
-    console.log(information);
+    //console.log(information);
     var translation_response = await openAiCompletionWithGPT3_5(information);
-    console.log(translation_response);
+    //console.log(translation_response);
     information = translation_response.choices[0].message.content;
-    var temp_doc = "./CloudStorage/Bank.docx";
+    return information;
+    /*var temp_doc = "./CloudStorage/Bank.docx";
     // Load the docx file as binary content
     const content = fs.readFileSync(
         path.resolve(temp_doc),
@@ -118,7 +121,7 @@ async function processDocxhindi(information, folder, fileName) {
     // file or res.send it with express for example.
     fileName += "Hindi";
     fs.writeFileSync(`${fileName}.docx`, buf);
-    return uploadToCloudBucket(folder, `${fileName}.docx`);
+    return uploadToCloudBucket(folder, `${fileName}.docx`);*/
 }
 
 async function openAiCompletionWithGPT3_5(message, temperature = 0.5, top_p = 0.9, frequency_penalty = 0.2, presence_penalty = 0) {
