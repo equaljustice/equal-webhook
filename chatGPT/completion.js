@@ -6,7 +6,7 @@ import { processDocx } from '../CloudStorage/processDocs.js';
 
 export async function createMessageContent(prompttype, userInputData, threadId) {
 
-  const legalTraining = prompttype != 'RTI' ? await getLegalTrainingMaterials(userInputData) : '';
+  const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
   const userInputPara = await createUserInputParagraph(userInputData, threadId);
   const message = [
     {
@@ -31,7 +31,6 @@ export async function createBankLetterwithFineTuned(prompttype, userInputData, t
     const FineTunedModelResponse = await openAiCompletionWithFineTunedATMBank(message);
     processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
     // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
-
     return;
   }
   catch (error) {
@@ -43,6 +42,20 @@ export async function createOmbudsmanLetterwithFineTuned(prompttype, userInputDa
 
     const message = await createMessageContent(prompttype, userInputData, threadId);
     const FineTunedModelResponse = await openAiCompletionWithFineTunedATMBankOmbudsman(message);
+    processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
+    // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
+
+    return;
+  }
+  catch (error) {
+    error
+  }
+}
+export async function createConsumerCourtLetterwithFineTuned(prompttype, userInputData, threadId) {
+  try {
+
+    const message = await createMessageContent(prompttype, userInputData, threadId);
+    const FineTunedModelResponse = await openAiCompletionWithFineTuneBankOmbudsmanCommon(message);
     processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
     // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
 
@@ -108,7 +121,8 @@ async function removeKeys(jsonData) {
           if (obj[key] && typeof obj[key] === 'object') {
             obj[key] = _clean(obj[key]); // Recurse if the value is an object
           } else if (['Senior_citizen', 'pension_savings_account', 'lost_atm',
-            'withdrawn_amount_exceed_daily_limit', 'transaction_happen_after_informed_bank_of_previous_fraud']
+            'withdrawn_amount_exceed_daily_limit', 'prior_police_complaint',
+            'transaction_happen_after_informed_bank_of_previous_fraud']
             .includes(key) && String(obj[key]).toLowerCase() === 'no') {
             delete obj[key];
           } else if (['applied_for_atmcard', 'withdrawing_regularly_from_atm',
@@ -147,7 +161,7 @@ async function openAiCompletionWithFineTunedATMBank(message, temperature = 0.5, 
   const openai = new OpenAI(process.env.OPENAI_API_KEY);
   //console.log("input to openAI", message);
   const completionResponse = await openai.chat.completions.create({
-    model: "ft:gpt-3.5-turbo-0613:personal::8twTZDyP",
+    model: "ft:gpt-3.5-turbo-1106:ashish-chandra:bankatmletter:90dP3i8f",
     messages: message,
     temperature: temperature,
     max_tokens: 1500,
@@ -173,11 +187,26 @@ async function openAiCompletionWithFineTunedATMBankOmbudsman(message, temperatur
   });
   return completionResponse;
 }
+async function openAiCompletionWithFineTuneBankOmbudsmanCommon(message, temperature = 0.5, top_p = 0.9, frequency_penalty = 0.2, presence_penalty = 0) {
+  const openai = new OpenAI(process.env.OPENAI_API_KEY);
+  //console.log("input to openAI", message);
+  const completionResponse = await openai.chat.completions.create({
+    model: "ft:gpt-3.5-turbo-1106:ashish-chandra:bnkltrandobdsuman:90dcJiEd",
+    messages: message,
+    temperature: temperature,
+    max_tokens: 1500,
+    n: 1,
+    top_p: top_p,
+    frequency_penalty: frequency_penalty,
+    presence_penalty: presence_penalty,
+  });
+  return completionResponse;
+}
 
 async function openAiCompletionWithGPT3_5(message, temperature = 0.5, top_p = 0.9, frequency_penalty = 0.2, presence_penalty = 0) {
   const openai = new OpenAI(process.env.OPENAI_API_KEY);
   const completionResponse = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo-0613",
+    model: "gpt-3.5-turbo-16k",
     messages: message,
     temperature: temperature,
     max_tokens: 1500,
