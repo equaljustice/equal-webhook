@@ -63,7 +63,7 @@ export async function createBankLetterwithFineTuned(prompttype, userInputData, t
 export async function createBankLetterwithFineTunedFailedtxnbank(prompttype, userInputData, threadId) {
     try {
         const message = await createMessageContentFailed_txn(prompttype, userInputData, threadId);
-        const FineTunedModelResponse = await openAiCompletionWithFineTunedATMBank(message);
+        const FineTunedModelResponse = await openAiCompletionWithFineTunedFailedtxnBank(message);
         processDocx(FineTunedModelResponse.choices[0].message.content, threadId, threadId + constants.GPT3_5_FINE_TUNED + prompttype);
         // processDocx(JSON.stringify(FineTunedModelResponse, null, 2), threadId, threadId+constants.FINE_TUNED_RESPONSE_JSON + prompttype);
         return;
@@ -331,7 +331,7 @@ async function openAiCompletionWithFineTunedFailedtxnBank(message, temperature =
     const openai = new OpenAI(process.env.OPENAI_API_KEY);
     //console.log("input to openAI", message);
     const completionResponse = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo-16k",
+        model: "ft:gpt-3.5-turbo-1106:ashish-chandra:failed-trn-bankltr:96IUpuRq",
         messages: message,
         temperature: temperature,
         max_tokens: 1500,
