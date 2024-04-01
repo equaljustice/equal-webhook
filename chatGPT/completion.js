@@ -6,7 +6,7 @@ import RBI_laws_failed_txn from '../JSONs/RBI_laws_failed_txn.json' assert { typ
 import { processDocx } from '../CloudStorage/processDocs.js';
 export async function createMessageContent(prompttype, userInputData, threadId) {
 
-    const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
+    const legalTraining = ["ATMRTI", "ATMPoliceComplaint","Failed_txn_RTI", "Failed_txn_PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
 
     const userInputPara = await createUserInputParagraph(userInputData, threadId);
     const message = [{
@@ -27,7 +27,7 @@ export async function createMessageContent(prompttype, userInputData, threadId) 
 }
 export async function createMessageContentHindi(prompttype, userInputData, threadId) {
 
-    const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
+    const legalTraining = ["ATMRTI", "ATMPoliceComplaint","Failed_txn_RTI", "Failed_txn_PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
 
     const userInputPara = await createUserInputParagraph(userInputData, threadId);
     const message = [{
@@ -49,7 +49,7 @@ export async function createMessageContentHindi(prompttype, userInputData, threa
 }
 export async function createMessageContentFailed_txn(prompttype, userInputData, threadId) {
 
-    const legalTraining = ["RTI", "PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterialsFailed_txn(userInputData);
+    const legalTraining = ["ATMRTI", "ATMPoliceComplaint","Failed_txn_RTI", "Failed_txn_PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterialsFailed_txn(userInputData);
 
     const userInputPara = await createUserInputParagraphFailed_txn(userInputData, threadId);
 

@@ -10,24 +10,35 @@ export const openQnAFineTuned = async (req, res) => {
         var responseJson = '';
         var messagesHistory = sessionInfo.parameters.messages ? sessionInfo.parameters.messages : [];
         var userInputPara = '';
+        let userInputData;
+        let generalData; 
+        let transactionArray;
         let queryMessage = [];
         if (counter == 1) {
             let sysMessage = [{
                 role: "system",
                 content: "restrict response to 1500 chars, remove annotations from the response"
             }];
-            let generalData = sessionInfo.parameters.generalData ?
-                cleanJson(sessionInfo.parameters.generalData)
-                : "";
-            let transactionArray = sessionInfo.parameters.transactionArray ?
-                cleanJson(sessionInfo.parameters.transactionArray)
-                : "";
-            generalData.area_of_user = urbanPincodes.includes(Number(generalData.area_of_user.slice(0, 3))) ? "urban" : "rural";
+            const tag = req.body.fulfillmentInfo.tag;
+            switch (tag) {
+                case "ATMQnA":
+                    generalData = sessionInfo.parameters.generalData ?
+                        cleanJson(sessionInfo.parameters.generalData)
+                        : "";
+                    transactionArray = sessionInfo.parameters.transactionArray ?
+                        cleanJson(sessionInfo.parameters.transactionArray)
+                        : "";
+                    generalData.area_of_user = urbanPincodes.includes(Number(generalData.area_of_user.slice(0, 3))) ? "urban" : "rural";
 
-            let userInputData = { ...generalData, transactionArray: [...transactionArray] }
-
+                    userInputData = { ...generalData, transactionArray: [...transactionArray] }
+                    break;
+                case "Failed_txnQnA":
+                    userInputData = JSON.parse(sessionInfo.parameters.generalData);
+                    userInputData.area_of_user = urbanPincodes.includes(Number(sessionInfo.parameters.area_of_user.slice(0, 3))) ? "urban" : "rural";
+                    break;
+            }
             userInputPara = await createUserInputParagraph(userInputData, sessionInfo.parameters.threadId)
-            messagesHistory = sysMessage.concat([{role: "user", content: userInputPara}])
+            messagesHistory = sysMessage.concat([{ role: "user", content: userInputPara }])
         }
         var responseMessage = '';
         let len = req.body.text.length;
@@ -35,7 +46,7 @@ export const openQnAFineTuned = async (req, res) => {
             responseMessage = "It's crossing 300 characters limit, please be within limit"
         } else if (counter == null || counter < 12 && len < 300) {
 
-           queryMessage = queryMessage.concat([{
+            queryMessage = queryMessage.concat([{
                 role: "user",
                 content: req.body.text
             }]);

@@ -230,7 +230,7 @@ export const createDocWithFineTuned = async (req, res) => {
 
                         break;
                     case "Police Complaint":
-                        letterType = "PoliceComplaint";
+                        letterType = "ATMPoliceComplaint";
 
                         createLetterWithGPT3_5(letterType, userInputData, threadId);
                         textResponse = 'Creating Police Complaint, Please wait'
@@ -238,7 +238,7 @@ export const createDocWithFineTuned = async (req, res) => {
                         fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5 + letterType + '.docx';
                         break;
                     case "Consumer court":
-                        letterType = "ConsumerCourt";
+                        letterType = "ATMConsumerCourt";
 
                         createConsumerCourtLetterwithFineTuned(letterType, userInputData, threadId);
                         textResponse = 'Creating Consumer Court letter, Please wait'
@@ -260,7 +260,7 @@ export const createDocWithFineTuned = async (req, res) => {
                             "UCO Bank",
                             "Union Bank of India"
                         ].includes(generalData.bank_name)) {
-                            letterType = 'RTI'
+                            letterType = 'ATMRTI'
                             createLetterWithGPT3_5(letterType, userInputData, threadId)
                             textResponse = 'Creating RTI Application, Please wait'
                             docName = 'RTI letter';
@@ -334,14 +334,14 @@ export const createDocWithFineTuned = async (req, res) => {
                         fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5_FINE_TUNED + letterType + '.docx';
                         break;
                     case "Police Complaint":
-                        letterType = "PoliceComplaint";
+                        letterType = "Failed_txn_PoliceComplaint";
                         createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId);
                         textResponse = 'Creating Police Complaint, Please wait'
                         docName = 'Police Complaint letter';
                         fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + constants.GPT3_5 + letterType + '.docx';
                         break;
                     case "Consumer court":
-                        letterType = "ConsumerCourt";
+                        letterType = "Failed_txn_ConsumerCourt";
 
                         createConsumerCourtLetterwithFineTuned(letterType, userInputData, threadId);
                         textResponse = 'Creating Consumer Court letter, Please wait'
@@ -363,7 +363,7 @@ export const createDocWithFineTuned = async (req, res) => {
                             "UCO Bank",
                             "Union Bank of India"
                         ].includes(sessionInfo.parameters.name_of_bank)) {
-                            letterType = 'RTI'
+                            letterType = 'Failed_txn_RTI'
                             createLetterWithGPT3_5_Failed_txn(letterType, userInputData, threadId)
                             textResponse = 'Creating RTI Application, Please wait'
                             docName = 'RTI letter';
