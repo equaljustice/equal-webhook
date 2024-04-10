@@ -3,7 +3,7 @@ import { processDocx } from "../CloudStorage/processDocs.js";
 import urbanPincodes from '../JSONs/urbanPincodes.json' assert { type: "json" };
 import * as constants from '../constants.js';
 import * as types from '../utils/types.js'
-import { ATMLegalTrainingData, FailedTransactionLegalTrainingData } from "../LegalMaterial/legalTrainingData.js";
+import { ATMLegalTrainingData, FailedTransactionLegalTrainingData, UPILegalTrainingData } from "../LegalMaterial/legalTrainingData.js";
 import { createLetter } from "../chatGPT/createDocuments.js";
 let assi_id = "";
 let option = "";
@@ -28,7 +28,7 @@ var assistant_id_atm_bank = "asst_JXg4cxpxQo0ZukFcQuNs2229";
 var assistant_id_atm_RTI = "aasst_cYcV9lF2cCydoSFrv14Iozl7";
 var assistant_id_atm_consumer_court = "asst_AC6SXOaB2PgjyaTMF8YlarTh";
 var query = "";
-export const openQnA = async (req, res) => {
+export const openQnA = async(req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     try {
         let sessionInfo = req.body.sessionInfo;
@@ -74,7 +74,7 @@ export const openQnA = async (req, res) => {
     }
 };
 
-export const createDocWithAssistant = async (req, res) => {
+export const createDocWithAssistant = async(req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     let sessionInfo = req.body.sessionInfo;
     option = sessionInfo.parameters.option_for_compliant;
@@ -173,9 +173,10 @@ export const createDocWithAssistant = async (req, res) => {
         console.log(err);
     }
 };
-export const createDocWithFineTuned = async (req, res) => {
+export const createDocWithFineTuned = async(req, res) => {
+   
     try {
-       // console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
+        console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
         let sessionInfo = req.body.sessionInfo;
         option = sessionInfo.parameters.option_for_compliant;
         let userInputData, legalTrainingData;
@@ -200,7 +201,7 @@ export const createDocWithFineTuned = async (req, res) => {
                     await cleanJson(sessionInfo.parameters.generalData) : "";
                 let transactionArray = sessionInfo.parameters.transactionArray ?
                     cleanJson(sessionInfo.parameters.transactionArray) : "";
-                userInputData = { ...generalData, transactionArray: [...transactionArray] };
+                userInputData = {...generalData, transactionArray: [...transactionArray] };
                 userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.pincode);
                 legalTrainingData = ATMLegalTrainingData;
                 switch (option) {
@@ -242,8 +243,8 @@ export const createDocWithFineTuned = async (req, res) => {
                 break;
             case types.transaction.UPI:
                 userInputData = sessionInfo.parameters;
-                userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.area_of_user);
-                legalTrainingData = FailedTransactionLegalTrainingData;
+                userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.pincode);
+                legalTrainingData = UPILegalTrainingData;
                 switch (option) {
                     case types.letterOption.BANK_LETTER:
                         openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_BANK;
@@ -322,9 +323,10 @@ export const createDocWithFineTuned = async (req, res) => {
                 }
                 break;
         }
+
         textResponse = `Creating ${option} Letter, Please wait`;
         docName = `${option} letter`;
-        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + tag + '_'+ option.replace(' ', '') + '.docx';
+        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + tag + '_' + option.replace(' ', '') + '.docx';
         createLetter(tag, option.replace(' ', ''), userInputData, legalTrainingData, threadId, openAiConfig);
 
         const responseJson = {
@@ -379,6 +381,7 @@ export function cleanJson(jsonData) {
     })(cleanedJson);
     return cleanedJson;
 }
+
 function pincodeToArea(pincode) {
     try {
         const area = urbanPincodes.includes(Number(pincode.slice(0, 3))) ? "urban" : "rural";
@@ -404,6 +407,7 @@ function isPublicSectorBank(name_of_bank) {
         "Union Bank of India"
     ].includes(name_of_bank)
 }
+
 function generateSessionId(length) {
     const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let sessionId = '';
