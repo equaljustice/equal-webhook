@@ -1,6 +1,6 @@
 //const APIrouter = require('express').Router();
 import express from 'express';
-import {getQuestionJson} from './APIs/ATMFraudQuestions.js';
+import { getQuestionJson } from './APIs/ATMFraudQuestions.js';
 import { getCities, getStates } from './APIs/StateCity.js';
 import { getBanks } from './APIs/Banks.js';
 import path from 'path';
@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { openQnA, createDocWithAssistant, createDocWithFineTuned } from './Dialogflow-webhook/finFraudwebhooks.js';
 import { openQnAFineTuned } from './Dialogflow-webhook/qnaCompletion.js';
-import {postUserAnswers} from './APIs/getUserData.js'
+import { postUserAnswers } from './APIs/getUserData.js'
 import { authenticate, authenticateToken } from './Services/authenticate.js';
 import { listFiles, downloadFile } from './APIs/getGCSFiles.js';
 import { getSysFiles, downloadSysFiles } from './APIs/getRootFiles.js';
@@ -29,11 +29,11 @@ APIrouter.use('/downloadSysFile', downloadSysFiles);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 APIrouter.get('/secured', (req, res) => {
-    res.sendFile(path.join(__dirname, 'secured.html'));
+  res.sendFile(path.join(__dirname, 'secured.html'));
 })
 // Route to handle file download
 APIrouter.get('/download/:threadId/:filename', (req, res) => {
-  
+
   res.redirect(`https://storage.googleapis.com/ejustice-public-bucket/${req.params.threadId}/${req.params.filename}.docx?time=${new Date().getTime()}`);
 });
 APIrouter.get('/list-files/:folder', authenticateToken, listFiles);

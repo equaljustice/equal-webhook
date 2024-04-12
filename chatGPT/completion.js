@@ -1,25 +1,25 @@
 import OpenAI from 'openai';
 import { prompts } from "./prompts.js"
 import * as constants from '../constants.js';
-import LegalTrainingATM from '../JSONs/LegalTrainingATM.json' assert { type: "json" };
-import RBI_laws_failed_txn from '../JSONs/RBI_laws_failed_txn.json' assert { type: "json" };
+import { LegalTrainingATM } from '../JSONs/LegalTrainingATM.js';
+import { RBI_laws_failed_txn } from '../JSONs/RBI_laws_failed_txn.js'
 import { processDocx } from '../CloudStorage/processDocs.js';
 export async function createMessageContent(prompttype, userInputData, threadId) {
 
-    const legalTraining = ["ATMRTI", "ATMPoliceComplaint","Failed_txn_RTI", "Failed_txn_PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
+    const legalTraining = ["ATMRTI", "ATMPoliceComplaint", "Failed_txn_RTI", "Failed_txn_PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
 
     const userInputPara = await createUserInputParagraph(userInputData, threadId);
     const message = [{
-            "role": "system",
-            "content": `${prompts[prompttype]}`
-        },
-        {
-            "role": "user",
-            "content": `User's inputs and response is given below:
+        "role": "system",
+        "content": `${prompts[prompttype]}`
+    },
+    {
+        "role": "user",
+        "content": `User's inputs and response is given below:
       ${userInputPara}
       
       ${legalTraining}`
-        }
+    }
     ]
 
     processDocx(message[0].content + '\n' + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
@@ -27,21 +27,21 @@ export async function createMessageContent(prompttype, userInputData, threadId) 
 }
 export async function createMessageContentHindi(prompttype, userInputData, threadId) {
 
-    const legalTraining = ["ATMRTI", "ATMPoliceComplaint","Failed_txn_RTI", "Failed_txn_PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
+    const legalTraining = ["ATMRTI", "ATMPoliceComplaint", "Failed_txn_RTI", "Failed_txn_PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterials(userInputData);
 
     const userInputPara = await createUserInputParagraph(userInputData, threadId);
     const message = [{
-            "role": "system",
-            "content": `${prompts[prompttype]}
+        "role": "system",
+        "content": `${prompts[prompttype]}
              Generate letter in Hindi Language`
-        },
-        {
-            "role": "user",
-            "content": `User's inputs and response is given below: 
+    },
+    {
+        "role": "user",
+        "content": `User's inputs and response is given below: 
       ${userInputPara}
       
       ${legalTraining}`
-        }
+    }
     ]
 
     processDocx(message[0].content + '\n' + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
@@ -49,26 +49,26 @@ export async function createMessageContentHindi(prompttype, userInputData, threa
 }
 export async function createMessageContentFailed_txn(prompttype, userInputData, threadId) {
 
-    const legalTraining = ["ATMRTI", "ATMPoliceComplaint","Failed_txn_RTI", "Failed_txn_PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterialsFailed_txn(userInputData);
+    const legalTraining = ["ATMRTI", "ATMPoliceComplaint", "Failed_txn_RTI", "Failed_txn_PoliceComplaint"].includes(prompttype) ? '' : await getLegalTrainingMaterialsFailed_txn(userInputData);
 
     const userInputPara = await createUserInputParagraphFailed_txn(userInputData, threadId);
 
     const message = [{
-                "role": "system",
-                "content": `${prompts[prompttype]}`
-            },
-            {
-                "role": "user",
-                "content": `Facts about the case:
+        "role": "system",
+        "content": `${prompts[prompttype]}`
+    },
+    {
+        "role": "user",
+        "content": `Facts about the case:
     ${userInputPara}
     
     ${legalTraining}`
-            }
-        ]
-        //console.log("7");
+    }
+    ]
+    //console.log("7");
     processDocx(message[0].content + '\n Json generated from Dialogflow: '
-             + JSON.stringify(await removeKeys(userInputData),2) + '\n\n' 
-             + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
+        + JSON.stringify(await removeKeys(userInputData), 2) + '\n\n'
+        + message[1].content, threadId, threadId + constants.USERINPUTFILENAME + prompttype);
     return message;
 }
 export async function createBankLetterwithFineTuned(prompttype, userInputData, threadId) {
@@ -163,14 +163,14 @@ export async function createUserInputParagraph(userInputData, threadId) {
 
         let updatedUserData = await removeKeys(userInputData);
         let userInputMessage = [{
-                "role": "system",
-                "content": "Your Job is to convert the given Json objects in a simple textual paragraph without sounding like a storyboard"
-            },
-            {
-                "role": "user",
-                "content": `Here is the JSON data related Financial Fraud happend to me. All the transaction amounts are in rupees describe this in simple english language not more than 200 words,
+            "role": "system",
+            "content": "Your Job is to convert the given Json objects in a simple textual paragraph without sounding like a storyboard"
+        },
+        {
+            "role": "user",
+            "content": `Here is the JSON data related Financial Fraud happend to me. All the transaction amounts are in rupees describe this in simple english language not more than 200 words,
         ${JSON.stringify(updatedUserData, null, 2)}`
-            }
+        }
         ];
         /* console.log(`JSON: ${JSON.stringify(userInputData, null, 2)}
         JsonAfterRemovedKeys: ${JSON.stringify(updatedUserData, null, 2)})`); */
@@ -220,22 +220,22 @@ async function removeKeys(jsonData) {
                     if (obj[key] && typeof obj[key] === 'object') {
                         obj[key] = _clean(obj[key]); // Recurse if the value is an object
                     } else if (['senior_citizen', 'pension_savings_account', 'lost_atm',
-                            'withdrawn_amount_exceed_daily_limit', 'prior_police_complaint',
-                            'transaction_happen_after_informed_bank_of_previous_fraud'
-                        ]
+                        'withdrawn_amount_exceed_daily_limit', 'prior_police_complaint',
+                        'transaction_happen_after_informed_bank_of_previous_fraud'
+                    ]
                         .includes(key) && String(obj[key]).toLowerCase() === 'no') {
                         delete obj[key];
                     } else if (['applied_for_atmcard', 'withdrawing_regularly_from_atm',
-                            'refund_compensesion_expected', 'domestic_transaction',
-                            'transaction_sms_recieved', 'transaction_sms_recieved_within_one_hour',
-                            'transaction_email_recieved', 'transaction_email_recieved_within_one_hour',
-                            'transaction_from_ATM_in_home_city_or_work_city',
-                            'transaction_from_ATM_in_home_city_or_work_city_regularly_withdrawing'
-                        ]
+                        'refund_compensesion_expected', 'domestic_transaction',
+                        'transaction_sms_recieved', 'transaction_sms_recieved_within_one_hour',
+                        'transaction_email_recieved', 'transaction_email_recieved_within_one_hour',
+                        'transaction_from_ATM_in_home_city_or_work_city',
+                        'transaction_from_ATM_in_home_city_or_work_city_regularly_withdrawing'
+                    ]
                         .includes(key) && String(obj[key]).toLowerCase() === 'yes') {
                         delete obj[key]; // Delete the key if the value is 'yes' 
                     } else if (key === 'area_of_user' && String(obj[key]).toLowerCase() === 'urban') { delete obj[key]; }
-                    else if(['option_for_compliant'].includes(key)){
+                    else if (['option_for_compliant'].includes(key)) {
                         delete obj[key];
                     }
                 });
@@ -399,7 +399,7 @@ async function openAiCompletionWithFineTuneFailedBankOmbudsmanCommon(message, te
 async function getLegalTrainingMaterials(userInputData, promttype) {
     const result = [];
 
-    const processValue = async(key, value) => {
+    const processValue = async (key, value) => {
         if (typeof value === 'object') {
 
             // If the value is an object (either JSON object or array), process recursively
@@ -427,7 +427,7 @@ async function getLegalTrainingMaterials(userInputData, promttype) {
 async function getLegalTrainingMaterialsFailed_txn(userInputData, promttype) {
     const result = [];
 
-    const processValue = async(key, value) => {
+    const processValue = async (key, value) => {
         if (typeof value === 'object') {
 
             // If the value is an object (either JSON object or array), process recursively

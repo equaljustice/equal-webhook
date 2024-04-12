@@ -1,4 +1,4 @@
-import banks from '../JSONs/banks.json' assert {type: "json"}; 
+import {banks} from '../JSONs/banks.js'
 const getBanks = async(req, res) => {
 res.send(banks);
 }

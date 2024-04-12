@@ -1,4 +1,4 @@
-[
+export const LegalTrainingATM = [
     {
         "qId": "1",
         "Question": "What is your PINCODE",

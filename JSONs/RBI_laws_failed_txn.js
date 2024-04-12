@@ -1,4 +1,4 @@
-[{
+export const RBI_laws_failed_txn = [{
         "qId": 1,
         "Questions": "What is your PINCODE?",
         "Parameters": "area_of_user",

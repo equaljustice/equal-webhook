@@ -18,10 +18,9 @@ export async function createMessageContent(prompttype, userInputPara, legalTrain
     return message;
 }
 
-export async function createUserInputParagraph(userInputData, transactionType) {
+export async function createUserInputParagraph(updatedUserData, transactionType) {
     try {
 
-        let updatedUserData = await removeKeys(userInputData);
         //console.log("updatedUserData", updatedUserData);
         let userInputMessage;
         switch (transactionType) {
@@ -65,7 +64,7 @@ export async function createUserInputParagraph(userInputData, transactionType) {
     }
 }
 
-async function removeKeys(jsonData) {
+export async function removeKeys(jsonData) {
     let cleanedJson = JSON.parse(JSON.stringify(jsonData)); // Create a deep copy of the json
     (function _clean(obj) {
         if (obj && typeof obj === 'object') {
@@ -79,7 +78,7 @@ async function removeKeys(jsonData) {
                         obj[key] = _clean(obj[key]); // Recurse if the value is an object
                     } else if (['senior_citizen', 'pension_savings_account', 'lost_atm',
                             'withdrawn_amount_exceed_daily_limit', 'prior_police_complaint',
-                            'transaction_happen_after_informed_bank_of_previous_fraud'
+                            'transaction_happen_after_informed_bank_of_previous_fraud','senior-citizen'
                         ]
                         .includes(key) && String(obj[key]).toLowerCase() === 'no') {
                         delete obj[key];
@@ -94,6 +93,9 @@ async function removeKeys(jsonData) {
                         delete obj[key]; // Delete the key if the value is 'yes' 
                     } else if (key === 'area_of_user' && String(obj[key]).toLowerCase() === 'urban') { delete obj[key]; } else if (['option_for_compliant'].includes(key)) {
                         delete obj[key];
+                    }
+                    else if(['pincode', 'transaction-counter', 'option_for_compliant', 'transactionArray'].includes(key)){
+                        delete obj[key]
                     }
                 });
             }

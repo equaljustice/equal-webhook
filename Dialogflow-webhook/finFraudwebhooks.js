@@ -1,6 +1,6 @@
 import { createAssistantThread, interactWithAssistant } from "../chatGPT/assistant-api.js";
 import { processDocx } from "../CloudStorage/processDocs.js";
-import urbanPincodes from '../JSONs/urbanPincodes.json' assert { type: "json" };
+import { urbanPincodes } from '../JSONs/urbanPincodes.js';
 import * as constants from '../constants.js';
 import * as types from '../utils/types.js'
 import { ATMLegalTrainingData, FailedTransactionLegalTrainingData, UPILegalTrainingData } from "../LegalMaterial/legalTrainingData.js";
@@ -28,7 +28,7 @@ var assistant_id_atm_bank = "asst_JXg4cxpxQo0ZukFcQuNs2229";
 var assistant_id_atm_RTI = "aasst_cYcV9lF2cCydoSFrv14Iozl7";
 var assistant_id_atm_consumer_court = "asst_AC6SXOaB2PgjyaTMF8YlarTh";
 var query = "";
-export const openQnA = async(req, res) => {
+export const openQnA = async (req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     try {
         let sessionInfo = req.body.sessionInfo;
@@ -74,7 +74,7 @@ export const openQnA = async(req, res) => {
     }
 };
 
-export const createDocWithAssistant = async(req, res) => {
+export const createDocWithAssistant = async (req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     let sessionInfo = req.body.sessionInfo;
     option = sessionInfo.parameters.option_for_compliant;
@@ -173,10 +173,10 @@ export const createDocWithAssistant = async(req, res) => {
         console.log(err);
     }
 };
-export const createDocWithFineTuned = async(req, res) => {
-   
+export const createDocWithFineTuned = async (req, res) => {
+
     try {
-        console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
+        //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
         let sessionInfo = req.body.sessionInfo;
         option = sessionInfo.parameters.option_for_compliant;
         let userInputData, legalTrainingData;
@@ -186,9 +186,10 @@ export const createDocWithFineTuned = async(req, res) => {
         let textResponse = 'Invalid request';
         let fileURL = '';
         let docName = '';
+        let generalData, transactionArray;
         let openAiConfig = {
             model: types.openAIModels.GPT3_5,
-            temperature: 0.1,
+            temperature: 0.25,
             max_tokens: 1500,
             n: 1,
             top_p: 1,
@@ -197,11 +198,11 @@ export const createDocWithFineTuned = async(req, res) => {
         }
         switch (tag) {
             case types.transaction.ATM:
-                let generalData = sessionInfo.parameters.generalData ?
+                generalData = sessionInfo.parameters.generalData ?
                     await cleanJson(sessionInfo.parameters.generalData) : "";
-                let transactionArray = sessionInfo.parameters.transactionArray ?
+                transactionArray = sessionInfo.parameters.transactionArray ?
                     cleanJson(sessionInfo.parameters.transactionArray) : "";
-                userInputData = {...generalData, transactionArray: [...transactionArray] };
+                userInputData = { ...generalData, transactionArray: [...transactionArray] };
                 userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.pincode);
                 legalTrainingData = ATMLegalTrainingData;
                 switch (option) {
@@ -242,8 +243,10 @@ export const createDocWithFineTuned = async(req, res) => {
                 }
                 break;
             case types.transaction.UPI:
-                userInputData = sessionInfo.parameters;
+                userInputData = sessionInfo.parameters ?
+                await cleanJson(sessionInfo.parameters) : "";
                 userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.pincode);
+                //console.log('cleaned JSon', userInputData);
                 legalTrainingData = UPILegalTrainingData;
                 switch (option) {
                     case types.letterOption.BANK_LETTER:
@@ -358,6 +361,7 @@ export const createDocWithFineTuned = async(req, res) => {
 };
 
 export function cleanJson(jsonData) {
+    try{
     let cleanedJson = JSON.parse(JSON.stringify(jsonData)); // Create a deep copy of the json
     (function _clean(obj) {
         Object.keys(obj).forEach(key => {
@@ -374,12 +378,16 @@ export function cleanJson(jsonData) {
                     _clean(obj[key]); // Recurse if the value is an object
                 }
             }
-            if (obj[key] === 'NA' || String(obj[key]).includes('$')) {
+            if (obj[key] === 'NA' || obj[key] === null || String(obj[key]).includes('$')) {
                 delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
             }
         });
     })(cleanedJson);
     return cleanedJson;
+}catch(error){
+    console.log(error);
+    return jsonData;
+}
 }
 
 function pincodeToArea(pincode) {
