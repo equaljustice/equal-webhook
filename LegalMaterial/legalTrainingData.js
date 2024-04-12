@@ -411,7 +411,7 @@ export const UPILegalTrainingData = [{
         "qId": "3",
         "Question": "Where did you create your UPI handle?",
         "Parameter": "upi-handle-provider",
-        "Condition": "UPI App",
+        "Condition": "UPI Apps",
         "LegalTrainingMaterial": "Although I have created my UPI ID on a non-bank UPI App service provider, this does not preclude the bank to ensure my bank account and transactions are protected against any fraud including by putting fraud protection and fraud monitoring obligations on the UPI App providers. Adhering to RBI has given a strong recommendation to UPI App providers and NPCI has obligated the UPI App providers to follow the RBI mandated fraud protection and fraud monitoring guidelines to protect the bank account and money of the customers against any fraud or deceit"
     },
     {
@@ -607,14 +607,14 @@ export const UPILegalTrainingData = [{
         "qId": "31",
         "Question": "If yes, working days (excluding bank holidays) within which you informed the bank",
         "Parameter": "informed_bank_fraud_transaction_within",
-        "Condition": "between 4 to 7 days",
+        "Condition": "Between 4 - 7",
         "LegalTrainingMaterial": "As per the RBI guidelines and settled legal principles a mere delayed intimation of the transaction does not absolve bank from getting away from its primary duty to implement adequate monitoring / surveillance and other technologies to prevent the frauds in the account of the customer. Even if there is delay by the customer which in this case is a mere delayed intimation between 4 to 7 days, the bank is still fully liable to compensate the customer if the bank has been found negligent or there is a deficiency in service by the bank to protect the account of the customer. The bank should also be asked to demonstrate what actions and investigations it had undertaken to recover the money from the fraudulent person or from the account of the beneficiary or thereafter if there is a chain of onward transactions. The bank should also be asked to demonstrate whether it had received the money from the beneficiary bank and not credited to my account. Furthermore, if the beneficiary is a merchant, then the bank should be asked to demonstrate why it has not recovered the fraudulent money under a chargeback process, and if it has recovered, then why it did not credit my account."
     },
     {
         "qId": "32",
         "Question": "If yes, working days (excluding bank holidays) within which you informed the bank",
         "Parameter": "informed_bank_fraud_transaction_within",
-        "Condition": "more than 7 days",
+        "Condition": "More than 7",
         "LegalTrainingMaterial": "As per the RBI guidelines and settled legal principles a mere delayed intimation of the transaction does not absolve bank from getting away from its primary duty to implement adequate monitoring / surveillance and other technologies to prevent the frauds in the account of the customer. Even if there is delay which in this case is a mere delayed intimation of more than 7 days, the bank is still fully liable to compensate the customer if the bank has been found negligent or there is a deficiency in service by the bank to protect the account of the customer. The bank should also be asked to demonstrate what actions and investigations it had undertaken to recover the money from the fraudulent person or from the account of the beneficiary or thereafter if there is a chain of onward transactions. The bank should also be asked to demonstrate whether it had received the money from the beneficiary bank and not credited to my account. Furthermore, if the beneficiary is a merchant, then the bank should be asked to demonstrate why it has not recovered the fraudulent money under a chargeback process, and if it has recovered, then why it did not credit my account"
     },
     {
