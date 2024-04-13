@@ -10,8 +10,6 @@
   "scripts": {
     "start": "node index.js",
     "dev": "NODE_ENV=development nodemon index.js",
-    "lint": "eslint --ext *.js --ext test/*.js",
-    "fix": "eslint --fix --ext *.js --ext test/*.js",
     "build-image": "gcloud builds submit --pack image=asia-south1-docker.pkg.dev/atmprebuiltagent/cloud-run-source-deploy:manual",
     "deploy": "gcloud run deploy microservice-template --image asia-south1-docker.pkg.dev/atmprebuiltagent/cloud-run-source-deploy:manual --region asia-south1",
     "test": "mocha test/app.test.js --check-leaks",
@@ -39,8 +37,6 @@
     "pizzip": "^3.1.6"
   },
   "devDependencies": {
-    "eslint": "^8.57.0",
-    "eslint-config-google": "^0.14.0",
     "got": "^14.0.0",
     "mocha": "^10.3.0",
     "nodemon": "^3.1.0",
