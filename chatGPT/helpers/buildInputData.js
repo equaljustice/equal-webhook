@@ -78,7 +78,12 @@ export async function removeKeys(jsonData) {
                         obj[key] = _clean(obj[key]); // Recurse if the value is an object
                     } else if (['senior_citizen', 'pension_savings_account', 'lost_atm',
                             'withdrawn_amount_exceed_daily_limit', 'prior_police_complaint',
-                            'transaction_happen_after_informed_bank_of_previous_fraud','senior-citizen'
+                            'transaction_happen_after_informed_bank_of_previous_fraud','senior-citizen',
+                            'upi-handle-of-pension-bank-account','last-upi-transaction-more-than-one-year-ago',
+                            'transaction-happened-after-block-disable-upi-id','upi-pin-share-with-bank-or-upiapp-officer-at-bank-office',
+                            'upi-lost-mobileorsim','upi-simclone', 'user-enabled-geolocation-on-upi-app',
+                            'did-the-fraud-amount-exceeded-the-daily-payment-limit',
+                            'transaction_happen_after_informed_bank_or_UPIapp_of_previous_fraud'
                         ]
                         .includes(key) && String(obj[key]).toLowerCase() === 'no') {
                         delete obj[key];
@@ -87,14 +92,16 @@ export async function removeKeys(jsonData) {
                             'transaction_sms_recieved', 'transaction_sms_recieved_within_one_hour',
                             'transaction_email_recieved', 'transaction_email_recieved_within_one_hour',
                             'transaction_from_ATM_in_home_city_or_work_city',
-                            'transaction_from_ATM_in_home_city_or_work_city_regularly_withdrawing'
+                            'transaction_from_ATM_in_home_city_or_work_city_regularly_withdrawing',
+                            'user_created_upi_handle'
                         ]
                         .includes(key) && String(obj[key]).toLowerCase() === 'yes') {
                         delete obj[key]; // Delete the key if the value is 'yes' 
                     } else if (key === 'area_of_user' && String(obj[key]).toLowerCase() === 'urban') { delete obj[key]; } else if (['option_for_compliant'].includes(key)) {
                         delete obj[key];
                     }
-                    else if(['pincode', 'transaction-counter', 'option_for_compliant', 'transactionArray'].includes(key)){
+                    else if(['pincode', 'transaction-counter', 'option_for_compliant', 'transactionArray',
+                            'upi-simclone-telcoinform'].includes(key)){
                         delete obj[key]
                     }
                 });

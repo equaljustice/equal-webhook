@@ -1,5 +1,5 @@
 export async function getLegalTraining(userInputData, legalTrainingData) {
-    const result = ["RBI Guidelines:\n"];
+    const result = [];
 
     const processValue = async(key, value) => {
         if (typeof value === 'object') {
