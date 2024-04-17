@@ -1,4 +1,4 @@
-[
+export const banks = [
     "Bank of Baroda",
     "Bank of India",
     "Bank of Maharashtra",

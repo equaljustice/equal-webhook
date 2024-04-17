@@ -1,5 +1,5 @@
 import { Pinecone } from '@pinecone-database/pinecone'
-import LegalTrainingATM from '../../JSONs/embOutput.json' assert {type: "json"};
+import LegalTrainingATM from '../../JSONs/embOutput.json'
 const pc = new Pinecone({ apiKey: "59b5ebcc-942b-4a5d-bce7-b778a42056d8" })
 const index = pc.index("atm-conditions")
 

@@ -1,4 +1,4 @@
-[
+export const qjson = [
     {
       "qid": 1,
       "question": {
