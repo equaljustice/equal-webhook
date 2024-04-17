@@ -1,6 +1,6 @@
 //const APIrouter = require('express').Router();
 import express from 'express';
-import { getQuestionJson } from './APIs/ATMFraudQuestions.js';
+import { getQuestionJson } from './APIs/getQuestions.js';
 import { getCities, getStates } from './APIs/StateCity.js';
 import { getBanks } from './APIs/Banks.js';
 import path from 'path';
@@ -14,7 +14,7 @@ import { listFiles, downloadFile } from './APIs/getGCSFiles.js';
 import { getSysFiles, downloadSysFiles } from './APIs/getRootFiles.js';
 const APIrouter = express.Router();
 
-APIrouter.use('/getATMfraudQuestions', getQuestionJson);
+APIrouter.use('/getQuestions', getQuestionJson);
 APIrouter.use('/getStates', getStates);
 APIrouter.use('/getCities/:stateCode', getCities);
 APIrouter.use('/getBanks', getBanks);

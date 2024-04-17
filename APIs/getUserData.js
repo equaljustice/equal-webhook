@@ -1,5 +1,7 @@
-import { createLetter } from "../Services/createLetter.js";
+import { createLetter } from "../chatGPT/createDocuments.js";
 import { urbanPincodes } from '../JSONs/urbanPincodes.js'
+import * as constants from '../constants.js';
+import { ATMLegalTrainingData, FailedTransactionLegalTrainingData, UPILegalTrainingData } from "../LegalMaterial/legalTrainingData.js";
 
 const postUserAnswers = async (req, res) => {
   console.log('Input from API', JSON.stringify(req.body, null, 2));
@@ -7,8 +9,19 @@ const postUserAnswers = async (req, res) => {
   userInputData.area_of_user = urbanPincodes.includes(Number(userInputData.area_of_user.slice(0, 3))) ? "urban" : "rural";
   var threadId = generateSessionId(15);
   console.log('Prepared Data', JSON.stringify(userInputData, null, 2));
-  createLetter(req.body.fraudType, req.body.letterOption, userInputData, threadId)
-  res.send({ downloadLink: 'https://equal-webhook-nh3rcdoxhq-el.a.run.app/' + threadId });
+  let openAiConfig = {
+    model: types.openAIModels.GPT3_5,
+    temperature: 0.25,
+    max_tokens: 1500,
+    n: 1,
+    top_p: 1,
+    frequency_penalty: 1,
+    presence_penalty: 0,
+  }
+  createLetter(req.body.fraudType, req.body.letterOption, userInputData, ATMLegalTrainingData, threadId, openAiConfig);
+  let fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + req.body.fraudType + '_' + req.body.letterOption.replace(' ', '') + '.docx';
+        
+  res.send({ downloadLink: fileURL });
 }
 const prepareInputData = (inputJson) => {
   const outputJson = {}
