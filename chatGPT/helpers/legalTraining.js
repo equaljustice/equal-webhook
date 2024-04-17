@@ -1,6 +1,5 @@
-
 export async function getLegalTraining(userInputData, legalTrainingData) {
-    const result = ["RBI Guidelines"];
+    const result = [];
 
     const processValue = async(key, value) => {
         if (typeof value === 'object') {
@@ -14,6 +13,7 @@ export async function getLegalTraining(userInputData, legalTrainingData) {
             // If the value is not an object, find matching questions
 
             const matchingQuestions = legalTrainingData.filter(item => item.Parameter.toLowerCase() === key.toLowerCase() && item.Condition.toLowerCase() === value.toLowerCase());
+            //console.log('matchingQuestions', matchingQuestions);
             matchingQuestions.forEach(matchingQuestion => {
                 result.push(matchingQuestion.LegalTrainingMaterial + `\n\n`);
             });

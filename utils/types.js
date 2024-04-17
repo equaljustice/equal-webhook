@@ -6,7 +6,8 @@ export const openAIModels = {
     ATM_FRAUD_OMBUDSMAN: 'ft:gpt-3.5-turbo-1106:ashish-chandra:atmombudsman:8zov1AhH',
     FAILED_TRANASACTION_BANK: 'ft:gpt-3.5-turbo-1106:ashish-chandra:failed-trn-bankltr:96IUpuRq',
     FAILED_TRANASACTION_CONSUMER_COURT: 'ft:gpt-3.5-turbo-1106:ashish-chandra:failedtr-consumerc:9AFwUlml',
-    FAILED_TRANASACTION_OMBUDSMAN: 'ft:gpt-3.5-turbo-1106:ashish-chandra:failedtr-obmudsman:9AEMVzCm'
+    FAILED_TRANASACTION_OMBUDSMAN: 'ft:gpt-3.5-turbo-1106:ashish-chandra:failedtr-obmudsman:9AEMVzCm',
+    OPEN_QNA: 'ft:gpt-3.5-turbo-1106:ashish-chandra::8xglmTtV'
 }
 
 export const transaction = {

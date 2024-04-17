@@ -1,4 +1,4 @@
-import LegalTrainingATM from '../JSONs/LegalTrainingATM.json' assert {type: "json"}; 
+import LegalTrainingATM from '../JSONs/LegalTrainingATM.js'
   
   const inputJson = {"senior-citizen": "yes", "pensionner": "yes", "tr-sms":"No"};
   

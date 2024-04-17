@@ -1,7 +1,9 @@
 import OpenAI from 'openai';
-import { createUserInputParagraph } from '../chatGPT/completion.js';
 import { cleanJson } from './finFraudwebhooks.js';
-import urbanPincodes from '../JSONs/urbanPincodes.json' assert {type: "json"};
+import { urbanPincodes } from '../JSONs/urbanPincodes.js'
+import { createUserInputParagraph, removeKeys } from '../chatGPT/helpers/buildInputData.js';
+import { openAiChatCompletion } from '../chatGPT/helpers/openAI.js';
+import * as types from "../utils/types.js"; 
 export const openQnAFineTuned = async (req, res) => {
     //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     try {
@@ -9,9 +11,8 @@ export const openQnAFineTuned = async (req, res) => {
         var counter = sessionInfo.parameters.counter;
         var responseJson = '';
         var messagesHistory = sessionInfo.parameters.messages ? sessionInfo.parameters.messages : [];
-        var userInputPara = '';
         let userInputData;
-        let generalData; 
+        let generalData;
         let transactionArray;
         let queryMessage = [];
         if (counter == 1) {
@@ -21,7 +22,7 @@ export const openQnAFineTuned = async (req, res) => {
             }];
             const tag = req.body.fulfillmentInfo.tag;
             switch (tag) {
-                case "ATMQnA":
+                case types.transaction.ATM:
                     generalData = sessionInfo.parameters.generalData ?
                         cleanJson(sessionInfo.parameters.generalData)
                         : "";
@@ -32,12 +33,17 @@ export const openQnAFineTuned = async (req, res) => {
 
                     userInputData = { ...generalData, transactionArray: [...transactionArray] }
                     break;
-                case "Failed_txnQnA":
+                case types.transaction.FAILED_TRANASACTION:
                     userInputData = JSON.parse(sessionInfo.parameters.generalData);
                     userInputData.area_of_user = urbanPincodes.includes(Number(sessionInfo.parameters.area_of_user.slice(0, 3))) ? "urban" : "rural";
                     break;
+                case types.transaction.UPI:
+                    userInputData = sessionInfo.parameters ?
+                await cleanJson(sessionInfo.parameters) : "";
+                break
             }
-            userInputPara = await createUserInputParagraph(userInputData, sessionInfo.parameters.threadId)
+            const updatedUserData = await removeKeys(userInputData);
+        const userInputPara = await createUserInputParagraph(updatedUserData, tag);
             messagesHistory = sysMessage.concat([{ role: "user", content: userInputPara }])
         }
         var responseMessage = '';
@@ -51,7 +57,7 @@ export const openQnAFineTuned = async (req, res) => {
                 content: req.body.text
             }]);
             queryMessage = messagesHistory.concat(queryMessage);
-            const QnAResponse = await openAiCompletionWithFineTunedQnA(queryMessage);
+            const QnAResponse = await openAiChatCompletion(queryMessage, types.openAIModels.OPEN_QNA, 0.8, 500,1,0.9,0.2,0);
             responseMessage = QnAResponse.choices[0].message.content
         } else {
             responseMessage = "Your questions limit is over, Thank you for using our service, hope your issue will be resolved"

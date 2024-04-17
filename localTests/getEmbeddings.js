@@ -1,4 +1,4 @@
-import data from '../JSONs/LegalTrainingATMsample.json' assert {type: "json"}; 
+import LegalTrainingATM from '../JSONs/LegalTrainingATM.js'
 import fs from 'fs';
 import OpenAI from "openai";
 
@@ -14,7 +14,7 @@ async function getEmbeddings(text) {
 async function processQuestions() {
   const processedData = [];
 
-  for (const item of data) {
+  for (const item of LegalTrainingATM) {
     const conditionEmbedding = await getEmbeddings(item.Parameter +':'+ item.Condition);
     //const conditionEmbedding = await getEmbeddings(item.Condition);
     //const legalTrainingMaterialEmbedding = await getEmbeddings(item.LegalTrainingMaterial);
