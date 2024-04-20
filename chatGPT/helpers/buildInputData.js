@@ -101,7 +101,7 @@ export async function removeKeys(jsonData) {
                         delete obj[key];
                     }
                     else if(['pincode', 'transaction-counter', 'option_for_compliant', 'transactionArray',
-                            'upi-simclone-telcoinform'].includes(key)){
+                            'upi-simclone-telcoinform','compensation-and-damages'].includes(key)){
                         delete obj[key]
                     }
                 });
