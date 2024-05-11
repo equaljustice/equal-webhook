@@ -5,6 +5,7 @@ import * as types from '../utils/types.js'
 import { ATMLegalTrainingData, FailedTransactionLegalTrainingData, UPILegalTrainingData } from "../LegalMaterial/legalTrainingData.js";
 
 export const postUserAnswers = async (req, res) => {
+  try{
   console.log('Input from API', JSON.stringify(req.body, null, 2));
   let userInputData = prepareInputData(req.body.data);
   userInputData.area_of_user = urbanPincodes.includes(Number(userInputData.area_of_user.slice(0, 3))) ? "urban" : "rural";
@@ -23,8 +24,12 @@ export const postUserAnswers = async (req, res) => {
   let fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + req.body.fraudType + '_' + req.body.letterOption.replace(' ', '') + '.docx';
         
   res.send({ downloadLink: fileURL });
+}catch(err){
+  console.log(err);
+}
 }
 export const prepareInputData = (inputJson) => {
+  try{
   const outputJson = {}
   inputJson.forEach(item => {
     if (item.parameter === 'fraud_transactions_count') {
@@ -43,6 +48,9 @@ export const prepareInputData = (inputJson) => {
     }
   });
   return outputJson;
+}catch(err){
+  console.log(err);
+}
 };
 export function generateSessionId(length) {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

@@ -5,7 +5,7 @@ import { createUserInputParagraph, removeKeys } from '../chatGPT/helpers/buildIn
 import { openAiChatCompletion } from '../chatGPT/helpers/openAI.js';
 import * as types from "../utils/types.js"; 
 export const openQnAFineTuned = async (req, res) => {
-    //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
+    console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     try {
         let sessionInfo = req.body.sessionInfo;
         var counter = sessionInfo.parameters.counter;
@@ -41,6 +41,10 @@ export const openQnAFineTuned = async (req, res) => {
                     userInputData = sessionInfo.parameters ?
                 await cleanJson(sessionInfo.parameters) : "";
                 break
+                case types.employee.Retrenchment:
+                    userInputData = sessionInfo.parameters ?
+                    await cleanJson(sessionInfo.parameters) : "";
+                break;
             }
             const updatedUserData = await removeKeys(userInputData);
         const userInputPara = await createUserInputParagraph(updatedUserData, tag);
@@ -50,7 +54,7 @@ export const openQnAFineTuned = async (req, res) => {
         let len = req.body.text.length;
         if (len > 300 && counter < 12) {
             responseMessage = "It's crossing 300 characters limit, please be within limit"
-        } else if (counter == null || counter < 12 && len < 300) {
+        } else if (counter == null || counter < 11 && len < 300) {
 
             queryMessage = queryMessage.concat([{
                 role: "user",

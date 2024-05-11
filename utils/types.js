@@ -13,7 +13,12 @@ export const openAIModels = {
 export const transaction = {
     ATM: 'ATM',
     FAILED_TRANASACTION: 'FAILED_TXN',
-    UPI: 'UPI'
+    UPI: 'UPI',
+    
+}
+
+export const employee = {
+    Retrenchment: 'Retrenchment'
 }
 
 export const letterOption = {
@@ -21,7 +26,10 @@ export const letterOption = {
     BANKING_OMBUDSMAN: "Banking Ombudsman",
     POLICE_COMPLAINT: "Police Complaint",
     CONSUMER_COURT: "Consumer court",
-    RTI_APPLICATION: "RTI Application"
+    RTI_APPLICATION: "RTI Application",
+    NOTICE_TO_COMPANY_HR: "Notice To The Company",
+    HUMAN_RIGHTS: "Complaint before Human Rights Commission",
+    BORD_OF_DIRECTOR: "Complaint To The Board Of Directors"
 }
 
 export const targetpage = {
