@@ -3,7 +3,7 @@ import { processDocx } from "../CloudStorage/processDocs.js";
 import { urbanPincodes } from '../JSONs/urbanPincodes.js';
 import * as constants from '../constants.js';
 import * as types from '../utils/types.js'
-import { ATMLegalTrainingData, FailedTransactionLegalTrainingData, UPILegalTrainingData } from "../LegalMaterial/legalTrainingData.js";
+import { ATMLegalTrainingData, EmployeeTrainingData, FailedTransactionLegalTrainingData, UPILegalTrainingData } from "../LegalMaterial/legalTrainingData.js";
 import { createLetter } from "../chatGPT/createDocuments.js";
 let assi_id = "";
 let option = "";
@@ -244,7 +244,7 @@ export const createDocWithFineTuned = async (req, res) => {
                 break;
             case types.transaction.UPI:
                 userInputData = sessionInfo.parameters ?
-                await cleanJson(sessionInfo.parameters) : "";
+                    await cleanJson(sessionInfo.parameters) : "";
                 userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.pincode);
                 //console.log('cleaned JSon', userInputData);
                 legalTrainingData = UPILegalTrainingData;
@@ -325,12 +325,38 @@ export const createDocWithFineTuned = async (req, res) => {
                         break;
                 }
                 break;
+            case types.employee.Retrenchment:
+                userInputData = sessionInfo.parameters ?
+                    await cleanJson(sessionInfo.parameters) : "";
+                console.log("User input data", userInputData);
+                legalTrainingData = EmployeeTrainingData;
+                switch (option) {
+                    case types.letterOption.NOTICE_TO_COMPANY_HR:
+                         openAiConfig.temperature = 0.5;
+                        // openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_BANK;
+                        break;
+                    case types.letterOption.BORD_OF_DIRECTOR:
+                        //openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_OMBUDSMAN;
+                        break;
+                    case types.letterOption.POLICE_COMPLAINT:
+                        openAiConfig.temperature = 0.5;
+                        break;
+                    case types.letterOption.LABOUR_COURT:
+                        //openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_CONSUMER_COURT;
+                        break;
+                    case types.letterOption.RTI_APPLICATION:
+                        //openAiConfig.model =
+                        break;
+                }
+                break;
+
         }
 
-        textResponse = `Creating ${option} Letter, Please wait`;
-        docName = `${option} letter`;
-        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + tag + '_' + option.replace(' ', '') + '.docx';
-        createLetter(tag, option.replace(' ', ''), userInputData, legalTrainingData, threadId, openAiConfig);
+        textResponse = `Creating ${option}, Please wait`;
+        docName = `${option}`;
+        option = option.split(' ').join('_');
+        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + tag + '_' + option + '.docx';
+        createLetter(tag, option, userInputData, legalTrainingData, threadId, openAiConfig);
 
         const responseJson = {
             fulfillment_response: {
@@ -361,33 +387,33 @@ export const createDocWithFineTuned = async (req, res) => {
 };
 
 export function cleanJson(jsonData) {
-    try{
-    let cleanedJson = JSON.parse(JSON.stringify(jsonData)); // Create a deep copy of the json
-    (function _clean(obj) {
-        Object.keys(obj).forEach(key => {
-            if (obj[key] && typeof obj[key] === 'object') {
-                if (Array.isArray(obj[key])) {
-                    obj[key] = obj[key].map(item => {
-                        if (typeof item === 'object') {
-                            return _clean(item);
-                        } else {
-                            return item;
-                        }
-                    });
-                } else {
-                    _clean(obj[key]); // Recurse if the value is an object
+    try {
+        let cleanedJson = JSON.parse(JSON.stringify(jsonData)); // Create a deep copy of the json
+        (function _clean(obj) {
+            Object.keys(obj).forEach(key => {
+                if (obj[key] && typeof obj[key] === 'object') {
+                    if (Array.isArray(obj[key])) {
+                        obj[key] = obj[key].map(item => {
+                            if (typeof item === 'object') {
+                                return _clean(item);
+                            } else {
+                                return item;
+                            }
+                        });
+                    } else {
+                        _clean(obj[key]); // Recurse if the value is an object
+                    }
                 }
-            }
-            if (obj[key] === 'NA' || obj[key] === null || String(obj[key]).includes('$')) {
-                delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
-            }
-        });
-    })(cleanedJson);
-    return cleanedJson;
-}catch(error){
-    console.log(error);
-    return jsonData;
-}
+                if (obj[key] === 'NA' || obj[key] === null || String(obj[key]).includes('$')) {
+                    delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
+                }
+            });
+        })(cleanedJson);
+        return cleanedJson;
+    } catch (error) {
+        console.log(error);
+        return jsonData;
+    }
 }
 
 function pincodeToArea(pincode) {

@@ -1,7 +1,9 @@
 export async function getLegalTraining(userInputData, legalTrainingData) {
     const result = [];
-
-    const processValue = async(key, value) => {
+    if (legalTrainingData == '') {
+        return result;
+    }
+    const processValue = async (key, value) => {
         if (typeof value === 'object') {
 
             // If the value is an object (either JSON object or array), process recursively

@@ -1,17 +1,17 @@
 //const APIrouter = require('express').Router();
 import express from 'express';
-import { getQuestionJson } from './APIs/getQuestions.js';
-import { getCities, getStates } from './APIs/StateCity.js';
-import { getBanks } from './APIs/Banks.js';
+import { getQuestionJson } from './UI-APIs/getQuestions.js';
+import { getCities, getStates } from './UI-APIs/StateCity.js';
+import { getBanks } from './UI-APIs/Banks.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { openQnA, createDocWithAssistant, createDocWithFineTuned } from './Dialogflow-webhook/finFraudwebhooks.js';
 import { openQnAFineTuned } from './Dialogflow-webhook/qnaCompletion.js';
-import { postUserAnswers } from './APIs/getUserData.js'
+import { postUserAnswers } from './UI-APIs/postUserData.js'
 import { authenticate, authenticateToken } from './Services/authenticate.js';
-import { listFiles, downloadFile } from './APIs/getGCSFiles.js';
-import { getSysFiles, downloadSysFiles } from './APIs/getRootFiles.js';
+import { listFiles, downloadFile } from './UI-APIs/getGCSFiles.js';
+import { postOpenQuestion } from './UI-APIs/openQnA.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/getQuestions', getQuestionJson);
@@ -23,8 +23,7 @@ APIrouter.post('/postUserData', postUserAnswers);
 APIrouter.post('/webhook_QnAFineTuned', openQnAFineTuned);
 APIrouter.post('/webhook_createDoc', createDocWithAssistant);
 APIrouter.post('/webhook_createDocWithFineTuned', createDocWithFineTuned);
-APIrouter.use('/getSysFiles', getSysFiles);
-APIrouter.use('/downloadSysFile', downloadSysFiles);
+APIrouter.post('/postUserQuestion', postOpenQuestion);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
