@@ -1,5 +1,8 @@
-export async function getLegalTraining(userInputData, legalTrainingData) {
+export async function getLegalTraining(userInputData, legalTrainingData, letterOption, tag) {
     const result = [];
+    if(["RTIApplication", "PoliceComplaint"].includes(letterOption) && tag != types.employee.Retrenchment){
+        return result;
+    }
     if (legalTrainingData == '') {
         return result;
     }

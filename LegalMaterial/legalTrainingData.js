@@ -1155,3 +1155,140 @@ export const EmployeeTrainingData = [
         "LegalTrainingMaterial": "As I am covered under the benefits and protections under Employee State Insurance Act, my termination of employment during the course of my availing medical treatment is unfair, inhuman and illegal. You are hereby notified to immediately reinstate my employment from retrospective effect and continue to support my financial and medical expenses and income till such time I am fully recovered."
     }
 ]
+
+export const EmployeeTrainingData_PoliceComplaint = [
+    
+    {
+        "qId": 7,
+        "Question": "Are you holding any statutory position in your company like board of directors, compliance officer, principal officer, manager, occupier, etc.?",
+        "Parameter": "Employee_holding_statutory_positions",
+        "Condition": "Yes",
+        "LegalTrainingMaterial": "I would like to put on record that I have ceased to hold all statutory positions under applicable laws that I was holding for my employer during my employment. I have informed my employer to inform all the relevant statutory authorities of my cessation of my such statutory positions. I would further like to put on record through your good offices that the duties performed by me under these statutory positions were performed under the overall directions, supervision and advice of the senior management and my managers, and not by me alone."
+    },
+    {
+        "qId": 8,
+        "Question": "If you are a signatory to the bank accounts of your company, have you signed any cheques or given any auto debit instructions for the company which are not yet encashed or signed any post dated cheques?",
+        "Parameter": "Employee_signed_cheques_remain_uncashed",
+        "Condition": "Yes",
+        "LegalTrainingMaterial": "I would like to bring to notice and put on record that, in my capacity as an employee, I was made an authorized signatory to the bank accounts of my employer. In the course of my employment, I may have signed various cheques or would have given auto debit instructions. I have notified to my employer to ensure either those cheques are returned and replaced with new cheques with other signatories, or the auto debit instructions under my named are canceled, or the cheques are duly honored and encash whenever presented by the payee, or auto debit is duly processed in favor of the payee whenever due. I shall not be responsible or liable for any dishonor of any cheques or auto debit instructions, if my employer fails to make payment under those cheques / instructions to the payee."
+    },
+    {
+        "qId": 9,
+        "Question": "Are you named as a complainant or witness in any legal matter of your company?",
+        "Parameter": "Employee_named_as_complainant_or_witness_for_employer_legal_matters",
+        "Condition": "Yes",
+        "LegalTrainingMaterial": "I would like to put on notice and bring on record that during the course of my employment, I was asked to act as a complainant or I was a witness in certain legal or law enforcement matters of the employer. The employer is notified to undertake all necessary actions to immediately replace my name with any other authorized person’s name as the complainant on behalf of the employer, and provide me with sufficient proof of such change."
+    },
+    {
+        "qId": 14,
+        "Question": "Have you been forced to voluntarily resign by threats of performance issues or disciplinary actions?",
+        "Parameter": "Employee_threatened_by_employer_to_voluntary_resign",
+        "Condition": "Yes",
+        "LegalTrainingMaterial": "I was coerced into tendering a voluntary resignation against my free will. I was put under threat and duress with unjustified and illegal consequences including that of false allegations of poor job performance or breach of employer’s policies and conduct, and damaging my personal character in the records of the employer. In light of this, I hereby declare that my termination of employment was not voluntary but an act of deceit, coercion, threat, intimidation and illegal activities of the employers and its other employees involved in the termination of my employment.  "
+    },
+    {
+        "qId": 15,
+        "Question": "For employees belonging to Scheduled Caste or Scheduled Tribe (SC/ST): Do you believe you have been unfairly treated in termination of your employment due to your caste? ",
+        "Parameter": "Employee_belongs_to_schedule_cast_or_schedule_tribe_and_unfairly_terminated",
+        "Condition": "Yes",
+        "LegalTrainingMaterial": "I was threatened, intimidated, and put into wrongful and illegal confinement and coerced and forced to tender my resignation against my will on the grounds of voluntary termination. I was illegally confined and threatened with false allegations to ruin my personal character and professional credentials, if I refuse to tender voluntary resignation to the employer against my free will."
+    },
+    {
+        "qId": 16,
+        "Question": "For employees belonging to Scheduled Caste or Scheduled Tribe (SC/ST): Do you believe you have been unfairly treated in termination of your employment due to your caste? ",
+        "Parameter": "Employee_belongs_to_schedule_cast_or_schedule_tribe_and_unfairly_terminated",
+        "Condition": "Not Aware",
+        "LegalTrainingMaterial": "Being a scheduled caste or a scheduled tribe, I am given special protections under the relevant laws of India. I was unfairly and unjustifiably treated amongst other classes or castes of employees or workers in the process of termination. This is a clear violation of applicable laws meant for the dignity and protection of the employees or workers belonging to scheduled caste and scheduled tribes. This is also a criminal wrong with criminal punishment to act unfairly with our castes of people."
+    },
+    {
+        "qId": 27,
+        "Question": "Are you being terminated as a result of retaliation against your complaint?",
+        "Parameter": "Employee_terminated_as_retaliation_to_previous_complaint_filed_by_employee",
+        "Condition": "Yes",
+        "LegalTrainingMaterial": "I would like to bring to your notice that I had recently filed a complaint with the employer on a certain matter as given in the User inputs above. It is my belief that my employment is being terminated as a result of retaliation against such a complaint. This action indicates internal conspiracies and collusion for the illegal acts under my complaint. You are requested to kindly initiate a thorough investigation on the internal affairs of the employer to check any criminal wrongs being conducted by them."
+    },
+    {
+        "qId": 28,
+        "Question": "Were you paid your full salary due up to the date of termination?",
+        "Parameter": "Employee_received_all_salary_for_retrenchment",
+        "Condition": "No",
+        "LegalTrainingMaterial": "The remuneration and other compensation that was earned by me or accrued to me was held in trust by my employer. I was not paid my dues and I strongly believe my employer had no intention to pay me my dues when they would have internally decided to illegally terminate my employment. This is not only a mala fide and illegal act on the part of my employer and its management and other responsible employees, but also an act of breach of trust, which is a cognizable and non-bailable offense under the Indian Penal Code (or its successor legislation, if any). You are requested to take cognizance of this complaint and register an appropriate FIR against the employer, its management and other responsible employees."
+    },
+    {
+        "qId": 29,
+        "Question": "Were you paid any accrued bonus or incentives that were due, including those based on time or performance?",
+        "Parameter": "Employee_received_bonus_or_incentive_on_retrenchment",
+        "Condition": "No",
+        "LegalTrainingMaterial": "The bonuses and other incentives that were earned by me or accrued to me were held in trust by my employer. I was not paid my dues and I strongly believe my employer had no intention to pay me my dues when they would have internally decided to illegally terminate my employment. This is not only a mala fide and illegal act on the part of my employer and its management and other responsible employees, but also an act of breach of trust, which is a cognizable and non-bailable offense under the Indian Penal Code (or its successor legislation, if any). You are requested to take cognizance of this complaint and register an appropriate FIR against the employer, its management and other responsible employees."
+    },
+    {
+        "qId": 30,
+        "Question": "Were you paid leave encashment that was due?",
+        "Parameter": "Employee_received_leave_encashment_that_was_due",
+        "Condition": "No",
+        "LegalTrainingMaterial": "The leave encashments that were earned by me or accrued to me were held in trust by my employer. I was not paid my dues and I strongly believe my employer had no intention to pay me my dues when they would have internally decided to illegally terminate my employment. This is not only a mala fide and illegal act on the part of my employer and its management and other responsible employees, but also an act of breach of trust, which is a cognizable and non-bailable offense under the Indian Penal Code (or its successor legislation, if any). You are requested to take cognizance of this complaint and register an appropriate FIR against the employer, its management and other responsible employees."
+    },
+    {
+        "qId": 31,
+        "Question": "Were you paid gratuity that was due? ",
+        "Parameter": "Employee_received_gratuity_that_was_due ",
+        "Condition": "No",
+        "LegalTrainingMaterial": "The gratuity that was earned by me or accrued to me was held in trust by my employer. I was not paid my dues and I strongly believe my employer had no intention to pay me my dues when they would have internally decided to illegally terminate my employment. This is not only a mala fide and illegal act on the part of my employer and its management and other responsible employees, but also an act of breach of trust, which is a cognizable and non-bailable offense under the Indian Penal Code (or its successor legislation, if any). You are requested to take cognizance of this complaint and register an appropriate FIR against the employer, its management and other responsible employees."
+    },
+    {
+        "qId": 37,
+        "Question": "Do you wish to claim overtime salary if you were often required by your company or manager to work beyond standard office hours or on weekends (for eg: you worked extra in more than 50% of your working days and many weekends), and were not paid overtime? ",
+        "Parameter": "Working_outside_working_hours_and_weekends_and_wants_overtime",
+        "Condition": "Yes",
+        "LegalTrainingMaterial": "I was threatened and intimidated with dire consequences if I do not frequently work beyond office hours within the confinements of the office against my wishes. I was also frequently put into wrongful and illegal confinement within the office premises against my wishes, whenever I wanted to return back to my home."
+    },
+    {
+        "qId": 39,
+        "Question": "Are you aware that your company has deposited the TDS on Salary / Compensation?",
+        "Parameter": "Employer_deposited_TDS_on_salary_to_government_department",
+        "Condition": "No",
+        "LegalTrainingMaterial": "I am unsure whether the employer has been depositing the tax with the government which it has deducted from my remuneration. If the employer is not depositing, then it amounts to cheating the government of tax dues, and wrongful gain to the employer by illegally using the money which is due to others."
+    },
+    {
+        "qId": 40,
+        "Question": "Are you aware that your company has deposited the TDS on Salary / Compensation?",
+        "Parameter": "Employer_deposited_TDS_on_salary_to_government_department",
+        "Condition": "Not Aware",
+        "LegalTrainingMaterial": "I am unsure whether the employer has been depositing the tax with the government which it has deducted from my remuneration. If the employer is not depositing, then it amounts to cheating the government of tax dues, and wrongful gain to the employer by illegally using the money which is due to others."
+    },
+    {
+        "qId": 41,
+        "Question": "Are you aware that your company has deposited the Employee’s contribution to PF?",
+        "Parameter": "Employer_deposited_employee_pf_contribution_to_government_department",
+        "Condition": "No",
+        "LegalTrainingMaterial": "I am unsure whether the employer has been depositing the provident fund deducted from my remuneration with the government. If the employer is not depositing, then it amounts to cheating the employee of his life-time savings, and wrongful gain to the employer by illegally using the money which is due to others."
+    },
+    {
+        "qId": 42,
+        "Question": "Are you aware that your company has deposited the Employee’s contribution to PF?",
+        "Parameter": "Employer_deposited_employee_pf_contribution_to_government_department",
+        "Condition": "Not Aware",
+        "LegalTrainingMaterial": "I am unsure whether the employer has been depositing the provident fund deducted from my remuneration with the government. If the employer is not depositing, then it amounts to cheating the employee of his life-time savings, and wrongful gain to the employer by illegally using the money which is due to others."
+    },
+    {
+        "qId": 43,
+        "Question": "Are you aware that your company has deposited the Employer’s contribution to PF?",
+        "Parameter": "Employer_deposited_employer_own_pf_contribution_to_government_department",
+        "Condition": "No",
+        "LegalTrainingMaterial": "I am unsure whether the employer has been depositing its contribution to the provident fund with the government. If the employer is not depositing, then it amounts to cheating the employee of his life-time savings, and wrongful gain to the employer by illegally using the money which is due to others."
+    },
+    {
+        "qId": 44,
+        "Question": "Are you aware that your company has deposited the Employer’s contribution to PF?",
+        "Parameter": "Employer_deposited_employer_own_pf_contribution_to_government_department",
+        "Condition": "Not Aware",
+        "LegalTrainingMaterial": "I am unsure whether the employer has been depositing its contribution to the provident fund with the government. If the employer is not depositing, then it amounts to cheating the employee of his life-time savings, and wrongful gain to the employer by illegally using the money which is due to others."
+    },
+    {
+        "qId": 51,
+        "Question": "Were you injured in the past due to work or during working hours and that injury persists?",
+        "Parameter": "Workplace_injury_in_past_still_subsisting",
+        "Condition": "Yes",
+        "LegalTrainingMaterial": "I sustain a certain level of hurt, grievous hurt, or bodily injury in my workplace. I believe this was due to certain acts of negligence, gross negligence and/or recklessness on the part of my employer and its key management personnel. These acts are cognizable in nature and should be thoroughly investigated to only punish for the hurt or injury caused to me, but to also ensure no other person is hurt or injured."
+    }
+]

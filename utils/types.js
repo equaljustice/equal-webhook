@@ -1,6 +1,7 @@
 export const openAIModels = {
     GPT3_5: 'gpt-3.5-turbo-16k',
     GPT4: 'gpt-4-0125-preview',
+    GPT4o: 'gpt-4o',
     ATM_FRAUD_BANK: 'ft:gpt-3.5-turbo-1106:ashish-chandra:bankatmletter:90dP3i8f',
     ATM_FRAUD_CONSUMER_COURT: 'ft:gpt-3.5-turbo-1106:ashish-chandra:bnkltrandobdsuman:90dcJiEd',
     ATM_FRAUD_OMBUDSMAN: 'ft:gpt-3.5-turbo-1106:ashish-chandra:atmombudsman:8zov1AhH',

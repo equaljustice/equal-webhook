@@ -3,8 +3,8 @@ import { processDocx } from "../CloudStorage/processDocs.js";
 import { urbanPincodes } from '../JSONs/urbanPincodes.js';
 import * as constants from '../constants.js';
 import * as types from '../utils/types.js'
-import { ATMLegalTrainingData, EmployeeTrainingData, FailedTransactionLegalTrainingData, UPILegalTrainingData } from "../LegalMaterial/legalTrainingData.js";
-import { createLetter } from "../chatGPT/createDocuments.js";
+import { ATMLegalTrainingData, EmployeeTrainingData, EmployeeTrainingData_PoliceComplaint, FailedTransactionLegalTrainingData, UPILegalTrainingData } from "../LegalMaterial/legalTrainingData.js";
+import { createLetter, createLetterWith4o } from "../chatGPT/createDocuments.js";
 let assi_id = "";
 let option = "";
 var responseMessage;
@@ -333,13 +333,13 @@ export const createDocWithFineTuned = async (req, res) => {
                 switch (option) {
                     case types.letterOption.NOTICE_TO_COMPANY_HR:
                          openAiConfig.temperature = 0.5;
-                        // openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_BANK;
                         break;
                     case types.letterOption.BORD_OF_DIRECTOR:
                         //openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_OMBUDSMAN;
                         break;
                     case types.letterOption.POLICE_COMPLAINT:
                         openAiConfig.temperature = 0.5;
+                        legalTrainingData = EmployeeTrainingData_PoliceComplaint;
                         break;
                     case types.letterOption.LABOUR_COURT:
                         //openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_CONSUMER_COURT;
@@ -348,6 +348,7 @@ export const createDocWithFineTuned = async (req, res) => {
                         //openAiConfig.model =
                         break;
                 }
+                createLetterWith4o(tag, option, userInputData, legalTrainingData, threadId, openAiConfig);
                 break;
 
         }
@@ -357,7 +358,7 @@ export const createDocWithFineTuned = async (req, res) => {
         option = option.split(' ').join('_');
         fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + tag + '_' + option + '.docx';
         createLetter(tag, option, userInputData, legalTrainingData, threadId, openAiConfig);
-
+        
         const responseJson = {
             fulfillment_response: {
                 messages: [{
