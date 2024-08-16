@@ -6,7 +6,7 @@ import { getBanks } from './UI-APIs/Banks.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { openQnA, createDocWithAssistant, createDocWithFineTuned } from './Dialogflow-webhook/finFraudwebhooks.js';
+import { createDocWithFineTuned } from './Dialogflow-webhook/finFraudwebhooks.js';
 import { openQnAFineTuned } from './Dialogflow-webhook/qnaCompletion.js';
 import { postUserAnswers } from './UI-APIs/postUserData.js'
 import { authenticate, authenticateToken } from './Services/authenticate.js';
@@ -18,10 +18,8 @@ APIrouter.use('/getQuestions', getQuestionJson);
 APIrouter.use('/getStates', getStates);
 APIrouter.use('/getCities/:stateCode', getCities);
 APIrouter.use('/getBanks', getBanks);
-APIrouter.post('/webhook_QnA', openQnA);
 APIrouter.post('/postUserData', postUserAnswers);
 APIrouter.post('/webhook_QnAFineTuned', openQnAFineTuned);
-APIrouter.post('/webhook_createDoc', createDocWithAssistant);
 APIrouter.post('/webhook_createDocWithFineTuned', createDocWithFineTuned);
 APIrouter.post('/postUserQuestion', postOpenQuestion);
 

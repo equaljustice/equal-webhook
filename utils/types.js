@@ -22,6 +22,10 @@ export const employee = {
     Retrenchment: 'Retrenchment'
 }
 
+export const travel = {
+    Flights: 'Flights'
+}
+
 export const letterOption = {
     BANK_LETTER: "Bank",
     BANKING_OMBUDSMAN: "Banking Ombudsman",
@@ -30,7 +34,10 @@ export const letterOption = {
     RTI_APPLICATION: "RTI Application",
     NOTICE_TO_COMPANY_HR: "Notice To The Company",
     HUMAN_RIGHTS: "Complaint before Human Rights Commission",
-    BORD_OF_DIRECTOR: "Complaint To The Board Of Directors"
+    BORD_OF_DIRECTOR: "Complaint To The Board Of Directors",
+    AIRLINE_NODEL_OFFICER: "Letter To The Airline Nodal Officer",
+    AIRLINE_APPELLATE_AUTH: "Letter To The Airline Appellate Authority",
+    AIRLINE_CONSUMER_COURT: "Complaint Before Consumer Court"
 }
 
 export const targetpage = {

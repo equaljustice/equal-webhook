@@ -3,7 +3,7 @@ import { cleanJson } from './finFraudwebhooks.js';
 import { urbanPincodes } from '../JSONs/urbanPincodes.js'
 import { createUserInputParagraph, removeKeys } from '../chatGPT/helpers/buildInputData.js';
 import { openAiChatCompletion } from '../chatGPT/helpers/openAI.js';
-import * as types from "../utils/types.js"; 
+import * as types from "../utils/types.js";
 export const openQnAFineTuned = async (req, res) => {
     console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
     try {
@@ -39,15 +39,20 @@ export const openQnAFineTuned = async (req, res) => {
                     break;
                 case types.transaction.UPI:
                     userInputData = sessionInfo.parameters ?
-                await cleanJson(sessionInfo.parameters) : "";
-                break
+                        await cleanJson(sessionInfo.parameters) : "";
+                    break
                 case types.employee.Retrenchment:
                     userInputData = sessionInfo.parameters ?
-                    await cleanJson(sessionInfo.parameters) : "";
-                break;
+                        await cleanJson(sessionInfo.parameters) : "";
+                    break;
+                case types.travel.Flights:
+                    
+                default:
+                    userInputData = sessionInfo.parameters ?
+                        await cleanJson(sessionInfo.parameters) : "";
             }
-            const updatedUserData = await removeKeys(userInputData);
-        const userInputPara = await createUserInputParagraph(updatedUserData, tag);
+            //const updatedUserData = await removeKeys(userInputData);
+            const userInputPara = await createUserInputParagraph(userInputData, tag);
             messagesHistory = sysMessage.concat([{ role: "user", content: userInputPara }])
         }
         var responseMessage = '';
@@ -61,7 +66,7 @@ export const openQnAFineTuned = async (req, res) => {
                 content: req.body.text
             }]);
             queryMessage = messagesHistory.concat(queryMessage);
-            const QnAResponse = await openAiChatCompletion(queryMessage, types.openAIModels.OPEN_QNA, 0.8, 500,1,0.9,0.2,0);
+            const QnAResponse = await openAiChatCompletion(queryMessage, types.openAIModels.OPEN_QNA, 0.8, 500, 1, 0.9, 0.2, 0);
             responseMessage = QnAResponse.choices[0].message.content
         } else {
             responseMessage = "Your questions limit is over, Thank you for using our service, hope your issue will be resolved"
