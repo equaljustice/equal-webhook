@@ -1,7 +1,7 @@
 import * as types from "../../utils/types.js";
 import { openAiChatCompletion } from './openAI.js';
 import { prompts } from "../prompts.js";
-import { ATMJsonOrder, EmployeeJsonOrder, UPITrJsonOrder, FailedTrJsonOrder, FlightsJsonOrder } from "./JsonKeyOrder.js";
+import { ATMJsonOrder, EmployeeJsonOrder, UPITrJsonOrder, FailedTrJsonOrder, FlightsJsonOrder } from "./jsonKeyOrder.js";
 
 export async function createMessageContent(prompttype, userInputPara, legalTraining) {
     const message = [{

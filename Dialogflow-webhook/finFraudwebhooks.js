@@ -184,7 +184,7 @@ export const createDocWithFineTuned = async (req, res) => {
                         //openAiConfig.model =
                         break;
                 }
-                createLetterWith4o(tag, option, userInputData, legalTrainingData, threadId, openAiConfig);
+                createLetterWith4o(tag, option.split(' ').join('_'), userInputData, legalTrainingData, threadId, openAiConfig);
                 break;
             case types.travel.Flights:
                 userInputData = sessionInfo.parameters ?
@@ -202,7 +202,7 @@ export const createDocWithFineTuned = async (req, res) => {
                         openAiConfig.temperature = 0.5;
                         break;
                 }
-                createLetterWith4o(tag, option, userInputData, legalTrainingData, threadId, openAiConfig);
+                createLetterWith4o(tag, option.split(' ').join('_'), userInputData, legalTrainingData, threadId, openAiConfig);
                 break;
             default:
                 legalTrainingData = '';
