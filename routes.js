@@ -6,12 +6,13 @@ import { getBanks } from './UI-APIs/Banks.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { createDocWithFineTuned } from './Dialogflow-webhook/finFraudwebhooks.js';
-import { openQnAFineTuned } from './Dialogflow-webhook/qnaCompletion.js';
+import { openQnAFineTuned } from './Webhook/DFQnA.js';
+import { createDocWithFineTuned } from './Webhook/DFWebhook.js';
 import { postUserAnswers } from './UI-APIs/postUserData.js'
 import { authenticate, authenticateToken } from './Services/authenticate.js';
 import { listFiles, downloadFile } from './UI-APIs/getGCSFiles.js';
 import { postOpenQuestion } from './UI-APIs/openQnA.js';
+import { AnalyzeJobOffer, verifywhatsapp } from './Webhook/InfobipWebhook.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/getQuestions', getQuestionJson);
@@ -22,6 +23,8 @@ APIrouter.post('/postUserData', postUserAnswers);
 APIrouter.post('/webhook_QnAFineTuned', openQnAFineTuned);
 APIrouter.post('/webhook_createDocWithFineTuned', createDocWithFineTuned);
 APIrouter.post('/postUserQuestion', postOpenQuestion);
+APIrouter.post('/infobip-webhook', AnalyzeJobOffer);
+APIrouter.use('/verifywhatsapp', verifywhatsapp);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

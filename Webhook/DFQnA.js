@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { cleanJson } from './finFraudwebhooks.js';
+import { cleanJson } from './DFWebhook.js';
 import { urbanPincodes } from '../JSONs/urbanPincodes.js'
 import { createUserInputParagraph, removeKeys } from '../chatGPT/helpers/buildInputData.js';
 import { openAiChatCompletion } from '../chatGPT/helpers/openAI.js';
@@ -41,12 +41,12 @@ export const openQnAFineTuned = async (req, res) => {
                     userInputData = sessionInfo.parameters ?
                         await cleanJson(sessionInfo.parameters) : "";
                     break
+                case types.travel.Flights:
                 case types.employee.Retrenchment:
                     userInputData = sessionInfo.parameters ?
                         await cleanJson(sessionInfo.parameters) : "";
                     break;
-                case types.travel.Flights:
-                    
+                                    
                 default:
                     userInputData = sessionInfo.parameters ?
                         await cleanJson(sessionInfo.parameters) : "";
