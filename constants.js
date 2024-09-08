@@ -8,3 +8,4 @@ export const USERINPUTFILENAME = 'UserInput',
     GPT4_RESPONSE_JSON = 'GPT4Json',
     ASSISTANT = 'Assistant',
     PUBLIC_BUCKET_URL = 'https://storage.googleapis.com/ejustice-public-bucket'
+   

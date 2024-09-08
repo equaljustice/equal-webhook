@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import app from './app.js';
+import { closeRedisConnection } from './Services/redis/redisWAThreads.js';
 import {logger, initLogCorrelation} from './utils/logging.js';
 import {fetchProjectId} from './utils/metadata.js';
 import dotenv from 'dotenv';
@@ -43,6 +44,7 @@ const main = async () => {
  */
 process.on('SIGTERM', () => {
   // Clean up resources on shutdown
+  closeRedisConnection();
   logger.info('Caught SIGTERM.');
   logger.flush();
 });

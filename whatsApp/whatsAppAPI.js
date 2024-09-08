@@ -1,7 +1,10 @@
 import axios from 'axios';
-import { extractTextFromDocument } from '../utils/readFileData.js';
+import fs from 'fs';
+import path from 'path';
+import { convertMarkdownToWhatsApp } from './markdownToWA.js';
 
 export async function sendWatsAppReplyText(textResponse, to, message_id) {
+textResponse = await convertMarkdownToWhatsApp(textResponse);
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
@@ -26,14 +29,14 @@ export async function sendWatsAppReplyText(textResponse, to, message_id) {
 
   axios.request(config)
     .then((response) => {
-      console.log("send reply text", JSON.stringify(response.data));
+      console.log("sent reply text: ", to, textResponse, JSON.stringify(response.data));
     })
     .catch((error) => {
       console.log(error);
     });
 }
 
-export async function markAsRead(message_id) {
+export async function markAsRead(message_id, message) {
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "status": "read",
@@ -53,7 +56,6 @@ export async function markAsRead(message_id) {
 
   axios.request(config)
     .then((response) => {
-      console.log("MarkAsRead", JSON.stringify(response.data));
     })
     .catch((error) => {
       console.log(error);
@@ -80,23 +82,48 @@ export async function getWAMediaURL(mediaId, phoneId) {
 
 }
 
-export async function downloadWAFile(mediaUrl) {
-  try {
-    let config = {
-      method: 'get',
-      maxBodyLength: Infinity,
-      url: mediaUrl,
-      headers: {
-        'Authorization': process.env.WhatsApp_Token
-      }
-    };
+export async function downloadWAFile(mediaUrl, filename) {
+  return new Promise((resolve, reject) => {
+    try {
+      let config = {
+        method: 'get',
+        maxBodyLength: Infinity,
+        url: mediaUrl,
+        headers: {
+          'Authorization': process.env.WhatsApp_Token,
+        },
+        responseType: 'stream',
+      };
 
-    const response = await axios.request(config)
+      axios
+        .request(config)
+        .then((response) => {
+          const mediaPath = path.resolve(
+            './CloudStorage',
+            'whatsappfiles',
+            filename
+          ); // Add appropriate file extension like .pdf or .jpg
 
-    //console.log("downloaded file", JSON.stringify(response.data));
-    return response;
-  } catch (error) {
-    console.log(error);
-  }
+          const writer = fs.createWriteStream(mediaPath);
 
+          response.data.pipe(writer);
+
+          writer.on('finish', () => {
+            console.log('Media file downloaded and saved to local storage.');
+            resolve(mediaPath); // Resolve the promise with the file path
+          });
+
+          writer.on('error', (err) => {
+            console.error('Error saving the media file:', err);
+            reject(err); // Reject the promise if there's an error
+          });
+        })
+        .catch((error) => {
+          console.error('Error downloading the media file:', error);
+          reject(error); // Reject the promise if download fails
+        });
+    } catch (error) {
+      reject(error); // Catch any other errors and reject the promise
+    }
+  });
 }

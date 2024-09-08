@@ -22,7 +22,7 @@ let infobip = new Infobip({
 
   export async function markAsRead(from, messageId) {
     let response = await infobip.channels.whatsapp.markAsRead(from, messageId);
-    console.log("markAsRead: ", response)
+    console.log("markAsRead: ", response.data)
   }
 
   

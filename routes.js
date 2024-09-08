@@ -12,7 +12,7 @@ import { postUserAnswers } from './UI-APIs/postUserData.js'
 import { authenticate, authenticateToken } from './Services/authenticate.js';
 import { listFiles, downloadFile } from './UI-APIs/getGCSFiles.js';
 import { postOpenQuestion } from './UI-APIs/openQnA.js';
-import { AnalyzeJobOffer, verifywhatsapp } from './Webhook/InfobipWebhook.js';
+import { getWhatsAppMsg } from './Webhook/WAWebhook.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/getQuestions', getQuestionJson);
@@ -23,8 +23,7 @@ APIrouter.post('/postUserData', postUserAnswers);
 APIrouter.post('/webhook_QnAFineTuned', openQnAFineTuned);
 APIrouter.post('/webhook_createDocWithFineTuned', createDocWithFineTuned);
 APIrouter.post('/postUserQuestion', postOpenQuestion);
-APIrouter.post('/infobip-webhook', AnalyzeJobOffer);
-APIrouter.use('/verifywhatsapp', verifywhatsapp);
+APIrouter.use('/verifywhatsapp', getWhatsAppMsg);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

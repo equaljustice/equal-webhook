@@ -40,7 +40,8 @@
     "pino": "^8.19.0",
     "pino-http": "^9.0.0",
     "pino-pretty": "^10.3.1",
-    "pizzip": "^3.1.6"
+    "pizzip": "^3.1.6",
+    "redis": "^4.7.0"
   },
   "devDependencies": {
     "got": "^14.0.0",

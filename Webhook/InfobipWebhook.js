@@ -6,11 +6,11 @@ import {
     EmployeeTrainingData_PoliceComplaint, FailedTransactionLegalTrainingData,
     UPILegalTrainingData, FlightsTrainingData
 } from "../LegalMaterial/legalTrainingData.js";
+import fs from 'fs';
+import { promisify } from 'util';
 import { extractTextFromDocument } from '../utils/readFileData.js'
-import { markAsRead, sendWatsAppReplyText, getWAMediaURL } from '../whatsApp/whatsAppAPI.js';
+import { markAsRead, sendWatsAppReplyText, getWAMediaURL, downloadWAFile } from '../whatsApp/whatsAppAPI.js';
 import { interactWithAssistant } from "../chatGPT/helpers/assistant-api.js";
-import { utils } from 'mocha';
-
 
 
 export const AnalyzeJobOffer = async (req, res) => {
@@ -27,7 +27,7 @@ export const AnalyzeJobOffer = async (req, res) => {
         //await markAsRead(req.body.results[0].from, req.body.results[0].messageId);
         //response = await interactWithAssistant(req.body.results[0].message.text, req.body.results[0].threadId, 'asst_ouENsY02xWT4JowVZf7AwEi3');
         markAsRead(message_id);
-        response = await interactWithAssistant(messageBody, '', 'asst_ouENsY02xWT4JowVZf7AwEi3');
+        response = await interactWithAssistant(messageBody, '', 'asst_em2POAQCJrN5O8QoHnLBFLQz');
         threadId = response.threadId;
         //if(response.text)
         //await sendWatsAppReplyText(response.text, req.body.results[0].to, req.body.results[0].from);
@@ -64,7 +64,6 @@ export const AnalyzeJobOffer = async (req, res) => {
     }
 
 };
-
 export const AnalyzeJobOfferLetter = async (req, res) => {
 
     try {
@@ -72,13 +71,15 @@ export const AnalyzeJobOfferLetter = async (req, res) => {
         //console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
         const message_id = req.body.entry[0].changes[0].value.messages[0].id;
         const from = req.body.entry[0].changes[0].value.messages[0].from;
-        markAsRead(message_id);
-        sendWatsAppReplyText("Please wait till I go through the document.", from);
+        //markAsRead(message_id);
+        //sendWatsAppReplyText("Please wait till I go through the document.", from);
         const media = await getWAMediaURL(req.body.entry[0].changes[0].value.messages[0].document.id, req.body.entry[0].changes[0].value.metadata.phone_number_id);
 
-        const messageBody = await extractTextFromDocument(media.url, media.mime_type, media.sha256);
-
-
+        //const messageBody = await extractTextFromDocument(media.url, media.mime_type, media.sha256,req.body.entry[0].changes[0].value.messages[0].document.filename);
+        const mediafile = await downloadWAFile(media.url);
+        console.log('file _ downloaded', mediafile);
+        //await writeFileAsync(media.sha256,req.body.entry[0].changes[0].value.messages[0].document.filename, mediafile);
+        return;
         let userInputData, legalTrainingData, response;
         var threadId;// = req.body.results[0].messageId ? req.body.results[0].messageId : generateSessionId(15);
         const tag = ' ';
@@ -153,5 +154,5 @@ function hasMessagesArray(data) {
 
 function hasDocumentMessages(data) {
     // Check if the entry array, changes array, and messages array exist
-    return hasMessagesArray(data) && data.entry[0].changes[0].value.messages[0].type == "document";
+    return hasMessagesArray(data) && ['document', 'image'].includes(data.entry[0].changes[0].value.messages[0].type);
 }

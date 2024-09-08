@@ -1,7 +1,23 @@
-import axios from 'axios';
 import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
-import { downloadWAFile } from '../whatsApp/whatsAppAPI.js'
+import fs from 'fs';
+import path from 'path';
+
+// Function to delete a file from local storage
+export function deleteFile(filePath) {
+    return new Promise((resolve, reject) => {
+        fs.unlink(filePath, (err) => {
+            if (err) {
+                console.error(`Error deleting the file: ${filePath}`, err);
+                reject(err);
+            } else {
+                console.log(`File ${filePath} deleted successfully.`);
+                resolve();
+            }
+        });
+    });
+}
+
 
 function getFileType(url) {
     if (url.endsWith('.pdf')) {
@@ -25,11 +41,13 @@ async function extractTextFromDOCX(data) {
 }
 
 // Main function to handle both PDF and DOCX files
-export async function extractTextFromDocument(url, mime_type, sha256) {
+export async function extractTextFromDocument(filePath, mime_type) {
+    if (!filePath) {
+        console.log("Null FilePath");
+        return;
+    }
     try {
-        // Fetch the document from the URL
-        //const response = await axios.get(url, { responseType: 'arraybuffer' });
-        const response = await downloadWAFile(url);
+        const dataBuffer = fs.readFileSync(filePath);
         const fileType = mime_type || getFileType(url);
 
         if (!fileType) {
@@ -39,14 +57,9 @@ export async function extractTextFromDocument(url, mime_type, sha256) {
         let extractedText;
 
         if (fileType.endsWith('pdf')) {
-            // Example usage
-            const documentData = Buffer.from(response);
-            const encryptionKey = sha256; // Provided by WhatsApp API
-            const ivHex = 'your-initialization-vector-hex'; // IV in hex format provided by WhatsApp API
-
-            processEncryptedPDF(documentData, encryptionKey, ivHex)
+            extractedText = await extractTextFromPDF(dataBuffer)
         } else if (fileType.endsWith('document')) {
-            extractedText = await extractTextFromDOCX(response.data);
+            extractedText = await extractTextFromDOCX(dataBuffer);
         }
         console.log("extracted text", extractedText);
         // Return the extracted text

@@ -1,18 +1,24 @@
 import OpenAI from 'openai';
+import { getThreadId, saveThreadId } from '../../Services/redis/redisWAThreads.js'
 
-
-export async function interactWithAssistant(query, threadId, ass_id) {
+export async function interactWithAssistant(query, phoneNumber, ass_id) {
+    if (query == '' || !query)
+        return { response: { answer: '', question: '' } };
     const openai = new OpenAI(process.env.OPENAI_API_KEY);
     try {
-        if (!threadId || threadId == "") {
-            
+        let threadId = await getThreadId(phoneNumber);
+        if (!threadId) {
             // Create a Thread
             threadId = await createAssistantThread();
+            saveThreadId(phoneNumber, threadId);
         }
         // Add a Message to a Thread
         await openai.beta.threads.messages.create(threadId, {
             role: "user",
             content: query,
+        }).catch(async (error) => {
+            console.error('Creating new Thread', error);
+            threadId = await createAssistantThread();
         });
 
         // Run the Assistant
@@ -28,27 +34,28 @@ export async function interactWithAssistant(query, threadId, ass_id) {
         }
         // Retrieve the Assistant's Response
         const messagesResponse = await openai.beta.threads.messages.list(threadId);
-       
-        const assistantResponses = messagesResponse.data.filter(msg => msg.role === 'assistant');
-        //console.log("assistantResponses[0]", JSON.stringify(assistantResponses[0]));
-        const text = assistantResponses[0].content[0].text.value;
-       // console.log("assistantResponses", JSON.stringify(assistantResponses, null, 2));
-        // If there are no text responses, response will remain an empty string.
-        var response = { text, threadId };
-        return response;
 
+        const assistantResponses = messagesResponse.data.filter(msg => msg.role === 'assistant');
+            var response = { answer: assistantResponses[0].content[0].text.value };
+            return response;
+        
     } catch (error) {
         console.error("Error interacting with Assistant:", error);
         return "Error: Unable to process the request";
     }
 }
 
-export async function createAssistantThread(){
+export async function createAssistantThread() {
     const openai = new OpenAI(process.env.OPENAI_API_KEY);
-       
+
     const threadResponse = await openai.beta.threads.create();
-            return threadResponse.id;
-       
+    return threadResponse.id;
+
 }
 
-export async function createThreadIfnoExist(){}
+export async function deleteAssistantThread(threadId) {
+    const openai = new OpenAI(process.env.OPENAI_API_KEY);
+
+    const threadResponse = await openai.beta.threads.del(threadId);
+    return threadResponse;
+}

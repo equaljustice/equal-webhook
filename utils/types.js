@@ -11,6 +11,10 @@ export const openAIModels = {
     OPEN_QNA: 'ft:gpt-3.5-turbo-1106:ashish-chandra::8xglmTtV'
 }
 
+export const openAIAssist = {
+    EMP_OFFER: 'asst_em2POAQCJrN5O8QoHnLBFLQz'
+}
+
 export const transaction = {
     ATM: 'ATM',
     FAILED_TRANASACTION: 'FAILED_TXN',
