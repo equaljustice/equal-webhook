@@ -10,6 +10,7 @@ const handleTextMessage = async (message, from) => {
     if(messageBody == 'RESTART'){
         const threadId = await deleteThread(from);
         deleteAssistantThread(threadId);
+        messageBody = 'Hi';
     }
     let response = await interactWithAssistant(messageBody, from, types.openAIAssist.EMP_OFFER);
     if(response.answer|| response.answer != '')
@@ -61,21 +62,22 @@ const AnalyzeMessage = async (req, res) => {
                 break;
         }
 
-        res.sendStatus(200);
+       
     } catch (error) {
         console.log("Error in catch", error);
-        res.sendStatus(500);
+        
     }
 };
 
 export const getWhatsAppMsg = async (req, res) => {
     
     if (isStatusMessage(req.body)) {
-        return;
+        res.sendStatus(200);
     }
     else if (hasMessagesArray(req.body)) {
         console.log(JSON.stringify(req.body, null, 1));
         AnalyzeMessage(req, res);
+        res.sendStatus(200);
     }
     else if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === 'testtoken') {
         res.send(req.query['hub.challenge']);

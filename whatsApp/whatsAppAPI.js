@@ -100,7 +100,6 @@ export async function downloadWAFile(mediaUrl, filename) {
         .then((response) => {
           const mediaPath = path.resolve(
             './CloudStorage',
-            'whatsappfiles',
             filename
           ); // Add appropriate file extension like .pdf or .jpg
 
