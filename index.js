@@ -26,7 +26,7 @@ const main = async () => {
   let project = process.env.GOOGLE_CLOUD_PROJECT;
   if (!project) {
     try {
-      project = await fetchProjectId();
+      project = fetchProjectId();
     } catch (err) {
       logger.warn('Could not fetch Project Id for tracing.');
     }

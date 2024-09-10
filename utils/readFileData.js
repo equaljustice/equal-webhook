@@ -1,7 +1,7 @@
 import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import fs from 'fs';
-import path from 'path';
+import { logger } from './logging.js';
 
 // Function to delete a file from local storage
 export function deleteFile(filePath) {
@@ -61,7 +61,7 @@ export async function extractTextFromDocument(filePath, mime_type) {
         } else if (fileType.endsWith('document')) {
             extractedText = await extractTextFromDOCX(dataBuffer);
         }
-        console.log("extracted text", extractedText);
+        logger.info(extractedText);
         // Return the extracted text
         return extractedText;
 

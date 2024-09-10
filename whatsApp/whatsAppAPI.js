@@ -2,9 +2,10 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { convertMarkdownToWhatsApp } from './markdownToWA.js';
+import { logger } from '../utils/logging.js';
 
-export async function sendWatsAppReplyText(textResponse, to, message_id) {
-textResponse = await convertMarkdownToWhatsApp(textResponse);
+export async function sendWatsAppReplyText(textResponse, to, phone_number_id) {
+  textResponse = await convertMarkdownToWhatsApp(textResponse);
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
@@ -19,7 +20,7 @@ textResponse = await convertMarkdownToWhatsApp(textResponse);
   let config = {
     method: 'post',
     maxBodyLength: Infinity,
-    url: 'https://graph.facebook.com/v20.0/382211174979358/messages',
+    url: `https://graph.facebook.com/v20.0/${phone_number_id}/messages`,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': process.env.WhatsApp_Token
@@ -29,14 +30,14 @@ textResponse = await convertMarkdownToWhatsApp(textResponse);
 
   axios.request(config)
     .then((response) => {
-      console.log("sent reply text: ", to, textResponse, JSON.stringify(response.data));
+      logger.info("sent reply text: ", to, textResponse);
     })
     .catch((error) => {
       console.log(error);
     });
 }
 
-export async function markAsRead(message_id, message) {
+export async function markAsRead(message_id, phone_number_id) {
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "status": "read",
@@ -46,7 +47,7 @@ export async function markAsRead(message_id, message) {
   let config = {
     method: 'post',
     maxBodyLength: Infinity,
-    url: 'https://graph.facebook.com/v20.0/382211174979358/messages',
+    url: `https://graph.facebook.com/v20.0/${phone_number_id}/messages`,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': process.env.WhatsApp_Token
@@ -62,19 +63,19 @@ export async function markAsRead(message_id, message) {
     });
 }
 
-export async function getWAMediaURL(mediaId, phoneId) {
+export async function getWAMediaURL(mediaId, phone_number_id) {
   try {
     let config = {
       method: 'get',
       maxBodyLength: Infinity,
-      url: `https://graph.facebook.com/v20.0/${mediaId}?phone_number_id=${phoneId}`,
+      url: `https://graph.facebook.com/v20.0/${mediaId}?phone_number_id=${phone_number_id}`,
       headers: {
         'Authorization': process.env.WhatsApp_Token
       }
     };
 
     const response = await axios.request(config)
-    console.log("media", response.data)
+    //console.log("media", response.data)
     return response.data;
   } catch (error) {
     console.log(error);

@@ -46,7 +46,7 @@
   "devDependencies": {
     "got": "^14.0.0",
     "mocha": "^10.3.0",
-    "nodemon": "^3.1.0",
+    "nodemon": "^3.1.4",
     "supertest": "^6.1.3"
   }
 }

@@ -1,81 +1,75 @@
 import * as types from '../utils/types.js';
+import { logger } from '../utils/logging.js';
 import { extractTextFromDocument, deleteFile } from '../utils/readFileData.js';
 import { markAsRead, sendWatsAppReplyText, getWAMediaURL, downloadWAFile } from '../whatsApp/whatsAppAPI.js';
 import { deleteAssistantThread, interactWithAssistant } from "../chatGPT/helpers/assistant-api.js";
 import { deleteThread } from '../Services/redis/redisWAThreads.js';
 
-const handleTextMessage = async (message, from) => {
-    const messageBody = message.text.body;
-    markAsRead(message.id, message.text.body);
-    if(messageBody == 'RESTART'){
+const handleTextMessage = async (message, from, phone_number_id) => {
+    markAsRead(message.id, phone_number_id);
+    if (message.text.body == 'RESTART') {
         const threadId = await deleteThread(from);
         deleteAssistantThread(threadId);
-        messageBody = 'Hi';
+        message.text.body = 'Hi';
     }
-    let response = await interactWithAssistant(messageBody, from, types.openAIAssist.EMP_OFFER);
-    if(response.answer|| response.answer != '')
-    await sendWatsAppReplyText(response.answer, from);
-   
+    let response = await interactWithAssistant(message.text.body, from, types.openAIAssist.EMP_OFFER);
+    if (response.answer || response.answer != '')
+        await sendWatsAppReplyText(response.answer, from, phone_number_id);
+
 };
 
 const handleDocumentMessage = async (message, from, phone_number_id) => {
-    const message_id = message.id;
-    const doc_id = message.document.id;
-    const filename = message.document.filename;
-    markAsRead(message_id, message.document.filename);
-    const media = await getWAMediaURL(doc_id, phone_number_id);
+    markAsRead(message.id, phone_number_id);
+    let media = await getWAMediaURL(message.document.id, phone_number_id);
 
-
-    let filePath = await downloadWAFile(media.url, doc_id + '_' + filename);
+    let filePath = await downloadWAFile(media.url, message.document.id + '_' + message.document.filename);
     //await sendWatsAppReplyText("Please wait till I go through the document.", from);
-    console.log('filePath: ', filePath);
+    logger.info(filePath);
     let pdfContent = await extractTextFromDocument(filePath, media.mime_type);
-
     let response = await interactWithAssistant(pdfContent, from, types.openAIAssist.EMP_OFFER);
-    
     if (response.answer || response.answer != '') {
-       await sendWatsAppReplyText(`${response.answer}`, from);
+        await sendWatsAppReplyText(response.answer, from, phone_number_id);
     }
     deleteFile(filePath);
 };
 
 const AnalyzeMessage = async (req, res) => {
     try {
-        const message = req.body.entry[0].changes[0].value.messages[0];
-        const from = message.from;
-        const message_id = message.id;
-        const phone_number_id = req.body.entry[0].changes[0].value.metadata.phone_number_id;
+        let message = req.body.entry[0].changes[0].value.messages[0];
+        let phone_number_id = req.body.entry[0].changes[0].value.metadata.phone_number_id;
         switch (message.type) {
             case 'text':
-                await handleTextMessage(message, from);
+                await handleTextMessage(message, message.from, phone_number_id);
                 break;
             case 'document':
-                await handleDocumentMessage(message, from, phone_number_id);
+                await handleDocumentMessage(message, message.from, phone_number_id);
                 break;
             case 'image':
             case 'audio':
             case 'video':
-                sendWatsAppReplyText("Received your media! We'll process it soon.", from);
+                //sendWatsAppReplyText("Received your media.", message.from);
+                break;
+            case 'reaction':
                 break;
             default:
-                sendWatsAppReplyText("Unsupported message type.", from);
+                //sendWatsAppReplyText("Unsupported message type.", message.from);
                 break;
         }
 
-       
+
     } catch (error) {
         console.log("Error in catch", error);
-        
+
     }
 };
 
 export const getWhatsAppMsg = async (req, res) => {
-    
+
     if (isStatusMessage(req.body)) {
         res.sendStatus(200);
     }
     else if (hasMessagesArray(req.body)) {
-        console.log(JSON.stringify(req.body, null, 1));
+        logger.info(req.body);
         AnalyzeMessage(req, res);
         res.sendStatus(200);
     }
