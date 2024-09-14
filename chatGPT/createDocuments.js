@@ -12,10 +12,9 @@ export async function createLetter(tag, letterOption, userInputData, legalTraini
         const userInputPara = await createUserInputParagraph(updatedUserData, tag);
         const legalTraining = await getLegalTraining(userInputData, legalTrainingData, letterOption, tag);
         const message = await createMessageContent(promptType, userInputPara, legalTraining);
-        processDocx(JSON.stringify(updatedUserData,null,2) + '\n\n'+ message[0].content + '\n' + message[1].content, sessionId, sessionId + promptType + '_Input');
         const completionResponse = await openAiChatCompletion(message, openAiConfig.model, openAiConfig.temprature, openAiConfig.max_tokens, openAiConfig.n, openAiConfig.top_p, openAiConfig.frequency_penalty, openAiConfig.presence_penalty);
-        processDocx(completionResponse.choices[0].message.content, sessionId, sessionId + promptType);
-
+        await processDocx(completionResponse.choices[0].message.content, sessionId, sessionId + promptType);
+        processDocx(JSON.stringify(updatedUserData,null,2) + '\n\n'+ message[0].content + '\n' + message[1].content, sessionId, sessionId + promptType + '_Input');
         return;
     } catch (error) {
         console.log(error);

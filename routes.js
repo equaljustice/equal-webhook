@@ -12,7 +12,7 @@ import { postUserAnswers } from './UI-APIs/postUserData.js'
 import { authenticate, authenticateToken } from './Services/authenticate.js';
 import { listFiles, downloadFile } from './UI-APIs/getGCSFiles.js';
 import { postOpenQuestion } from './UI-APIs/openQnA.js';
-import { getWhatsAppMsg } from './Webhook/WAWebhook.js';
+import { getWhatsAppMsg } from './Webhook/WAWebhookNew.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/getQuestions', getQuestionJson);

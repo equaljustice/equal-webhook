@@ -1,6 +1,6 @@
 //import {qjson}  from "../JSONs/allQustions.js"
-import { getATMDataAsJson } from "../Services/createATMQuestions.js"
-import { getFAILED_TXNDataAsJson } from "../Services/createFailedTxnQuestions.js";
+import { getATMDataAsJson } from "./createATMQuestions.js"
+import { getFAILED_TXNDataAsJson } from "./createFailedTxnQuestions.js";
 import * as types from '../utils/types.js'
 const getQuestionJson = async (req, res) => {
   switch (req.body.transaction) {

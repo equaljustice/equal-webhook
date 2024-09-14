@@ -63,7 +63,7 @@ const AnalyzeMessage = async (req, res) => {
     }
 };
 
-export const getWhatsAppMsg = async (req, res) => {
+export const getWhatsAppMsgSingle = async (req, res) => {
 
     if (isStatusMessage(req.body)) {
         res.sendStatus(200);

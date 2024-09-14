@@ -1,18 +1,17 @@
 import OpenAI from 'openai';
 import fs from 'fs';
-import { getThreadId, saveThreadId } from '../../Services/redis/redisWAThreads.js'
+import { saveSession } from '../../Services/redis/redisWASession.js';
 
-const openai = new OpenAI(process.env.OPENAI_API_KEY);
+const openai = new OpenAI({apiKey: process.env.OPENAI_API_KEY});
 
-export async function interactWithAssistant(query, phoneNumber, ass_id) {
+export async function interactWithAssistant(query, phoneNumber, ass_id, threadId, action, targetAgent) {
     if (query == '' || !query)
-        return { response: { answer: '', question: '' } };
+        return { response: { answer: ''} };
     try {
-        let threadId = await getThreadId(phoneNumber);
         if (!threadId) {
             // Create a Thread
             threadId = await createAssistantThread();
-            saveThreadId(phoneNumber, threadId);
+            saveSession(phoneNumber, threadId, action, 'assistant', targetAgent);
         }
         // Add a Message to a Thread
         await openai.beta.threads.messages.create(threadId, {
@@ -58,9 +57,13 @@ export async function createAssistantThread() {
 
 export async function deleteAssistantThread(threadId) {
     //const openai = new OpenAI(process.env.OPENAI_API_KEY);
-
+try{
     const threadResponse = await openai.beta.threads.del(threadId);
     return threadResponse;
+}catch(err){
+    console.log(err);
+}
+
 }
 
 export async function sendFileToAssistant(filePath, threadId, ass_id) {

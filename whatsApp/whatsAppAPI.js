@@ -3,6 +3,28 @@ import fs from 'fs';
 import path from 'path';
 import { convertMarkdownToWhatsApp } from './markdownToWA.js';
 import { logger } from '../utils/logging.js';
+import { trimString } from './DFchipsToButtons.js';
+
+async function callWhatsAppAPI(data, phone_number_id){
+  let config = {
+    method: 'post',
+    maxBodyLength: Infinity,
+    url: `https://graph.facebook.com/v20.0/${phone_number_id}/messages`,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': process.env.WhatsApp_Token
+    },
+    data: data
+  };
+
+  axios.request(config)
+    .then((response) => {
+      logger.info(`sent WA reply: ${data}`);
+    })
+    .catch((error) => {
+      logger.error(error);
+    });
+}
 
 export async function sendWatsAppReplyText(textResponse, to, phone_number_id) {
   textResponse = await convertMarkdownToWhatsApp(textResponse);
@@ -13,28 +35,26 @@ export async function sendWatsAppReplyText(textResponse, to, phone_number_id) {
     "type": "text",
     "text": {
       "preview_url": false,
-      "body": textResponse
+      "body":  trimString(textResponse,4096)
     }
   });
 
-  let config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://graph.facebook.com/v20.0/${phone_number_id}/messages`,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': process.env.WhatsApp_Token
-    },
-    data: data
-  };
+  callWhatsAppAPI(data, phone_number_id);
+}
 
-  axios.request(config)
-    .then((response) => {
-      logger.info("sent reply text: ", to, textResponse);
-    })
-    .catch((error) => {
-      console.log(error);
-    });
+export async function sendWatsAppVideo(to, phone_number_id) {
+  let data = JSON.stringify({
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": to,
+    "type": "video",
+    "video": {
+      "id" : "2793714917464332", /* Only if using uploaded media */
+      "caption": "Introduction to EqualJustice.ai"
+    }
+  });
+
+  callWhatsAppAPI(data, phone_number_id);
 }
 
 export async function markAsRead(message_id, phone_number_id) {
@@ -44,23 +64,7 @@ export async function markAsRead(message_id, phone_number_id) {
     "message_id": message_id
   });
 
-  let config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://graph.facebook.com/v20.0/${phone_number_id}/messages`,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': process.env.WhatsApp_Token
-    },
-    data: data
-  };
-
-  axios.request(config)
-    .then((response) => {
-    })
-    .catch((error) => {
-      console.log(error);
-    });
+  callWhatsAppAPI(data, phone_number_id);
 }
 
 export async function getWAMediaURL(mediaId, phone_number_id) {
@@ -78,7 +82,7 @@ export async function getWAMediaURL(mediaId, phone_number_id) {
     //console.log("media", response.data)
     return response.data;
   } catch (error) {
-    console.log(error);
+    logger.error(error);
   }
 
 }
@@ -109,17 +113,16 @@ export async function downloadWAFile(mediaUrl, filename) {
           response.data.pipe(writer);
 
           writer.on('finish', () => {
-            console.log('Media file downloaded and saved to local storage.');
             resolve(mediaPath); // Resolve the promise with the file path
           });
 
           writer.on('error', (err) => {
-            console.error('Error saving the media file:', err);
+            logger.error(err);
             reject(err); // Reject the promise if there's an error
           });
         })
         .catch((error) => {
-          console.error('Error downloading the media file:', error);
+          logger.error(error);
           reject(error); // Reject the promise if download fails
         });
     } catch (error) {
@@ -127,3 +130,82 @@ export async function downloadWAFile(mediaUrl, filename) {
     }
   });
 }
+
+export async function sendWatsAppWithButtons(textResponse, buttons, footer='', to, phone_number_id) {
+  textResponse = await convertMarkdownToWhatsApp(textResponse);
+  let data = JSON.stringify({
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": to,
+    "type": "interactive",
+    "interactive": {
+      "type": "button",
+      "body": {
+        "text": trimString(textResponse,1024)
+      },
+      "footer": {
+        "text": trimString(footer,60)
+      },
+      "action": {
+        buttons
+      }
+    }
+  });
+
+  callWhatsAppAPI(data, phone_number_id);
+}
+
+
+export async function sendWatsAppWithList(textResponse, sections, header = '', footer='', to, phone_number_id) {
+  textResponse = await convertMarkdownToWhatsApp(textResponse);
+  let data = JSON.stringify({
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": to,
+    "type": "interactive",
+    "interactive": {
+      "type": "list",
+      "header": {
+        "type": "text",
+        "text": trimString(header, 60)
+      },
+      "body": {
+        "text": trimString(textResponse,4096)
+      },
+      "footer": {
+        "text": trimString(footer,60)
+      },
+      "action": sections
+    }
+  });
+
+  callWhatsAppAPI(data, phone_number_id);
+}
+
+export async function sendWatsAppWithRedirectButton(textResponse, file, header = '', footer='', to, phone_number_id) {
+  textResponse = await convertMarkdownToWhatsApp(textResponse);
+  let data = JSON.stringify({
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": to,
+    "type": "interactive",
+    "interactive": {
+        "type": "cta_url",
+        "header": {
+          "type": "text",
+            "text": header
+        },
+        "body": {
+            "text": textResponse
+        },
+        "footer": {
+            "text": footer
+        },
+        "action": file
+    }
+});
+
+  callWhatsAppAPI(data, phone_number_id);
+}
+
+

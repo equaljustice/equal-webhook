@@ -1,12 +1,12 @@
 import { createClient } from 'redis';
 
-const client = createClient({
+/* const client = createClient({
     password: process.env.Redis_pass,
     socket: {
         host: process.env.Redis_host,
         port: 11212
     }
-});
+}); 
 // Connect the client
 await client.connect();
 
@@ -53,3 +53,4 @@ export async function deleteThread(phoneNumber) {
 export async function closeRedisConnection() {
     await client.quit();
 }
+    */

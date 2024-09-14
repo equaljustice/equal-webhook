@@ -34,7 +34,8 @@ export const openQnAFineTuned = async (req, res) => {
                     userInputData = { ...generalData, transactionArray: [...transactionArray] }
                     break;
                 case types.transaction.FAILED_TRANASACTION:
-                    userInputData = JSON.parse(sessionInfo.parameters.generalData);
+                    userInputData = sessionInfo.parameters ?
+                        await cleanJson(sessionInfo.parameters): "";
                     userInputData.area_of_user = urbanPincodes.includes(Number(sessionInfo.parameters.area_of_user.slice(0, 3))) ? "urban" : "rural";
                     break;
                 case types.transaction.UPI:
@@ -93,7 +94,8 @@ export const openQnAFineTuned = async (req, res) => {
             },
             sessionInfo: {
                 parameters: {
-                    messages
+                    messages,
+                    counter: counter+1,
                 }
             }
         };

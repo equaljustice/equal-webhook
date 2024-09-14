@@ -79,7 +79,7 @@ export async function createUserInputParagraph(UserData, transactionType) {
 
         }
         console.log("ordered json", reorderedUserData);
-        const GPT4Response = await openAiChatCompletion(userInputMessage, types.openAIModels.GPT4);
+        const GPT4Response = await openAiChatCompletion(userInputMessage, types.openAIModels.GPT4, 0.5);
 
         return GPT4Response.choices[0].message.content;
     } catch (error) {

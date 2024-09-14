@@ -8,7 +8,7 @@ export function deleteFile(filePath) {
     return new Promise((resolve, reject) => {
         fs.unlink(filePath, (err) => {
             if (err) {
-                console.error(`Error deleting the file: ${filePath}`, err);
+                logger.error(`Error deleting the file: ${err}`);
                 reject(err);
             } else {
                 console.log(`File ${filePath} deleted successfully.`);
@@ -43,7 +43,7 @@ async function extractTextFromDOCX(data) {
 // Main function to handle both PDF and DOCX files
 export async function extractTextFromDocument(filePath, mime_type) {
     if (!filePath) {
-        console.log("Null FilePath");
+        logger.warn("Null FilePath");
         return;
     }
     try {
@@ -66,7 +66,7 @@ export async function extractTextFromDocument(filePath, mime_type) {
         return extractedText;
 
     } catch (error) {
-        console.error('Error reading document:', error);
+        logger.error(error);
         return null;
     }
 }

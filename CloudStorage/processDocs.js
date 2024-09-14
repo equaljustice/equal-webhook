@@ -5,6 +5,8 @@ import path from 'path';
 import { Storage } from '@google-cloud/storage';
 import * as constants from '../constants.js';
 
+const storage = new Storage();
+
 export function processDocx(information, folder, fileName) {
     var temp_doc = "./CloudStorage/Bank.docx";
     // Load the docx file as binary content
@@ -38,13 +40,13 @@ export function processDocx(information, folder, fileName) {
     // buf is a nodejs Buffer, you can either write it to a
     // file or res.send it with express for example.
     fs.writeFileSync(`${fileName}.docx`, buf);
-    return uploadToCloudBucket(folder, `${fileName}.docx`);
+    return uploadToCloudBucketNew(folder, `${fileName}.docx`);
 }
 
 function uploadToCloudBucket(folder, destinationFile) {
 
     // Initialize storage
-    const storage = new Storage();
+    
 
     const bucketName = constants.PUBLIC_BUCKET_DEV;
     const bucket = storage.bucket(bucketName)
@@ -72,4 +74,30 @@ function uploadToCloudBucket(folder, destinationFile) {
             }
         }
     )
+}
+
+async function uploadToCloudBucketNew(folder, destinationFile) {
+    const bucketName = constants.PUBLIC_BUCKET_DEV;
+    const bucket = storage.bucket(bucketName);
+    const filePath = path.resolve(destinationFile);
+
+    try {
+        // Upload the file
+        const [file] = await bucket.upload(filePath, {
+            destination: `${folder}/${path.basename(destinationFile)}`,
+            resumable: true,  // Ensure resumable uploads for large files
+        });
+
+        console.log(`File ${destinationFile} uploaded successfully.`);
+
+        // Make the file public
+        await file.makePublic();
+        const publicUrl = file.publicUrl();
+        console.log(`Public URL for ${file.name}: ${publicUrl}`);
+        return publicUrl;
+
+    } catch (err) {
+        console.error(`Error uploading ${destinationFile}: ${err.message}`);
+        throw err;  // Re-throw the error if needed
+    }
 }

@@ -23,11 +23,16 @@ export const transaction = {
 }
 
 export const employee = {
-    Retrenchment: 'Retrenchment'
+    Retrenchment: 'Retrenchment',
+    Offer: 'JobOffer'
 }
 
 export const travel = {
     Flights: 'Flights'
+}
+export const actions = {
+    Welcome: 'WELCOME',
+    Fallback: 'FALLBACK'
 }
 
 export const letterOption = {
