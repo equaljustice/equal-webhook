@@ -1,11 +1,11 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
-import { convertMarkdownToWhatsApp } from './markdownToWA.js';
 import { logger } from '../utils/logging.js';
 import { trimString } from './DFchipsToButtons.js';
+import { checkFileAvailability } from '../CloudStorage/checkFileReadyness.js';
 
-async function callWhatsAppAPI(data, phone_number_id){
+async function callWhatsAppAPI(data, phone_number_id) {
   let config = {
     method: 'post',
     maxBodyLength: Infinity,
@@ -27,7 +27,6 @@ async function callWhatsAppAPI(data, phone_number_id){
 }
 
 export async function sendWatsAppReplyText(textResponse, to, phone_number_id) {
-  textResponse = await convertMarkdownToWhatsApp(textResponse);
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
@@ -35,7 +34,7 @@ export async function sendWatsAppReplyText(textResponse, to, phone_number_id) {
     "type": "text",
     "text": {
       "preview_url": false,
-      "body":  trimString(textResponse,4096)
+      "body": trimString(textResponse, 4096)
     }
   });
 
@@ -49,7 +48,7 @@ export async function sendWatsAppVideo(to, phone_number_id) {
     "to": to,
     "type": "video",
     "video": {
-      "id" : "2793714917464332", /* Only if using uploaded media */
+      "id": "2793714917464332", /* Only if using uploaded media */
       "caption": "Introduction to EqualJustice.ai"
     }
   });
@@ -131,8 +130,7 @@ export async function downloadWAFile(mediaUrl, filename) {
   });
 }
 
-export async function sendWatsAppWithButtons(textResponse, buttons, footer='', to, phone_number_id) {
-  textResponse = await convertMarkdownToWhatsApp(textResponse);
+export async function sendWatsAppWithButtons(textResponse, buttons, footer = '', to, phone_number_id) {
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
@@ -141,10 +139,10 @@ export async function sendWatsAppWithButtons(textResponse, buttons, footer='', t
     "interactive": {
       "type": "button",
       "body": {
-        "text": trimString(textResponse,1024)
+        "text": trimString(textResponse, 1024)
       },
       "footer": {
-        "text": trimString(footer,60)
+        "text": trimString(footer, 60)
       },
       "action": {
         buttons
@@ -156,8 +154,7 @@ export async function sendWatsAppWithButtons(textResponse, buttons, footer='', t
 }
 
 
-export async function sendWatsAppWithList(textResponse, sections, header = '', footer='', to, phone_number_id) {
-  textResponse = await convertMarkdownToWhatsApp(textResponse);
+export async function sendWatsAppWithList(textResponse, sections, header = '', footer = '', to, phone_number_id) {
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
@@ -170,10 +167,10 @@ export async function sendWatsAppWithList(textResponse, sections, header = '', f
         "text": trimString(header, 60)
       },
       "body": {
-        "text": trimString(textResponse,4096)
+        "text": trimString(textResponse, 4096)
       },
       "footer": {
-        "text": trimString(footer,60)
+        "text": trimString(footer, 60)
       },
       "action": sections
     }
@@ -182,30 +179,42 @@ export async function sendWatsAppWithList(textResponse, sections, header = '', f
   callWhatsAppAPI(data, phone_number_id);
 }
 
-export async function sendWatsAppWithRedirectButton(textResponse, file, header = '', footer='', to, phone_number_id) {
-  textResponse = await convertMarkdownToWhatsApp(textResponse);
+export async function sendWatsAppWithRedirectButton(textResponse, file, header = '', footer = '', to, phone_number_id) {
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
     "to": to,
     "type": "interactive",
     "interactive": {
-        "type": "cta_url",
-        "header": {
-          "type": "text",
-            "text": header
-        },
-        "body": {
-            "text": textResponse
-        },
-        "footer": {
-            "text": footer
-        },
-        "action": file
+      "type": "cta_url",
+      "header": {
+        "type": "text",
+        "text": header
+      },
+      "body": {
+        "text": textResponse
+      },
+      "footer": {
+        "text": footer
+      },
+      "action": file
     }
-});
+  });
 
   callWhatsAppAPI(data, phone_number_id);
 }
+
+export async function sendWhatsAppFileLink(textResponse, file, header = '', footer = '', to, phone_number_id) {
+  let fileAvailable = false;
+  let counter = 0;
+  while (!fileAvailable && counter < 6) {
+    fileAvailable = await checkFileAvailability(file.parameters.url);
+    if(fileAvailable)
+      sendWatsAppWithRedirectButton(textResponse, file, header, footer, to, phone_number_id);
+    // Adjust the delay (in milliseconds) based on your requirements
+    await new Promise(resolve => setTimeout(resolve, 15000));  // 10 seconds delay
+    counter = counter+1;
+  }
+  }
 
 

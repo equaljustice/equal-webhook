@@ -39,14 +39,14 @@ async function detectIntent(
 }
 
 
-export async function getActionFromDF(query, phoneNumber){
+export async function getActionFromDFES(query, phoneNumber){
     let response = await detectIntent('atmprebuiltagent', phoneNumber, query ,null, 'en');
     //console.log('DF_ES response',JSON.stringify(response.queryResult.fulfillmentMessages.filter(msg => msg.payload), null, 2));
     let payload = response.queryResult.fulfillmentMessages.filter(msg => msg.payload);
     if(payload && payload[0])
-        return convertProtobufToJson(payload[0].payload);
+        return {payload: convertProtobufToJson(payload[0].payload), fulfillmentText: response.queryResult.fulfillmentText};
     else
-        return null;
+        return {fulfillmentText: response.queryResult.fulfillmentText};
 }
 
 //console.log(await getActionFromDF('ATM fraud', '919762421929'));

@@ -23,7 +23,9 @@ export async function saveSession(phoneNumber, threadId, action, agentType, targ
         };
 
         // Store the session object as a JSON string in Redis
-        await client.set(phoneNumber, JSON.stringify(session));
+        await client.set(phoneNumber, JSON.stringify(session),{
+            EX: 7200  // Expiration time in seconds (2 hours)
+        });
         console.log(`Session saved for phone number: ${phoneNumber}`);
     } catch (error) {
         console.error('Error saving session to Redis:', error);
@@ -40,7 +42,7 @@ export async function getSession(phoneNumber) {
         if (sessionString) {
             // Parse the JSON string back into an object
             const session = JSON.parse(sessionString);
-            logger.info(`Session retrieved for phone number: ${phoneNumber} : ${session}`);
+            //logger.info(`Session retrieved for phone number: ${phoneNumber} : ${session}`);
             return session;
         } else {
             console.log(`No session found for phone number: ${phoneNumber}`);

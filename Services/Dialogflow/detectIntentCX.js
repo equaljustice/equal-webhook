@@ -33,7 +33,6 @@ async function detectIntentCX(projectId, location, agentId, sessionId, languageC
   let payloadResponse = [];
   let chips;
   let sessionEnd = false;
-  logger.info(`DFCX response: ${JSON.stringify([response])}`);
   for (const message of response.queryResult.responseMessages) {
     if (message.text) {
       //console.log(`Agent Response: ${message.text.text}`);
@@ -47,7 +46,6 @@ async function detectIntentCX(projectId, location, agentId, sessionId, languageC
       sessionEnd = true
   }
   if (payloadResponse.length > 1) {
-    console.log(JSON.stringify(payloadResponse));
     chips = payloadResponse.find(item =>
       item.richContent.some(content =>
         content.some(innerContent => innerContent.type === 'chips')
@@ -55,7 +53,8 @@ async function detectIntentCX(projectId, location, agentId, sessionId, languageC
   }
   else if (payloadResponse[0])
     chips = payloadResponse[0]
-  return { answer: textResponse.join('\n'), payload: chips, sessionEnd }
+
+  return { answer: textResponse.join('\n\n'), payload: chips, sessionEnd }
 }
 
 //let response = await getCXResponse('atmprebuiltagent','asia-south1','9d9f910c-d14b-4489-b1f9-98c6c3e67c61','919762421929','en','yes');

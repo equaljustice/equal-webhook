@@ -1,12 +1,13 @@
 import * as types from '../utils/types.js';
 import { logger } from '../utils/logging.js';
 import { extractTextFromDocument, deleteFile } from '../utils/readFileData.js';
-import { markAsRead, sendWatsAppReplyText, getWAMediaURL, downloadWAFile, sendWatsAppWithButtons, sendWatsAppWithList, sendWatsAppWithRedirectButton, sendWatsAppVideo } from '../whatsApp/whatsAppAPI.js';
+import { markAsRead, sendWatsAppReplyText, getWAMediaURL, downloadWAFile, sendWatsAppWithButtons, sendWatsAppWithList, sendWhatsAppFileLink, sendWatsAppVideo } from '../whatsApp/whatsAppAPI.js';
 import { interactWithAssistant, createAssistantThread } from "../chatGPT/helpers/assistant-api.js";
 import { deleteSession, getSession, saveSession } from '../Services/redis/redisWASession.js';
-import { getActionFromDF } from '../Services/Dialogflow/detectIntentES.js';
+import { getActionFromDFES } from '../Services/Dialogflow/detectIntentES.js';
 import { getCXResponse } from '../Services/Dialogflow/detectIntentCX.js';
 import { DFchipsToButtonOrList } from '../whatsApp/DFchipsToButtons.js';
+import { convertMarkdownToWhatsApp } from '../whatsApp/markdownToWA.js';
 
 const handlInteractiveButtons = async (message, from, phone_number_id) => {
     switch (message.interactive.type) {
@@ -117,10 +118,12 @@ const handleTextMessage = async (message, from, phone_number_id) => {
     }
     let session = await getSession(from);
     if (!session) {
-        let DFResponse = await getActionFromDF(message.text.body, from);//call dialogflow ES detectIntent to get action
-
-        if (DFResponse && DFResponse.action && DFResponse.agentType) {
-            if (DFResponse.agentType == 'assistant') {
+        let DFResponse = await getActionFromDFES(message.text.body, from);//call dialogflow ES detectIntent to get action
+        if(DFResponse.fulfillmentText){
+            sendWatsAppReplyText(DFResponse.fulfillmentText, from, phone_number_id);
+        }
+        if (DFResponse.payload && DFResponse.payload.action && DFResponse.payload.agentType) {
+            if (DFResponse.payload.agentType == 'assistant') {
                 threadId = await createAssistantThread(from);
             }
             else {
@@ -128,16 +131,16 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             }
             session = {
                 threadId: threadId,
-                action: DFResponse.action,
-                agentType: DFResponse.agentType,
-                targetAgent: DFResponse.targetAgent
+                action: DFResponse.payload.action,
+                agentType: DFResponse.payload.agentType,
+                targetAgent: DFResponse.payload.targetAgent
             }
             message.text = { "body": "hi"}
-            saveSession(from, threadId, DFResponse.action, DFResponse.agentType, DFResponse.targetAgent);
+            saveSession(from, threadId, DFResponse.payload.action, DFResponse.payload.agentType, DFResponse.payload.targetAgent);
         }
-        else if(DFResponse && DFResponse.action){
+        else if(DFResponse.payload && DFResponse.payload.action){
             session = {
-                action: DFResponse.action
+                action: DFResponse.payload.action
             }
         }
         else {
@@ -152,10 +155,13 @@ const handleTextMessage = async (message, from, phone_number_id) => {
         case types.transaction.FAILED_TRANASACTION:
         case types.employee.Retrenchment:
         case types.travel.Flights:
+
             response = await getCXResponse(session.targetAgent, session.threadId, 'en', message.text.body); 
             break;
         case types.employee.Offer:
             response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId, session.action, session.targetAgent);
+            if(response.answer)
+                response.answer = convertMarkdownToWhatsApp(response.answer);
             break;
         case types.actions.Welcome:
             sendWatsAppWithList(response.answer, options, 'How can I help you Today?', 'EqualJustice.ai', from, phone_number_id);
@@ -171,13 +177,16 @@ const handleTextMessage = async (message, from, phone_number_id) => {
     }
     if (response.payload && response.answer) {
         let options = DFchipsToButtonOrList(response.payload);
+        console.log("options from DFCX", JSON.stringify(options));
         logger.info(`WhatsApp Reply ${from} :: ${message.text.body} :: Response:: ${response.answer}`);
         if (options.button)
             sendWatsAppWithList(response.answer, options, '', '', from, phone_number_id);
         else if (Array.isArray(options) && options.length> 0 && options.filter(option => option.type === 'reply'))
             sendWatsAppWithButtons(response.answer, options, '', from, phone_number_id);
-        else if (options.name && options.name == 'cta_url')
-            sendWatsAppWithRedirectButton(response.answer, options, 'Download Document', '', from, phone_number_id);
+        else if (options.name && options.name == 'cta_url'){
+            sendWatsAppReplyText(response.answer, from, phone_number_id);
+            sendWhatsAppFileLink('Here is link to dowload your document', options, 'Download Draft', 'EqualJustice.ai', from, phone_number_id);
+        }
         else
             sendWatsAppReplyText(response.answer, from, phone_number_id);
     }

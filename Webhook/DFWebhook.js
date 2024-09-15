@@ -210,8 +210,8 @@ export const createDocWithFineTuned = async (req, res) => {
                     await cleanJson(sessionInfo.parameters) : "";
         }
 
-        textResponse = `Creating ${option}, Please wait`;
-        docName = `${option}`;
+        textResponse = `Creating draft for ${option}, Please wait`;
+        docName = `Draft ${option}`;
         option = option.split(' ').join('_');
         fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + tag + '_' + option + '.docx';
         createLetter(tag, option, userInputData, legalTrainingData, threadId, openAiConfig);
