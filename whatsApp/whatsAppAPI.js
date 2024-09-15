@@ -48,7 +48,7 @@ export async function sendWatsAppVideo(to, phone_number_id) {
     "to": to,
     "type": "video",
     "video": {
-      "id": "2793714917464332", /* Only if using uploaded media */
+      "id": "495841383370609", /* Only if using uploaded media */
       "caption": "Introduction to EqualJustice.ai"
     }
   });

@@ -178,7 +178,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
     if (response.payload && response.answer) {
         let options = DFchipsToButtonOrList(response.payload);
         console.log("options from DFCX", JSON.stringify(options));
-        logger.info(`WhatsApp Reply ${from} :: ${message.text.body} :: Response:: ${response.answer}`);
+       // logger.info(`WhatsApp Reply ${from} :: ${message.text.body} :: Response:: ${response.answer}`);
         if (options.button)
             sendWatsAppWithList(response.answer, options, '', '', from, phone_number_id);
         else if (Array.isArray(options) && options.length> 0 && options.filter(option => option.type === 'reply'))
