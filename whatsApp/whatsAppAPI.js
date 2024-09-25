@@ -19,7 +19,7 @@ async function callWhatsAppAPI(data, phone_number_id) {
 
   axios.request(config)
     .then((response) => {
-     // logger.info(`sent WA reply: ${data}`);
+      logger.info(`sent WA reply: ${data}`);
     })
     .catch((error) => {
       logger.error(error);

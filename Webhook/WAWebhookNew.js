@@ -260,7 +260,7 @@ const AnalyzeMessage = async (req, res) => {
 };
 
 export const getWhatsAppMsg = async (req, res) => {
-    console.log('WA msg:', JSON.stringify(req.body));
+    //console.log('WA msg:', JSON.stringify(req.body));
     if (isStatusMessage(req.body)) {
         let status = req.body.entry[0].changes[0].value.statuses[0]
         if (status.type == 'payment') {
@@ -291,13 +291,16 @@ export const getWhatsAppMsg = async (req, res) => {
         AnalyzeMessage(req, res);
         res.sendStatus(200);
     }
-    else if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === 'testtoken') {
-        res.send(req.query['hub.challenge']);
-    } else {
+    else {
         res.sendStatus(200);
     }
 };
 
+export const verifywhatsapp = async (req, res) =>{
+    if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === 'equaljusticeai') {
+        res.send(req.query['hub.challenge']);
+    }
+}
 function hasMessagesArray(data) {
     return data.entry && data.entry[0].changes && data.entry[0].changes[0].value && Array.isArray(data.entry[0].changes[0].value.messages);
 }
