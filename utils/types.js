@@ -2,13 +2,13 @@ export const openAIModels = {
     GPT3_5: 'gpt-3.5-turbo-16k',
     GPT4: 'gpt-4-0125-preview',
     GPT4o: 'gpt-4o',
-    ATM_FRAUD_BANK: 'ft:gpt-3.5-turbo-1106:ashish-chandra:bankatmletter:90dP3i8f',
-    ATM_FRAUD_CONSUMER_COURT: 'ft:gpt-3.5-turbo-1106:ashish-chandra:bnkltrandobdsuman:90dcJiEd',
-    ATM_FRAUD_OMBUDSMAN: 'ft:gpt-3.5-turbo-1106:ashish-chandra:atmombudsman:8zov1AhH',
-    FAILED_TRANASACTION_BANK: 'ft:gpt-3.5-turbo-1106:ashish-chandra:failed-trn-bankltr:96IUpuRq',
-    FAILED_TRANASACTION_CONSUMER_COURT: 'ft:gpt-3.5-turbo-1106:ashish-chandra:failedtr-consumerc:9AFwUlml',
-    FAILED_TRANASACTION_OMBUDSMAN: 'ft:gpt-3.5-turbo-1106:ashish-chandra:failedtr-obmudsman:9AEMVzCm',
-    OPEN_QNA: 'ft:gpt-3.5-turbo-1106:ashish-chandra::8xglmTtV'
+    ATM_FRAUD_BANK: 'ft:gpt-4o-2024-08-06:ashish-chandra:bankatmletter:A7fDUFJj',
+    ATM_FRAUD_CONSUMER_COURT: 'ft:gpt-4o-2024-08-06:ashish-chandra:bnkltrandobdsuman:A7eFDO1q',
+    ATM_FRAUD_OMBUDSMAN: 'ft:gpt-4o-2024-08-06:ashish-chandra:atmombudsman:A97nEp09',
+    FAILED_TRANASACTION_BANK: 'ft:gpt-4o-2024-08-06:ashish-chandra:failed-trn-bankltr:A7e7meJC',
+    FAILED_TRANASACTION_CONSUMER_COURT: 'ft:gpt-4o-2024-08-06:ashish-chandra:failedtr-consumerc:A7dkWYtO',
+    FAILED_TRANASACTION_OMBUDSMAN: 'ft:gpt-4o-2024-08-06:ashish-chandra:failedtr-obmudsman:A7dksJ7I',
+    OPEN_QNA: 'ft:gpt-4o-2024-08-06:ashish-chandra::A98Mssc2'
 }
 
 export const openAIAssist = {

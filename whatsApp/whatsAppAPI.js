@@ -263,18 +263,18 @@ export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phon
                 "retailer_id": "1919",
                 "name": "Draft document",
                 "amount": {
-                  "value": 8390,
+                  "value": 9900,
                   "offset": 100
                 },
                 "sale_amount": {
-                  "value": 500,
+                  "value": 9900,
                   "offset": 100
                 },
                 "quantity": 1
               }
             ],
             "subtotal": {
-              "value": 500,
+              "value": 9900,
               "offset": 100
             },
             "tax": {
@@ -283,7 +283,7 @@ export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phon
               "description": ""
             },
             "discount": {
-              "value": 200,
+              "value": 9600,
               "offset": 100,
               "description": "Launch offer",
               "discount_program_name": "Launch"

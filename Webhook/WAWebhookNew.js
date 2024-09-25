@@ -277,8 +277,8 @@ export const getWhatsAppMsg = async (req, res) => {
                         }
                     }
                 ]
-                //sendWatsAppReplyText('We have recieved your payment, please send Hi to continue conversation.', status.recipient_id, phone_number_id);
-                sendWatsAppWithButtons('We have recieved your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
+                sendWatsAppReplyText('We have recieved your payment, please send Hi to continue conversation.', status.recipient_id, phone_number_id);
+                //sendWatsAppWithButtons('We have recieved your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
             }
             console.log('Payment status: ', status);
             //sendWhatsAppOrderStatus('Payment pending', status.payment.reference_id, status.status,status.recipient_id, phone_number_id)
