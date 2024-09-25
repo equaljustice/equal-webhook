@@ -33,6 +33,32 @@ export async function saveSession(phoneNumber, threadId, action, agentType, targ
     }
 }
 
+export async function updateSessionWithPayment(phoneNumber, paymentDetails) {
+    try {
+        // Fetch the existing session
+        const sessionData = await client.get(phoneNumber);
+        if (sessionData) {
+            // Parse the session data into an object
+            const session = JSON.parse(sessionData);
+
+            // Update the session with the new 'payment' key
+            session.payment = paymentDetails;
+
+            // Save the updated session back into Redis
+            await client.set(phoneNumber, JSON.stringify(session), {
+                EX: 7200  // Set expiration time again to 2 hours
+            });
+
+            console.log(`Session updated with payment for phone number: ${phoneNumber}`);
+        } else {
+            console.log(`No session found for phone number: ${phoneNumber}`);
+        }
+    } catch (error) {
+        console.error('Error updating session in Redis:', error);
+        return null;
+    }
+}
+
 // Function to get the session JSON object from Redis
 export async function getSession(phoneNumber) {
     try {

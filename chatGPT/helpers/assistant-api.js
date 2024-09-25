@@ -6,7 +6,7 @@ const openai = new OpenAI({apiKey: process.env.OPENAI_API_KEY});
 
 export async function interactWithAssistant(query, phoneNumber, ass_id, threadId, action, targetAgent) {
     if (query == '' || !query)
-        return { response: { answer: ''} };
+        return { response: { answer: 'Invlid input'} };
     try {
         if (!threadId) {
             // Create a Thread

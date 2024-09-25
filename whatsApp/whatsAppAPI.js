@@ -19,7 +19,7 @@ async function callWhatsAppAPI(data, phone_number_id) {
 
   axios.request(config)
     .then((response) => {
-      logger.info(`sent WA reply: ${data}`);
+     // logger.info(`sent WA reply: ${data}`);
     })
     .catch((error) => {
       logger.error(error);
@@ -209,12 +209,118 @@ export async function sendWhatsAppFileLink(textResponse, file, header = '', foot
   let counter = 0;
   while (!fileAvailable && counter < 6) {
     fileAvailable = await checkFileAvailability(file.parameters.url);
-    if(fileAvailable)
+    if (fileAvailable)
       sendWatsAppWithRedirectButton(textResponse, file, header, footer, to, phone_number_id);
     // Adjust the delay (in milliseconds) based on your requirements
     await new Promise(resolve => setTimeout(resolve, 15000));  // 10 seconds delay
-    counter = counter+1;
+    counter = counter + 1;
   }
-  }
+}
+
+export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phone_number_id) {
+  let data = JSON.stringify({
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": to,
+    "type": "interactive",
+    "interactive": {
+      "type": "order_details",
+      "body": {
+        "text": textResponse
+      },
+      "footer": {
+        "text": "EqualJustice.ai"
+      },
+      "action": {
+        "name": "review_and_pay",
+        "parameters": {
+          "reference_id": reference_id,
+          "type": "digital-goods",
+          "payment_settings": [
+            {
+              "type": "payment_gateway",
+              "payment_gateway": {
+                "type": "razorpay",
+                "configuration_name": "LetterGenration",
+                "razorpay": {
+                  "receipt": "receipt-value",
+                  "notes": {
+                    "customer_phone_number": to
+                  }
+                }
+              }
+            }
+          ],
+          "currency": "INR",
+          "total_amount": {
+            "value": 300,
+            "offset": 100
+          },
+          "order": {
+            "status": "pending",
+            "items": [
+              {
+                "retailer_id": "1919",
+                "name": "Draft document",
+                "amount": {
+                  "value": 8390,
+                  "offset": 100
+                },
+                "sale_amount": {
+                  "value": 500,
+                  "offset": 100
+                },
+                "quantity": 1
+              }
+            ],
+            "subtotal": {
+              "value": 500,
+              "offset": 100
+            },
+            "tax": {
+              "value": 0,
+              "offset": 100,
+              "description": ""
+            },
+            "discount": {
+              "value": 200,
+              "offset": 100,
+              "description": "Launch offer",
+              "discount_program_name": "Launch"
+            }
+          }
+        }
+      }
+    }
+  })
+
+  callWhatsAppAPI(data, phone_number_id);
+}
+
+export function sendWhatsAppOrderStatus(textResponse, reference_id, status, description, to, phone_number_id){
+  let data = JSON.stringify({
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": to,
+    "type": "interactive",
+    "interactive": {
+        "type": "order_status",
+        "body": {
+            "text": textResponse
+        },
+        "action": {
+            "name": "review_order",
+            "parameters": {
+                "reference_id": reference_id,
+                "order": {
+                    "status": status,
+                    "description": description
+                }
+            }
+        }
+    }
+})
+callWhatsAppAPI(data, phone_number_id);
+}
 
 

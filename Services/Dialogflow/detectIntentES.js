@@ -39,8 +39,8 @@ async function detectIntent(
 }
 
 
-export async function getActionFromDFES(query, phoneNumber){
-    let response = await detectIntent('atmprebuiltagent', phoneNumber, query ,null, 'en');
+export async function getActionFromDFES(query, sessionId){
+    let response = await detectIntent('atmprebuiltagent', sessionId, query ,null, 'en');
     //console.log('DF_ES response',JSON.stringify(response.queryResult.fulfillmentMessages.filter(msg => msg.payload), null, 2));
     let payload = response.queryResult.fulfillmentMessages.filter(msg => msg.payload);
     if(payload && payload[0])
