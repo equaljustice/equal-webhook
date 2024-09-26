@@ -27,6 +27,9 @@ async function detectIntentCX(projectId, location, agentId, sessionId, languageC
       },
       languageCode,
     },
+    queryParams: {
+      sessionTtl: { seconds: 86399 },
+    },
   };
   const [response] = await client.detectIntent(request);
   let textResponse = [];
@@ -42,7 +45,7 @@ async function detectIntentCX(projectId, location, agentId, sessionId, languageC
       //console.log(`Agent payload: ${JSON.stringify(convertProtobufToJson(message.payload))}`);
       payloadResponse.push(convertProtobufToJson(message.payload));
     }
-    else if(message.endInteraction)
+    else if (message.endInteraction)
       sessionEnd = true
   }
   if (payloadResponse.length > 1) {
