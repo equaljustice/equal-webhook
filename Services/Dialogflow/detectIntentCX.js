@@ -60,7 +60,7 @@ async function detectIntentCX(projectId, location, agentId, sessionId, languageC
 //let response = await getCXResponse('atmprebuiltagent','asia-south1','9d9f910c-d14b-4489-b1f9-98c6c3e67c61','919762421929','en','yes');
 //console.log(JSON.stringify(response,null,2));
 
-export async function getCXResponse(targetAgent, sessionId, languageCode, query) {
+export async function getCXResponse(query, targetAgent, sessionId, languageCode) {
   //console.log("targetAgent project", targetAgent.projectId);
   return await detectIntentCX(targetAgent.projectId, targetAgent.location, targetAgent.agentId, sessionId, languageCode, query);
 }

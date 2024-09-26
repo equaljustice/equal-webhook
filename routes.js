@@ -1,28 +1,20 @@
 //const APIrouter = require('express').Router();
 import express from 'express';
-import { getQuestionJson } from './UI-APIs/getQuestions.js';
 import { getCities, getStates } from './UI-APIs/StateCity.js';
-import { getBanks } from './UI-APIs/Banks.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { openQnAFineTuned } from './Webhook/DFQnA.js';
 import { createDocWithFineTuned } from './Webhook/DFWebhook.js';
-import { postUserAnswers } from './UI-APIs/postUserData.js'
 import { authenticate, authenticateToken } from './Services/authenticate.js';
 import { listFiles, downloadFile } from './UI-APIs/getGCSFiles.js';
-import { postOpenQuestion } from './UI-APIs/openQnA.js';
 import { getWhatsAppMsg, verifywhatsapp } from './Webhook/WAWebhookNew.js';
 const APIrouter = express.Router();
 
-APIrouter.use('/getQuestions', getQuestionJson);
 APIrouter.use('/getStates', getStates);
 APIrouter.use('/getCities/:stateCode', getCities);
-APIrouter.use('/getBanks', getBanks);
-APIrouter.post('/postUserData', postUserAnswers);
 APIrouter.post('/webhook_QnAFineTuned', openQnAFineTuned);
 APIrouter.post('/webhook_createDocWithFineTuned', createDocWithFineTuned);
-APIrouter.post('/postUserQuestion', postOpenQuestion);
 APIrouter.post('/whatsappMessage', getWhatsAppMsg);
 APIrouter.get('/whatsappMessage', verifywhatsapp)
 const __filename = fileURLToPath(import.meta.url);

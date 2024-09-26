@@ -164,7 +164,7 @@ export const createDocWithFineTuned = async (req, res) => {
             case types.employee.Retrenchment:
                 userInputData = sessionInfo.parameters ?
                     await cleanJson(sessionInfo.parameters) : "";
-                console.log("User input data", userInputData);
+                logger.info(`DFCX session data: ${JSON.stringify(sessionInfo.parameters)}`);
                 legalTrainingData = EmployeeTrainingData;
                 switch (option) {
                     case types.letterOption.NOTICE_TO_COMPANY_HR:
@@ -179,9 +179,6 @@ export const createDocWithFineTuned = async (req, res) => {
                         break;
                     case types.letterOption.LABOUR_COURT:
                         //openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_CONSUMER_COURT;
-                        break;
-                    case types.letterOption.RTI_APPLICATION:
-                        //openAiConfig.model =
                         break;
                 }
                 //createLetterWith4o(tag, option.split(' ').join('_'), userInputData, legalTrainingData, threadId, openAiConfig);
@@ -262,7 +259,7 @@ export function cleanJson(jsonData) {
                         _clean(obj[key]); // Recurse if the value is an object
                     }
                 }
-                if (obj[key] === 'NA' || obj[key] === null || String(obj[key]).includes('$')) {
+                if (obj[key] === 'NA' || obj[key] === null || String(obj[key]).includes('$') || obj[key]=='') {
                     delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
                 }
             });

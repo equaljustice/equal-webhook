@@ -8,7 +8,6 @@ const getStates = async (req, res) => {
         headers: headers,
         redirect: 'follow'
     };
-console.log("env sta",headers);
     fetch("https://api.countrystatecity.in/v1/countries/IN/states", requestOptions)
         .then(response => response.text())
         .then(result => res.send(result))

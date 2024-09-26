@@ -97,10 +97,9 @@ const handleTextMessage = async (message, from, phone_number_id) => {
     let session, threadId;
     if (message.text.body == 'RESTART') {
         session = await deleteSession(from);
-        sendWhatsAppOrderStatus('EqualJustice.ai', session.payment.reference_id, 'completed', 'Access removed', from, phone_number_id);
+        if (session.payment)
+            sendWhatsAppOrderStatus('EqualJustice.ai', session.payment.reference_id, 'completed', 'Access removed', from, phone_number_id);
         //deleteAssistantThread(threadId);
-        //sendWatsAppReplyText(response.answer, from, phone_number_id);
-        //sendWatsAppWithButtons(response.answer, buttons, {}, '', from, phone_number_id);
         sendWatsAppWithList(response.answer, options, 'How can I help you Today?', 'EqualJustice.ai', from, phone_number_id);
         return;
     }
@@ -146,24 +145,25 @@ const handleTextMessage = async (message, from, phone_number_id) => {
         case types.transaction.FAILED_TRANASACTION:
         case types.employee.Retrenchment:
         case types.travel.Flights:
-            if (session.payment)//payment found in redis session
-                response = await getCXResponse(session.targetAgent, session.threadId, 'en', message.text.body);
-            else {
+        case types.employee.Offer:
+            if ((session.payment && session.payment.transaction.status == 'success') || phone_number_id=='359476970593209')//payment found in redis session
+            {
+                if (session.agentType == 'assistant') {
+                    response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId, session.action, session.targetAgent);
+                    if (response.answer && response.answer != '')
+                        response.answer = convertMarkdownToWhatsApp(response.answer);
+                }
+                else
+                    response = await getCXResponse(message.text.body, session.targetAgent, session.threadId, 'en');
+            }
+            else if (session.payment && session.payment.transaction.status == 'failed') {
                 response = {
-                    answer: `Please complete payment to proceed further. If you have already paid, Please wait.`
+                    answer: `Please complete payment to proceed further. If you have successfully paid, Please wait.`
                 }
             }
-            break;
-        case types.employee.Offer:
-            if (session.payment)//payment found in redis session
-            {
-                response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId, session.action, session.targetAgent);
-                if (response.answer && response.answer != '')
-                    response.answer = convertMarkdownToWhatsApp(response.answer);
-            }
             else {
                 response = {
-                    answer: `Please complete payment to proceed further. If you have already paid, Please wait.`
+                    answer: `Please send RESTART to start again`
                 }
             }
             break;
@@ -264,10 +264,9 @@ export const getWhatsAppMsg = async (req, res) => {
     if (isStatusMessage(req.body)) {
         let status = req.body.entry[0].changes[0].value.statuses[0]
         if (status.type == 'payment') {
-
+            updateSessionWithPayment(status.recipient_id, status.payment);
             let phone_number_id = req.body.entry[0].changes[0].value.metadata.phone_number_id;
             if (status.status == 'captured') {
-                updateSessionWithPayment(status.recipient_id, status.payment);
                 let Hibutton = [
                     {
                         type: "reply",
@@ -280,7 +279,7 @@ export const getWhatsAppMsg = async (req, res) => {
                 sendWatsAppReplyText('We have recieved your payment, please send Hi to continue conversation.', status.recipient_id, phone_number_id);
                 //sendWatsAppWithButtons('We have recieved your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
             }
-            console.log('Payment status: ', status);
+            logger.info(JSON.stringify(status));
             //sendWhatsAppOrderStatus('Payment pending', status.payment.reference_id, status.status,status.recipient_id, phone_number_id)
         }
 
@@ -296,7 +295,7 @@ export const getWhatsAppMsg = async (req, res) => {
     }
 };
 
-export const verifywhatsapp = async (req, res) =>{
+export const verifywhatsapp = async (req, res) => {
     if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === 'equaljusticeai') {
         res.send(req.query['hub.challenge']);
     }

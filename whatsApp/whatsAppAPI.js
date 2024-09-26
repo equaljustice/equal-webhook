@@ -263,7 +263,7 @@ export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phon
                 "retailer_id": "1919",
                 "name": "Draft document",
                 "amount": {
-                  "value": 9900,
+                  "value": 19900,
                   "offset": 100
                 },
                 "sale_amount": {

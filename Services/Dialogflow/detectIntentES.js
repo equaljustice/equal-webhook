@@ -1,5 +1,6 @@
 import { SessionsClient } from '@google-cloud/dialogflow';
 import { convertProtobufToJson } from '../../utils/protoJson.js';
+import { logger } from '../../utils/logging.js';
 
 // Instantiates a session client
 const sessionClient = new SessionsClient();
@@ -41,7 +42,7 @@ async function detectIntent(
 
 export async function getActionFromDFES(query, sessionId){
     let response = await detectIntent('atmprebuiltagent', sessionId, query ,null, 'en');
-    //console.log('DF_ES response',JSON.stringify(response.queryResult.fulfillmentMessages.filter(msg => msg.payload), null, 2));
+    logger.info(JSON.stringify(response));
     let payload = response.queryResult.fulfillmentMessages.filter(msg => msg.payload);
     if(payload && payload[0])
         return {payload: convertProtobufToJson(payload[0].payload), fulfillmentText: response.queryResult.fulfillmentText};
