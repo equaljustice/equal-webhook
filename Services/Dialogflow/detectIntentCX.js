@@ -53,6 +53,9 @@ async function detectIntentCX(projectId, location, agentId, sessionId, languageC
       item.richContent.some(content =>
         content.some(innerContent => innerContent.type === 'chips')
       ));
+      if(chips.length == 0){
+        chips = payloadResponse[0];
+      }
   }
   else if (payloadResponse[0])
     chips = payloadResponse[0]

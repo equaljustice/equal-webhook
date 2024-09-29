@@ -207,7 +207,7 @@ export async function sendWatsAppWithRedirectButton(textResponse, file, header =
 export async function sendWhatsAppFileLink(textResponse, file, header = '', footer = '', to, phone_number_id) {
   let fileAvailable = false;
   let counter = 0;
-  while (!fileAvailable && counter < 6) {
+  while (!fileAvailable && counter < 10) {
     fileAvailable = await checkFileAvailability(file.parameters.url);
     if (fileAvailable)
       sendWatsAppWithRedirectButton(textResponse, file, header, footer, to, phone_number_id);
