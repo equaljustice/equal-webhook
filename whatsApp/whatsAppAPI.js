@@ -218,6 +218,7 @@ export async function sendWhatsAppFileLink(textResponse, file, header = '', foot
 }
 
 export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phone_number_id) {
+  const expirationTime = Math.floor((Date.now() + 6960000) / 1000).toString(); // 1hour58min
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
@@ -258,6 +259,10 @@ export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phon
           },
           "order": {
             "status": "pending",
+            "expiration": {
+              "timestamp": expirationTime,
+              "description": "Time limit expired"
+            },
             "items": [
               {
                 "retailer_id": "1919",
@@ -297,30 +302,30 @@ export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phon
   callWhatsAppAPI(data, phone_number_id);
 }
 
-export function sendWhatsAppOrderStatus(textResponse, reference_id, status, description, to, phone_number_id){
+export function sendWhatsAppOrderStatus(textResponse, reference_id, status, description, to, phone_number_id) {
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
     "to": to,
     "type": "interactive",
     "interactive": {
-        "type": "order_status",
-        "body": {
-            "text": textResponse
-        },
-        "action": {
-            "name": "review_order",
-            "parameters": {
-                "reference_id": reference_id,
-                "order": {
-                    "status": status,
-                    "description": description
-                }
-            }
+      "type": "order_status",
+      "body": {
+        "text": textResponse
+      },
+      "action": {
+        "name": "review_order",
+        "parameters": {
+          "reference_id": reference_id,
+          "order": {
+            "status": status,
+            "description": description
+          }
         }
+      }
     }
-})
-callWhatsAppAPI(data, phone_number_id);
+  })
+  callWhatsAppAPI(data, phone_number_id);
 }
 
 

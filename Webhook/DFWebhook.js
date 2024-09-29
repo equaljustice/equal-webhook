@@ -1,6 +1,7 @@
 import { urbanPincodes } from '../JSONs/urbanPincodes.js';
 import * as constants from '../constants.js';
 import * as types from '../utils/types.js'
+import { logger } from '../utils/logging.js';
 import {
     ATMLegalTrainingData, EmployeeTrainingData,
     EmployeeTrainingData_PoliceComplaint, FailedTransactionLegalTrainingData,
