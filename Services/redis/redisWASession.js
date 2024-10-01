@@ -38,15 +38,10 @@ export async function updateSessionWithPayment(phoneNumber, paymentDetails) {
         // Fetch the existing session
         const sessionData = await client.get(phoneNumber);
         if (sessionData) {
-            // Parse the session data into an object
             const session = JSON.parse(sessionData);
-
-            // Update the session with the new 'payment' key
             session.payment = paymentDetails;
-
-            // Save the updated session back into Redis
             await client.set(phoneNumber, JSON.stringify(session), {
-                EX: 86400  // Set expiration time again to 2 hours
+                EX: 86400  
             });
 
             console.log(`Session updated with payment for phone number: ${phoneNumber}`);

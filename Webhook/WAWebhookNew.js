@@ -60,8 +60,8 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                 title: "Employment",
                 rows: [
                     {
-                        "id": "Employemnt Termination",
-                        "title": "Employment Termination",
+                        "id": "Employment Termination",
+                        "title": "Employee",
                         "description": "Employment Termination Issues"
                     },
                     {
@@ -82,12 +82,12 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                     {
                         "id": "Flights",
                         "title": "Flights Grievances",
-                        "description": "Issues while Travelling in Flight"
+                        "description": "Issues while Traveling in Flight"
                     },
                     {
                         "id": "Trains",
                         "title": "Trains Grievances",
-                        "description": "Issues while Travelling in Train"
+                        "description": "Issues while Traveling in Train"
                     }
                 ]
             }
@@ -97,7 +97,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
     let session, threadId;
     if (message.text.body == 'RESTART') {
         session = await deleteSession(from);
-        if (session.payment)
+        if (session && session.payment)
             sendWhatsAppOrderStatus('EqualJustice.ai', session.payment.reference_id, 'completed', 'Access removed', from, phone_number_id);
         //deleteAssistantThread(threadId);
         sendWatsAppWithList(response.answer, options, 'How can I help you Today?', 'EqualJustice.ai', from, phone_number_id);
@@ -114,7 +114,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                 threadId = await createAssistantThread(from);
             }
             else {
-                threadId = from;
+                threadId = 'whatsApp-' + from +'-'+ await generateId(8)
             }
             session = {
                 threadId: threadId,
@@ -142,7 +142,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
     switch (session.action) {
         case types.transaction.ATM:
         case types.transaction.UPI:
-        case types.transaction.FAILED_TRANASACTION:
+        case types.transaction.FAILED_TRANSACTION:
         case types.employee.Retrenchment:
         case types.travel.Flights:
         case types.employee.Offer:
@@ -189,7 +189,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             sendWatsAppWithButtons(response.answer, options, '', from, phone_number_id);
         else if (options.name && options.name == 'cta_url') {
             sendWatsAppReplyText(response.answer, from, phone_number_id);
-            sendWhatsAppFileLink('Here is link to dowload your document', options, 'Download Draft', 'EqualJustice.ai', from, phone_number_id);
+            sendWhatsAppFileLink('Here is link to download your document', options, 'Download Draft', 'EqualJustice.ai', from, phone_number_id);
         }
         else
             sendWatsAppReplyText(response.answer, from, phone_number_id);
@@ -276,8 +276,8 @@ export const getWhatsAppMsg = async (req, res) => {
                         }
                     }
                 ]
-                sendWatsAppReplyText('We have recieved your payment, please send Hi to continue conversation.', status.recipient_id, phone_number_id);
-                //sendWatsAppWithButtons('We have recieved your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
+                sendWatsAppReplyText('We have received your payment, please send Hi to continue conversation.', status.recipient_id, phone_number_id);
+                //sendWatsAppWithButtons('We have received your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
             }
             logger.info(JSON.stringify(status));
             //sendWhatsAppOrderStatus('Payment pending', status.payment.reference_id, status.status,status.recipient_id, phone_number_id)

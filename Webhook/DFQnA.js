@@ -33,7 +33,7 @@ export const openQnAFineTuned = async (req, res) => {
 
                     userInputData = { ...generalData, transactionArray: [...transactionArray] }
                     break;
-                case types.transaction.FAILED_TRANASACTION:
+                case types.transaction.FAILED_TRANSACTION:
                     userInputData = sessionInfo.parameters ?
                         await cleanJson(sessionInfo.parameters): "";
                     userInputData.area_of_user = urbanPincodes.includes(Number(sessionInfo.parameters.area_of_user.slice(0, 3))) ? "urban" : "rural";

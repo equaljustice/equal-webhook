@@ -266,7 +266,7 @@ export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phon
             "items": [
               {
                 "retailer_id": "1919",
-                "name": "Draft document",
+                "name": "Invoice/Payment Slip",
                 "amount": {
                   "value": 19900,
                   "offset": 100

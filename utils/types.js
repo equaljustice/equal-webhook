@@ -2,12 +2,13 @@ export const openAIModels = {
     GPT3_5: 'gpt-3.5-turbo-16k',
     GPT4: 'gpt-4-0125-preview',
     GPT4o: 'gpt-4o',
-    ATM_FRAUD_BANK: 'ft:gpt-4o-2024-08-06:ashish-chandra:bankatmletter:A7fDUFJj',
+    /* ATM_FRAUD_BANK: 'ft:gpt-4o-2024-08-06:ashish-chandra:bankatmletter:A7fDUFJj',
     ATM_FRAUD_CONSUMER_COURT: 'ft:gpt-4o-2024-08-06:ashish-chandra:bnkltrandobdsuman:A7eFDO1q',
     ATM_FRAUD_OMBUDSMAN: 'ft:gpt-4o-2024-08-06:ashish-chandra:atmombudsman:A97nEp09',
-    FAILED_TRANASACTION_BANK: 'ft:gpt-4o-2024-08-06:ashish-chandra:failed-trn-bankltr:A7e7meJC',
-    FAILED_TRANASACTION_CONSUMER_COURT: 'ft:gpt-4o-2024-08-06:ashish-chandra:failedtr-consumerc:A7dkWYtO',
-    FAILED_TRANASACTION_OMBUDSMAN: 'ft:gpt-4o-2024-08-06:ashish-chandra:failedtr-obmudsman:A7dksJ7I',
+    FAILED_TRANSACTION_BANK: 'ft:gpt-4o-2024-08-06:ashish-chandra:failed-trn-bankltr:A7e7meJC',
+    FAILED_TRANSACTION_CONSUMER_COURT: 'ft:gpt-4o-2024-08-06:ashish-chandra:failedtr-consumerc:A7dkWYtO',
+    FAILED_TRANSACTION_OMBUDSMAN: 'ft:gpt-4o-2024-08-06:ashish-chandra:failedtr-obmudsman:A7dksJ7I',
+     */FINANCIAL_COMBINED: 'ft:gpt-4o-2024-08-06:ashish-chandra:atmftcombined:ADBvd5R9',
     OPEN_QNA: 'ft:gpt-4o-2024-08-06:ashish-chandra::A98Mssc2'
 }
 
@@ -17,7 +18,7 @@ export const openAIAssist = {
 
 export const transaction = {
     ATM: 'ATM',
-    FAILED_TRANASACTION: 'FAILED_TXN',
+    FAILED_TRANSACTION: 'FAILED_TXN',
     UPI: 'UPI',
     
 }
@@ -43,8 +44,8 @@ export const letterOption = {
     RTI_APPLICATION: "RTI Application",
     NOTICE_TO_COMPANY_HR: "Notice To The Company",
     HUMAN_RIGHTS: "Complaint before Human Rights Commission",
-    BORD_OF_DIRECTOR: "Complaint To The Board Of Directors",
-    AIRLINE_NODEL_OFFICER: "Letter To The Airline Nodal Officer",
+    BOARD_OF_DIRECTOR: "Complaint To The Board Of Directors",
+    AIRLINE_NODAL_OFFICER: "Letter To The Airline Nodal Officer",
     AIRLINE_APPELLATE_AUTH: "Letter To The Airline Appellate Authority",
     AIRLINE_CONSUMER_COURT: "Complaint Before Consumer Court"
 }

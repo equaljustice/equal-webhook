@@ -10,9 +10,10 @@ export async function createMessageContent(prompttype, userInputPara, legalTrain
     },
     {
         "role": "user",
-        "content": `Details:
+        "content": `Facts of the user's case:
       ${userInputPara}
 
+      Legal guidance notes corresponding to the facts stated above:
       ${legalTraining}`
     }
     ]
@@ -32,12 +33,12 @@ export async function createUserInputParagraph(UserData, transactionType) {
                 },
                 {
                     "role": "user",
-                    "content": `Here is the JSON data related Financial Fraud happend to me. All the transaction amounts are in rupees describe this in simple english language not more than 200 words,
+                    "content": `Here is the JSON data related Financial Fraud happened to me. All the transaction amounts are in rupees describe this in simple english language not more than 200 words,
         ${JSON.stringify(reorderedUserData, null, 2)}`
                 }
                 ];
                 break;
-            case types.transaction.FAILED_TRANASACTION:
+            case types.transaction.FAILED_TRANSACTION:
                 reorderedUserData = await reorderJsonKeys(UserData, FailedTrJsonOrder);
                 userInputMessage = [{
                     "role": "user",
@@ -78,10 +79,10 @@ export async function createUserInputParagraph(UserData, transactionType) {
             }]
 
         }
-        console.log("ordered json", reorderedUserData);
+        //console.log("ordered json", reorderedUserData);
         const GPT4Response = await openAiChatCompletion(userInputMessage, types.openAIModels.GPT4, 0.5);
 
-        return GPT4Response.choices[0].message.content;
+        return {paragraph:GPT4Response.choices[0].message.content, reorderedUserData};
     } catch (error) {
         console.log(error);
     }

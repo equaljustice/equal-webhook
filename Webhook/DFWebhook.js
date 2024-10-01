@@ -7,7 +7,7 @@ import {
     EmployeeTrainingData_PoliceComplaint, FailedTransactionLegalTrainingData,
     UPILegalTrainingData, FlightsTrainingData
 } from "../LegalMaterial/legalTrainingData.js";
-import { createLetter, createLetterWith4o } from "../chatGPT/createDocuments.js";
+import { createLetter } from "../chatGPT/createDocuments.js";
 
 let option = "";
 export const createDocWithFineTuned = async (req, res) => {
@@ -27,7 +27,7 @@ export const createDocWithFineTuned = async (req, res) => {
         let openAiConfig = {
             model: types.openAIModels.GPT4o,
             temperature: 0.25,
-            max_tokens: 1500,
+            max_tokens: 2500,
             n: 1,
             top_p: 1,
             frequency_penalty: 1,
@@ -42,18 +42,15 @@ export const createDocWithFineTuned = async (req, res) => {
                 userInputData = { ...generalData, transactionArray: [...transactionArray] };
                 userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.pincode);
                 legalTrainingData = ATMLegalTrainingData;
+
                 switch (option) {
                     case types.letterOption.BANK_LETTER:
-                        openAiConfig.model = types.openAIModels.ATM_FRAUD_BANK;
-                        break;
                     case types.letterOption.BANKING_OMBUDSMAN:
-                        openAiConfig.model = types.openAIModels.ATM_FRAUD_OMBUDSMAN;
+                    case types.letterOption.CONSUMER_COURT:
+                        openAiConfig.model = types.openAIModels.FINANCIAL_COMBINED;
                         break;
                     case types.letterOption.POLICE_COMPLAINT:
                         openAiConfig.temperature = 0.5;
-                        break;
-                    case types.letterOption.CONSUMER_COURT:
-                        openAiConfig.model = types.openAIModels.ATM_FRAUD_CONSUMER_COURT;
                         break;
                     case types.letterOption.RTI_APPLICATION:
                         if (isPublicSectorBank(generalData.bank_name)) {
@@ -87,16 +84,12 @@ export const createDocWithFineTuned = async (req, res) => {
                 legalTrainingData = UPILegalTrainingData;
                 switch (option) {
                     case types.letterOption.BANK_LETTER:
-                        openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_BANK;
-                        break;
                     case types.letterOption.BANKING_OMBUDSMAN:
-                        openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_OMBUDSMAN;
+                    case types.letterOption.CONSUMER_COURT:
+                        openAiConfig.model = types.openAIModels.FINANCIAL_COMBINED;
                         break;
                     case types.letterOption.POLICE_COMPLAINT:
                         openAiConfig.temperature = 0.5;
-                        break;
-                    case types.letterOption.CONSUMER_COURT:
-                        openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_CONSUMER_COURT;
                         break;
                     case types.letterOption.RTI_APPLICATION:
                         if (isPublicSectorBank(sessionInfo.parameters.name_of_bank)) {
@@ -122,22 +115,18 @@ export const createDocWithFineTuned = async (req, res) => {
                         break;
                 }
                 break;
-            case types.transaction.FAILED_TRANASACTION:
+            case types.transaction.FAILED_TRANSACTION:
                 userInputData = sessionInfo.parameters;
                 userInputData.area_of_user = await pincodeToArea(sessionInfo.parameters.area_of_user);
                 legalTrainingData = FailedTransactionLegalTrainingData;
                 switch (option) {
                     case types.letterOption.BANK_LETTER:
-                        openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_BANK;
-                        break;
                     case types.letterOption.BANKING_OMBUDSMAN:
-                        openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_OMBUDSMAN;
+                    case types.letterOption.CONSUMER_COURT:
+                        openAiConfig.model = types.openAIModels.FINANCIAL_COMBINED;
                         break;
                     case types.letterOption.POLICE_COMPLAINT:
                         openAiConfig.temperature = 0.5;
-                        break;
-                    case types.letterOption.CONSUMER_COURT:
-                        openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_CONSUMER_COURT;
                         break;
                     case types.letterOption.RTI_APPLICATION:
                         if (isPublicSectorBank(sessionInfo.parameters.name_of_bank)) {
@@ -171,18 +160,17 @@ export const createDocWithFineTuned = async (req, res) => {
                     case types.letterOption.NOTICE_TO_COMPANY_HR:
                         openAiConfig.temperature = 0.5;
                         break;
-                    case types.letterOption.BORD_OF_DIRECTOR:
-                        //openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_OMBUDSMAN;
+                    case types.letterOption.BOARD_OF_DIRECTOR:
+                        //openAiConfig.model = types.openAIModels.FAILED_TRANSACTION_OMBUDSMAN;
                         break;
                     case types.letterOption.POLICE_COMPLAINT:
                         openAiConfig.temperature = 0.5;
                         legalTrainingData = EmployeeTrainingData_PoliceComplaint;
                         break;
                     case types.letterOption.LABOUR_COURT:
-                        //openAiConfig.model = types.openAIModels.FAILED_TRANASACTION_CONSUMER_COURT;
+                        //openAiConfig.model = types.openAIModels.FAILED_TRANSACTION_CONSUMER_COURT;
                         break;
                 }
-                //createLetterWith4o(tag, option.split(' ').join('_'), userInputData, legalTrainingData, threadId, openAiConfig);
                 break;
             case types.travel.Flights:
                 userInputData = sessionInfo.parameters ?
@@ -190,7 +178,7 @@ export const createDocWithFineTuned = async (req, res) => {
                 console.log("User input data", userInputData);
                 legalTrainingData = FlightsTrainingData;
                 switch (option) {
-                    case types.letterOption.AIRLINE_NODEL_OFFICER:
+                    case types.letterOption.AIRLINE_NODAL_OFFICER:
                         openAiConfig.temperature = 0.5;
                         break;
                     case types.letterOption.AIRLINE_APPELLATE_AUTH:
@@ -200,7 +188,6 @@ export const createDocWithFineTuned = async (req, res) => {
                         openAiConfig.temperature = 0.5;
                         break;
                 }
-                //createLetterWith4o(tag, option.split(' ').join('_'), userInputData, legalTrainingData, threadId, openAiConfig);
                 break;
             default:
                 legalTrainingData = '';
@@ -260,7 +247,7 @@ export function cleanJson(jsonData) {
                         _clean(obj[key]); // Recurse if the value is an object
                     }
                 }
-                if (obj[key] === 'NA' || obj[key] === null || String(obj[key]).includes('$') || obj[key]=='') {
+                if (obj[key] === 'NA' || obj[key] === null || String(obj[key]).includes('$') || obj[key] == '') {
                     delete obj[key]; // Delete the key if the value is 'NA' or starts with '$'
                 }
             });
