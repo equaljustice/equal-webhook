@@ -10,7 +10,7 @@ import { DFchipsToButtonOrList } from '../whatsApp/DFchipsToButtons.js';
 import { convertMarkdownToWhatsApp } from '../whatsApp/markdownToWA.js';
 import { generateId } from '../utils/generateID.js';
 
-const handlInteractiveButtons = async (message, from, phone_number_id) => {
+const handleInteractiveButtons = async (message, from, phone_number_id) => {
     switch (message.interactive.type) {
         case 'button_reply':
             message.text = { "body": message.interactive.button_reply.id };
@@ -29,7 +29,7 @@ const handlInteractiveButtons = async (message, from, phone_number_id) => {
     handleTextMessage(message, from, phone_number_id);
 }
 const handleTextMessage = async (message, from, phone_number_id) => {
-    markAsRead(message.id, phone_number_id);
+
     let response = {
         answer: 'Please reply from one of the below option'
     }
@@ -53,6 +53,11 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                         "id": "Failures",
                         "title": "Payment failures",
                         "description": "Issues related to payment failures"
+                    },
+                    {
+                        "id": "ATM Failures",
+                        "title": "ATM Transaction failed",
+                        "description": "Cash not dispensed"
                     }
                 ]
             },
@@ -125,8 +130,12 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             message.text = { "body": "hi" }
             saveSession(from, threadId, DFResponse.payload.action, DFResponse.payload.agentType, DFResponse.payload.targetAgent);
             let reference_id = await generateId(8);
-            sendWhatsAppOrderForPayment("Please pay to proceed", reference_id, from, phone_number_id);
+            if(DFResponse.payload.pricing){
+            sendWhatsAppOrderForPayment("Please pay to proceed", DFResponse.payload.pricing ,reference_id, from, phone_number_id);
             return;
+        }
+        session.payment = {transaction: {status : 'success'}}
+        
         }
         else if (DFResponse.payload && DFResponse.payload.action) {
             session = {
@@ -198,6 +207,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
         sendWatsAppReplyText(response.answer, from, phone_number_id);
     if (response.sessionEnd) {
         session = await deleteSession(from);
+        if(session && session.payment)
         sendWhatsAppOrderStatus('EqualJustice.ai', session.payment.reference_id, 'completed', 'Access removed', from, phone_number_id);
 
     }
@@ -226,6 +236,7 @@ const AnalyzeMessage = async (req, res) => {
     try {
         let message = req.body.entry[0].changes[0].value.messages[0];
         let phone_number_id = req.body.entry[0].changes[0].value.metadata.phone_number_id;
+        markAsRead(message.id, phone_number_id);
         switch (message.type) {
             case 'text':
                 await handleTextMessage(message, message.from, phone_number_id);
@@ -234,7 +245,7 @@ const AnalyzeMessage = async (req, res) => {
                 await handleDocumentMessage(message, message.from, phone_number_id);
                 break;
             case 'interactive':
-                await handlInteractiveButtons(message, message.from, phone_number_id);
+                await handleInteractiveButtons(message, message.from, phone_number_id);
                 break;
             case 'image':
             case 'audio':
@@ -278,6 +289,8 @@ export const getWhatsAppMsg = async (req, res) => {
                 ]
                 sendWatsAppReplyText('We have received your payment, please send Hi to continue conversation.', status.recipient_id, phone_number_id);
                 //sendWatsAppWithButtons('We have received your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
+                let message = {"text" : { "body": 'Hi' }};
+                handleTextMessage(message, status.recipient_id, phone_number_id);
             }
             logger.info(JSON.stringify(status));
             //sendWhatsAppOrderStatus('Payment pending', status.payment.reference_id, status.status,status.recipient_id, phone_number_id)

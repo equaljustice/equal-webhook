@@ -217,7 +217,7 @@ export async function sendWhatsAppFileLink(textResponse, file, header = '', foot
   }
 }
 
-export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phone_number_id) {
+export function sendWhatsAppOrderForPayment(textResponse, p, reference_id, to, phone_number_id) {
   const expirationTime = Math.floor((Date.now() + 6960000) / 1000).toString(); // 1hour58min
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
@@ -254,7 +254,7 @@ export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phon
           ],
           "currency": "INR",
           "total_amount": {
-            "value": 300,
+            "value": p.sale_amount + p.tax - p.discount,
             "offset": 100
           },
           "order": {
@@ -266,29 +266,29 @@ export function sendWhatsAppOrderForPayment(textResponse, reference_id, to, phon
             "items": [
               {
                 "retailer_id": "1919",
-                "name": "Invoice/Payment Slip",
+                "name": "Invoice / Payment Slip",
                 "amount": {
-                  "value": 19900,
+                  "value": p.amount,
                   "offset": 100
                 },
                 "sale_amount": {
-                  "value": 9900,
+                  "value": p.sale_amount,
                   "offset": 100
                 },
                 "quantity": 1
               }
             ],
             "subtotal": {
-              "value": 9900,
+              "value": p.sale_amount,
               "offset": 100
             },
             "tax": {
-              "value": 0,
+              "value": p.tax,
               "offset": 100,
-              "description": ""
+              "description": "Tax"
             },
             "discount": {
-              "value": 9600,
+              "value": p.discount,
               "offset": 100,
               "description": "Launch offer",
               "discount_program_name": "Launch"

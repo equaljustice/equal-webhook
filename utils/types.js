@@ -20,7 +20,7 @@ export const transaction = {
     ATM: 'ATM',
     FAILED_TRANSACTION: 'FAILED_TXN',
     UPI: 'UPI',
-    
+
 }
 
 export const employee = {
@@ -54,5 +54,14 @@ export const targetpage = {
     ATMLetterOption: "projects/atmprebuiltagent/locations/asia-south1/agents/9d9f910c-d14b-4489-b1f9-98c6c3e67c61/flows/aa979626-23c2-4a9c-b456-45403d2dbf61/pages/43328113-8eb4-4cd5-911a-40700ad78d5c",
     UPILetterOption: "projects/atmprebuiltagent/locations/us-central1/agents/b2e20d6e-110e-4076-832f-09795e5d53a2/flows/aa979626-23c2-4a9c-b456-45403d2dbf61/pages/11e0abf0-ea69-47be-bb5a-744585f50f39",
     FailedTrLetterOption: "projects/atmprebuiltagent/locations/us-central1/agents/7f79f692-4e94-4d04-9bf1-203e68b815dc/flows/10d45ea1-8174-4894-96ed-0bbfb9b802ae/pages/43328113-8eb4-4cd5-911a-40700ad78d5c",
-                  
+
+}
+
+export const pricing = {
+    ATM: { amount: 9900, sale_amount: 4900, tax: 0, discount: 4600 },
+    FAILED_TRANSACTION: { amount: 4900, sale_amount: 2900, tax: 0, discount: 2600 },
+    UPI: { amount: 9900, sale_amount: 4900, tax: 0, discount: 4600 },
+    Retrenchment: { amount: 4900, sale_amount: 9900, tax: 0, discount: 9600 },
+    Flights: { amount: 9900, sale_amount: 4900, tax: 0, discount: 4600 },
+    Offer: { amount: 9900, sale_amount: 4900, tax: 0, discount: 4600 },
 }
