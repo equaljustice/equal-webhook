@@ -20,7 +20,7 @@ const handleInteractiveButtons = async (message, from, phone_number_id) => {
             break;
         case 'payment':
             if (message.interactive.payment.status == 'success')
-                sendWhatsAppOrderStatus('Payment Received', message.interactive.payment.reference_id, 'processing', 'Access allowed for next 2 hours', from, phone_number_id);
+                sendWhatsAppOrderStatus('Payment Received', message.interactive.payment.reference_id, 'processing', 'Access requested for next 2 hours', from, phone_number_id);
             return;
         default:
             return;
@@ -275,10 +275,10 @@ export const getWhatsAppMsg = async (req, res) => {
     if (isStatusMessage(req.body)) {
         let status = req.body.entry[0].changes[0].value.statuses[0]
         if (status.type == 'payment') {
-            updateSessionWithPayment(status.recipient_id, status.payment);
+            await updateSessionWithPayment(status.recipient_id, status.payment);
             let phone_number_id = req.body.entry[0].changes[0].value.metadata.phone_number_id;
             if (status.status == 'captured') {
-                let Hibutton = [
+                /* let Hibutton = [
                     {
                         type: "reply",
                         reply: {
@@ -286,9 +286,9 @@ export const getWhatsAppMsg = async (req, res) => {
                             title: 'Hi'
                         }
                     }
-                ]
-                sendWatsAppReplyText('We have received your payment, please send Hi to continue conversation.', status.recipient_id, phone_number_id);
+                ] */
                 //sendWatsAppWithButtons('We have received your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
+                sendWhatsAppOrderStatus('Access allowed for next 2 hours, Say Hi to continue', message.interactive.payment.reference_id, 'completed', 'Payment Received', status.recipient_id, phone_number_id);
                 let message = {"text" : { "body": 'Hi' }};
                 handleTextMessage(message, status.recipient_id, phone_number_id);
             }
