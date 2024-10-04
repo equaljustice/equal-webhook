@@ -271,7 +271,7 @@ const AnalyzeMessage = async (req, res) => {
 };
 
 export const getWhatsAppMsg = async (req, res) => {
-    logger.info(`WA msg: JSON.stringify(req.body)`);
+    logger.info(JSON.stringify(req.body));
     if (isStatusMessage(req.body)) {
         let status = req.body.entry[0].changes[0].value.statuses[0]
         if (status.type == 'payment') {
