@@ -271,7 +271,7 @@ const AnalyzeMessage = async (req, res) => {
 };
 
 export const getWhatsAppMsg = async (req, res) => {
-    //console.log('WA msg:', JSON.stringify(req.body));
+    logger.info(`WA msg: JSON.stringify(req.body)`);
     if (isStatusMessage(req.body)) {
         let status = req.body.entry[0].changes[0].value.statuses[0]
         if (status.type == 'payment') {
@@ -288,7 +288,7 @@ export const getWhatsAppMsg = async (req, res) => {
                     }
                 ] */
                 //sendWatsAppWithButtons('We have received your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
-                sendWhatsAppOrderStatus('Access allowed for next 2 hours, Say Hi to continue', message.interactive.payment.reference_id, 'completed', 'Payment Received', status.recipient_id, phone_number_id);
+                sendWhatsAppOrderStatus('Access allowed for next 2 hours, Say Hi to continue', status.payment.reference_id, 'completed', 'Payment Received', status.recipient_id, phone_number_id);
                 let message = {"text" : { "body": 'Hi' }};
                 handleTextMessage(message, status.recipient_id, phone_number_id);
             }
