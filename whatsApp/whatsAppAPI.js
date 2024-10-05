@@ -19,18 +19,35 @@ async function callWhatsAppAPI(data, phone_number_id) {
 
   axios.request(config)
     .then((response) => {
-      logger.info(`sent WA reply: ${data}`);
+      //logger.info(`sent WA reply: ${data}`);
     })
     .catch((error) => {
       logger.error(error);
     });
 }
 
-export async function sendWatsAppReplyText(textResponse, to, phone_number_id) {
+export async function sendWatsAppText(textResponse, to, phone_number_id) {
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
     "to": to,
+    "type": "text",
+    "text": {
+      "preview_url": false,
+      "body": trimString(textResponse, 4096)
+    }
+  });
+
+  callWhatsAppAPI(data, phone_number_id);
+}
+export async function sendWatsAppReplyText(textResponse, message_id, to, phone_number_id) {
+  let data = JSON.stringify({
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": to,
+    "context": {
+    "message_id": message_id
+  },
     "type": "text",
     "text": {
       "preview_url": false,

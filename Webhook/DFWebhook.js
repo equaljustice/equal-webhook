@@ -195,7 +195,7 @@ export const createDocWithFineTuned = async (req, res) => {
                     await cleanJson(sessionInfo.parameters) : "";
         }
 
-        textResponse = `Creating draft for ${option}, Please wait`;
+        textResponse = `Creating draft for ${option}. It might take around 1 minute, Please wait`;
         docName = `Draft ${option}`;
         option = option.split(' ').join('_');
         fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + tag + '_' + option + '.docx';
