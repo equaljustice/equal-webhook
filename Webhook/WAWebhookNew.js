@@ -217,7 +217,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
 const handleDocumentMessage = async (message, from, phone_number_id) => {
 
     let media = await getWAMediaURL(message.document.id, phone_number_id);
-
+    sendWatsAppReplyText('We have received your document, Please wait while we are processing it.', from, phone_number_id);
     let filePath = await downloadWAFile(media.url, message.document.id + '_' + message.document.filename);
     //await sendWatsAppReplyText("Please wait till I go through the document.", from);
     logger.info(filePath);

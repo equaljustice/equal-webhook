@@ -1,8 +1,7 @@
 import { createMessageContent, createUserInputParagraph, removeKeys } from "./helpers/buildInputData.js";
 import { openAiChatCompletion } from "./helpers/openAI.js";
 import { processDocx } from "../CloudStorage/processDocs.js";
-import { getLegalTraining } from "./helpers/legalTraining.js"
-import * as types from '../utils/types.js'
+import { getLegalTraining } from "./helpers/legalTraining.js";
 
 
 export async function createLetter(tag, letterOption, userInputData, legalTrainingData, sessionId, openAiConfig) {

@@ -183,7 +183,7 @@ export async function removeKeys(jsonData) {
                         .includes(key) && String(obj[key]).toLowerCase() === 'no') {
                         delete obj[key];
                     } else if (['applied_for_atmcard', 'withdrawing_regularly_from_atm',
-                        'refund_compensesion_expected', 'domestic_transaction',
+                        'domestic_transaction',
                         'transaction_sms_recieved', 'transaction_sms_recieved_within_one_hour',
                         'transaction_sms_recieved_within_hour', 'transaction_email_recieved_within_hour',
                         'transaction_email_recieved', 'transaction_email_recieved_within_one_hour',
