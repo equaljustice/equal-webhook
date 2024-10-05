@@ -30,7 +30,7 @@ export const createDocWithFineTuned = async (req, res) => {
             max_tokens: 2500,
             n: 1,
             top_p: 1,
-            frequency_penalty: 1,
+            frequency_penalty: 0,
             presence_penalty: 0,
         }
         switch (tag) {
