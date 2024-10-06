@@ -165,7 +165,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                 else
                     response = await getCXResponse(message.text.body, session.targetAgent, session.threadId, 'en');
             }
-            else if (session.payment && session.payment.transaction.status == 'failed') {
+            else if (session.payment) {
                 response = {
                     answer: `Please complete payment to proceed further. If you have successfully paid, Please wait.`
                 }
