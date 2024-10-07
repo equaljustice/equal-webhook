@@ -3,7 +3,7 @@ import { logger } from '../utils/logging.js';
 import { extractTextFromDocument, deleteFile } from '../utils/readFileData.js';
 import { markAsRead, sendWatsAppText, sendWatsAppReplyText, getWAMediaURL, downloadWAFile, sendWatsAppWithButtons, sendWatsAppWithList, sendWhatsAppFileLink, sendWatsAppVideo, sendWhatsAppOrderForPayment, sendWhatsAppOrderStatus } from '../whatsApp/whatsAppAPI.js';
 import { interactWithAssistant, createAssistantThread } from "../chatGPT/helpers/assistant-api.js";
-import { deleteSession, getSession, saveSession, updateSessionWithPayment } from '../Services/redis/redisWASession.js';
+import { deleteSession, getSession, saveSession, updateSessionWithNewThread, updateSessionWithPayment } from '../Services/redis/redisWASession.js';
 import { getActionFromDFES } from '../Services/Dialogflow/detectIntentES.js';
 import { getCXResponse } from '../Services/Dialogflow/detectIntentCX.js';
 import { DFchipsToButtonOrList } from '../whatsApp/DFchipsToButtons.js';
@@ -31,7 +31,7 @@ const handleInteractiveButtons = async (message, from, phone_number_id) => {
 const handleTextMessage = async (message, from, phone_number_id) => {
 
     let response = {
-        answer: 'Please reply from one of the below option'
+        answer: 'Please reply from one of the below option. Reply EXIT to start new use case'
     }
     let options = {
         button: "Options",
@@ -100,12 +100,11 @@ const handleTextMessage = async (message, from, phone_number_id) => {
     }
 
     let session, threadId;
-    if (message.text.body == 'RESTART') {
+    if (message.text.body == 'EXIT') {
         session = await deleteSession(from);
-        if (session && session.payment)
+        if (session && session.payment && session.payment.reference_id)
             sendWhatsAppOrderStatus('EqualJustice.ai', session.payment.reference_id, 'completed', 'Access removed', from, phone_number_id);
-        //deleteAssistantThread(threadId);
-        sendWatsAppWithList(response.answer, options, 'How can I help you Today?', 'EqualJustice.ai', from, phone_number_id);
+        sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply Reset to change your responses.', from, phone_number_id);
         return;
     }
     session = await getSession(from);
@@ -125,7 +124,8 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                 threadId: threadId,
                 action: DFResponse.payload.action,
                 agentType: DFResponse.payload.agentType,
-                targetAgent: DFResponse.payload.targetAgent
+                targetAgent: DFResponse.payload.targetAgent,
+                payment: { transaction: { status: 'pending' } }
             }
             message.text = { "body": "hi" }
             saveSession(from, threadId, DFResponse.payload.action, DFResponse.payload.agentType, DFResponse.payload.targetAgent);
@@ -135,7 +135,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                 return;
             }
             session.payment = { transaction: { status: 'success' } }
-
+            updateSessionWithPayment(from, session.payment);
         }
         else if (DFResponse.payload && DFResponse.payload.action) {
             session = {
@@ -147,7 +147,16 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             return;
         }
     }
-
+    if (['restart','reset'].includes(message.text.body.toLowerCase())) {
+        if (session.agentType == 'assistant') {
+            session.threadId = await createAssistantThread(from);
+        }
+        else {
+            session.threadId = 'whatsApp-' + from + '-' + await generateId(8)
+        }
+        updateSessionWithNewThread(from, session.threadId);
+        message.text = { "body": "hi" }
+    }
     switch (session.action) {
         case types.transaction.ATM:
         case types.transaction.UPI:
@@ -177,11 +186,11 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             }
             break;
         case types.actions.Welcome:
-            sendWatsAppWithList(response.answer, options, 'How can I help you Today?', 'EqualJustice.ai', from, phone_number_id);
+            sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply Reset to change your responses.', from, phone_number_id);
             sendWatsAppVideo(from, phone_number_id);
             return;
         case types.actions.Fallback:
-            sendWatsAppWithList(response.answer, options, 'How can I help you Today?', 'EqualJustice.ai', from, phone_number_id);
+            sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply Reset to change your responses.', from, phone_number_id);
             return;
         default:
             response = {
@@ -208,7 +217,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
     }
     if (response.sessionEnd) {
         session = await deleteSession(from);
-        if (session && session.payment)
+        if (session && session.payment && session.payment.reference_id)
             sendWhatsAppOrderStatus('EqualJustice.ai', session.payment.reference_id, 'completed', 'Access removed', from, phone_number_id);
 
     }
