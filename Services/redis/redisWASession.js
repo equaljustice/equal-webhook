@@ -54,6 +54,27 @@ export async function updateSessionWithPayment(phoneNumber, paymentDetails) {
     }
 }
 
+export async function updateSessionWithNewThread(phoneNumber, threadId) {
+    try {
+        // Fetch the existing session
+        const sessionData = await client.get(phoneNumber);
+        if (sessionData) {
+            const session = JSON.parse(sessionData);
+            session.threadId = threadId;
+            await client.set(phoneNumber, JSON.stringify(session), {
+                EX: 86400  
+            });
+
+            console.log(`Session restarted for phone number: ${phoneNumber}`);
+        } else {
+            console.log(`No session found for phone number: ${phoneNumber}`);
+        }
+    } catch (error) {
+        console.error('Error updating session in Redis:', error);
+        return null;
+    }
+}
+
 // Function to get the session JSON object from Redis
 export async function getSession(phoneNumber) {
     try {

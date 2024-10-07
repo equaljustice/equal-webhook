@@ -181,7 +181,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             }
             else {
                 response = {
-                    answer: `Please send RESTART to start again`
+                    answer: `Please send EXIT to start again`
                 }
             }
             break;
