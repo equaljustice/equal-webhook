@@ -2,13 +2,13 @@ export const openAIModels = {
     GPT3_5: 'gpt-3.5-turbo-16k',
     GPT4: 'gpt-4-0125-preview',
     GPT4o: 'gpt-4o',
-    /* ATM_FRAUD_BANK: 'ft:gpt-4o-2024-08-06:ashish-chandra:bankatmletter:A7fDUFJj',
+    ATM_FRAUD_BANK: 'ft:gpt-4o-2024-08-06:ashish-chandra:bankatmletter:A7fDUFJj',
     ATM_FRAUD_CONSUMER_COURT: 'ft:gpt-4o-2024-08-06:ashish-chandra:bnkltrandobdsuman:A7eFDO1q',
     ATM_FRAUD_OMBUDSMAN: 'ft:gpt-4o-2024-08-06:ashish-chandra:atmombudsman:A97nEp09',
     FAILED_TRANSACTION_BANK: 'ft:gpt-4o-2024-08-06:ashish-chandra:failed-trn-bankltr:A7e7meJC',
     FAILED_TRANSACTION_CONSUMER_COURT: 'ft:gpt-4o-2024-08-06:ashish-chandra:failedtr-consumerc:A7dkWYtO',
     FAILED_TRANSACTION_OMBUDSMAN: 'ft:gpt-4o-2024-08-06:ashish-chandra:failedtr-obmudsman:A7dksJ7I',
-     */FINANCIAL_COMBINED: 'ft:gpt-4o-2024-08-06:ashish-chandra:atmftcombined:ADBvd5R9',
+    FINANCIAL_COMBINED: 'ft:gpt-4o-2024-08-06:ashish-chandra:atmftcombined:ADBvd5R9',
     OPEN_QNA: 'ft:gpt-4o-2024-08-06:ashish-chandra::A98Mssc2'
 }
 

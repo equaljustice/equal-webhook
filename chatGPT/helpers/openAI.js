@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 
 
-export async function openAiChatCompletion(message, model, temperature = 0.1, max_tokens=1500, n = 1, top_p = 1, frequency_penalty = 1.07, presence_penalty = 0) {
+export async function openAiChatCompletion(message, model, temperature = 0.1, max_tokens=1500, n = 1, top_p = 1, frequency_penalty = 0, presence_penalty = 0) {
     const openai = new OpenAI(process.env.OPENAI_API_KEY);
     const completionResponse = await openai.chat.completions.create({
         model: model,
@@ -16,7 +16,7 @@ export async function openAiChatCompletion(message, model, temperature = 0.1, ma
     return completionResponse;
 }
 
-export async function openAiCompletion(message, model, temperature = 0.5, max_tokens, n = 1, top_p = 1, frequency_penalty = 1.07, presence_penalty = 0) {
+export async function openAiCompletion(message, model, temperature = 0.5, max_tokens, n = 1, top_p = 1, frequency_penalty = 0, presence_penalty = 0) {
     const openai = new OpenAI(process.env.OPENAI_API_KEY);
     const completionResponse = await openai.completions.create({
         model: model,
