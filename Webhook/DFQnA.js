@@ -15,7 +15,7 @@ export const openQnAFineTuned = async (req, res) => {
         let generalData;
         let transactionArray;
         let queryMessage = [];
-        if (counter == 1) {
+        if (messagesHistory == []) {
             let sysMessage = [{
                 role: "system",
                 content: "restrict response to 1500 chars, remove annotations from the response"
@@ -41,6 +41,7 @@ export const openQnAFineTuned = async (req, res) => {
                 case types.transaction.UPI:
                     userInputData = sessionInfo.parameters ?
                         await cleanJson(sessionInfo.parameters) : "";
+                    userInputData.area_of_user = urbanPincodes.includes(Number(sessionInfo.parameters.pincode.slice(0, 3))) ? "urban" : "rural";
                     break
                 case types.travel.Flights:
                 case types.employee.Retrenchment:

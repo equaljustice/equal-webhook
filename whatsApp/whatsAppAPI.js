@@ -226,12 +226,14 @@ export async function sendWhatsAppFileLink(textResponse, file, header = '', foot
   let counter = 0;
   while (!fileAvailable && counter < 10) {
     fileAvailable = await checkFileAvailability(file.parameters.url);
-    if (fileAvailable)
-      sendWatsAppWithRedirectButton(textResponse, file, header, footer, to, phone_number_id);
-    // Adjust the delay (in milliseconds) based on your requirements
-    await new Promise(resolve => setTimeout(resolve, 15000));  // 10 seconds delay
+    if (fileAvailable){
+      await sendWatsAppWithRedirectButton(textResponse, file, header, footer, to, phone_number_id);
+      return true;
+     } // Adjust the delay (in milliseconds) based on your requirements
+    await new Promise(resolve => setTimeout(resolve, 15000));  // 15 seconds delay
     counter = counter + 1;
   }
+  return false;
 }
 
 export function sendWhatsAppOrderForPayment(textResponse, p, reference_id, to, phone_number_id) {

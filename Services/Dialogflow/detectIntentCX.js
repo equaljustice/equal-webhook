@@ -10,27 +10,9 @@ import { logger } from '../../utils/logging.js';
 //const client = new SessionsClient({apiEndpoint: 'asia-south1-dialogflow.googleapis.com'})
 
 
-async function detectIntentCX(projectId, location, agentId, sessionId, languageCode, query) {
+async function detectIntentCX(client, request) {
   // const sessionId = Math.random().toString(36).substring(7);
-  const client = new SessionsClient({ apiEndpoint: `${location}-dialogflow.googleapis.com` })
-  const sessionPath = client.projectLocationAgentSessionPath(
-    projectId,
-    location,
-    agentId,
-    sessionId
-  );
-  const request = {
-    session: sessionPath,
-    queryInput: {
-      text: {
-        text: query,
-      },
-      languageCode,
-    },
-    queryParams: {
-      sessionTtl: { seconds: 86399 },
-    },
-  };
+  
   const [response] = await client.detectIntent(request);
   let textResponse = [];
   let payloadResponse = [];
@@ -67,6 +49,47 @@ async function detectIntentCX(projectId, location, agentId, sessionId, languageC
 //console.log(JSON.stringify(response,null,2));
 
 export async function getCXResponse(query, targetAgent, sessionId, languageCode) {
-  //console.log("targetAgent project", targetAgent.projectId);
-  return await detectIntentCX(targetAgent.projectId, targetAgent.location, targetAgent.agentId, sessionId, languageCode, query);
+  const client = new SessionsClient({ apiEndpoint: `${targetAgent.location}-dialogflow.googleapis.com` })
+  const sessionPath = client.projectLocationAgentSessionPath(
+    targetAgent.projectId,
+    targetAgent.location,
+    targetAgent.agentId,
+    sessionId
+  );
+  const request = {
+    session: sessionPath,
+    queryInput: {
+      text: {
+        text: query,
+      },
+      languageCode,
+    },
+    queryParams: {
+      sessionTtl: { seconds: 86399 },
+    },
+  };
+  return await detectIntentCX(client, request);
+}
+
+export async function getCXEventResponse(event, targetAgent, sessionId, languageCode) {
+  const client = new SessionsClient({ apiEndpoint: `${targetAgent.location}-dialogflow.googleapis.com` })
+  const sessionPath = client.projectLocationAgentSessionPath(
+    targetAgent.projectId,
+    targetAgent.location,
+    targetAgent.agentId,
+    sessionId
+  );
+  const request = {
+    session: sessionPath,
+    queryInput: {
+      event: {
+        event: event,
+      },
+      languageCode,
+    },
+    queryParams: {
+      sessionTtl: { seconds: 86399 },
+    },
+  };
+  return await detectIntentCX(client, request);
 }

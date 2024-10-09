@@ -5,7 +5,7 @@ import { markAsRead, sendWatsAppText, sendWatsAppReplyText, getWAMediaURL, downl
 import { interactWithAssistant, createAssistantThread } from "../chatGPT/helpers/assistant-api.js";
 import { deleteSession, getSession, saveSession, updateSessionWithNewThread, updateSessionWithPayment } from '../Services/redis/redisWASession.js';
 import { getActionFromDFES } from '../Services/Dialogflow/detectIntentES.js';
-import { getCXResponse } from '../Services/Dialogflow/detectIntentCX.js';
+import { getCXEventResponse, getCXResponse } from '../Services/Dialogflow/detectIntentCX.js';
 import { DFchipsToButtonOrList } from '../whatsApp/DFchipsToButtons.js';
 import { convertMarkdownToWhatsApp } from '../whatsApp/markdownToWA.js';
 import { generateId } from '../utils/generateID.js';
@@ -197,6 +197,11 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                 answer: `This use case is under development, Please try again this later`
             }
     }
+   sendAIResponse(session, response, message, from, phone_number_id);
+
+};
+
+const sendAIResponse = async(session, response, message, from, phone_number_id) =>{
     if (response.payload && response.answer) {
         let options = DFchipsToButtonOrList(response.payload);
         //console.log("options from DFCX", JSON.stringify(options));
@@ -207,7 +212,11 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             sendWatsAppWithButtons(response.answer, options, '', from, phone_number_id);
         else if (options.name && options.name == 'cta_url') {
             sendWatsAppText(response.answer, from, phone_number_id);
-            sendWhatsAppFileLink('Here is link to download your document', options, 'Download Draft', 'EqualJustice.ai', from, phone_number_id);
+            const fileSent = await sendWhatsAppFileLink('Here is link to download your document', options, 'Download Draft', 'EqualJustice.ai', from, phone_number_id);
+            if(fileSent){
+                response = await getCXEventResponse('startQnA', session.targetAgent, session.threadId, 'en');
+                sendAIResponse(session, response, message, from, phone_number_id);
+            }
         }
         else
             sendWatsAppText(response.answer, from, phone_number_id);
@@ -221,8 +230,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             sendWhatsAppOrderStatus('EqualJustice.ai', session.payment.reference_id, 'completed', 'Access removed', from, phone_number_id);
 
     }
-
-};
+}
 
 const handleDocumentMessage = async (message, from, phone_number_id) => {
 
