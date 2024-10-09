@@ -41,13 +41,17 @@ export async function sendWatsAppText(textResponse, to, phone_number_id) {
   callWhatsAppAPI(data, phone_number_id);
 }
 export async function sendWatsAppReplyText(textResponse, message_id, to, phone_number_id) {
+  if (message_id == null) {
+    sendWatsAppText(textResponse, to, phone_number_id)
+    return;
+  }
   let data = JSON.stringify({
     "messaging_product": "whatsapp",
     "recipient_type": "individual",
     "to": to,
     "context": {
-    "message_id": message_id
-  },
+      "message_id": message_id
+    },
     "type": "text",
     "text": {
       "preview_url": false,
@@ -226,10 +230,10 @@ export async function sendWhatsAppFileLink(textResponse, file, header = '', foot
   let counter = 0;
   while (!fileAvailable && counter < 10) {
     fileAvailable = await checkFileAvailability(file.parameters.url);
-    if (fileAvailable){
+    if (fileAvailable) {
       await sendWatsAppWithRedirectButton(textResponse, file, header, footer, to, phone_number_id);
       return true;
-     } // Adjust the delay (in milliseconds) based on your requirements
+    } // Adjust the delay (in milliseconds) based on your requirements
     await new Promise(resolve => setTimeout(resolve, 15000));  // 15 seconds delay
     counter = counter + 1;
   }

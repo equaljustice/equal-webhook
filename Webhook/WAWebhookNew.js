@@ -237,16 +237,10 @@ const handleDocumentMessage = async (message, from, phone_number_id) => {
     let media = await getWAMediaURL(message.document.id, phone_number_id);
     sendWatsAppText('We have received your document, Please wait while we are processing it.', from, phone_number_id);
     let filePath = await downloadWAFile(media.url, message.document.id + '_' + message.document.filename);
-    //await sendWatsAppReplyText("Please wait till I go through the document.", from);
     logger.info(filePath);
     let pdfContent = await extractTextFromDocument(filePath, media.mime_type);
-    /* let response = await interactWithAssistant(pdfContent, from, types.openAIAssist.EMP_OFFER);
-    if (response.answer || response.answer != '') {
-        await sendWatsAppReplyText(response.answer, from, phone_number_id);
-    } */
     message.text = { "body": pdfContent };
     handleTextMessage(message, from, phone_number_id);
-
     deleteFile(filePath);
 };
 
