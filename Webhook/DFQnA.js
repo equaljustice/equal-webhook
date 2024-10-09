@@ -4,18 +4,19 @@ import { urbanPincodes } from '../JSONs/urbanPincodes.js'
 import { createUserInputParagraph, removeKeys } from '../chatGPT/helpers/buildInputData.js';
 import { openAiChatCompletion } from '../chatGPT/helpers/openAI.js';
 import * as types from "../utils/types.js";
+import { logger } from '../utils/logging.js';
 export const openQnAFineTuned = async (req, res) => {
-    console.log('Webhook Request:', JSON.stringify(req.body, null, 2));
+    logger.info(`QnA Request: ${JSON.stringify(req.body)}`);
     try {
         let sessionInfo = req.body.sessionInfo;
-        var counter = sessionInfo.parameters.counter;
-        var responseJson = '';
-        var messagesHistory = sessionInfo.parameters.messages ? sessionInfo.parameters.messages : [];
+        let counter = sessionInfo.parameters.counter;
+        let responseJson = '';
+        let messagesHistory = sessionInfo.parameters.messages ? sessionInfo.parameters.messages : [];
         let userInputData;
         let generalData;
         let transactionArray;
         let queryMessage = [];
-        if (messagesHistory == []) {
+        if (messagesHistory.length == 0) {
             let sysMessage = [{
                 role: "system",
                 content: "restrict response to 1500 chars, remove annotations from the response"
@@ -55,7 +56,7 @@ export const openQnAFineTuned = async (req, res) => {
             }
             //const updatedUserData = await removeKeys(userInputData);
             const userInputPara = await createUserInputParagraph(userInputData, tag);
-            messagesHistory = sysMessage.concat([{ role: "user", content: userInputPara }])
+            messagesHistory = sysMessage.concat([{ role: "user", content: userInputPara.paragraph }])
         }
         var responseMessage = '';
         let len = req.body.text.length;
