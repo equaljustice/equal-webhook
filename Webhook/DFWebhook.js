@@ -198,8 +198,9 @@ export const createDocWithFineTuned = async (req, res) => {
         textResponse = `Creating draft for ${option}. It might take couple of minutes, Please wait`;
         docName = `Draft ${option}`;
         option = option.split(' ').join('_');
-        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + threadId + tag + '_' + option + '.docx';
-        createLetter(tag, option, userInputData, legalTrainingData, threadId, openAiConfig);
+        let fileName = tag + '_' + option + '_' + threadId
+        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' +  fileName + '.docx';
+        createLetter(tag, option, userInputData, legalTrainingData, threadId, openAiConfig, fileName);
 
         const responseJson = {
             fulfillment_response: {
