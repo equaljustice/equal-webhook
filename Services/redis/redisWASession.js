@@ -8,10 +8,10 @@ const client = createClient({
         port: 11212
     }
 });
-try{
-// Connect the client
-await client.connect();
-}catch (error){
+try {
+    // Connect the client
+    await client.connect();
+} catch (error) {
     await client.connect();
 }
 // Function to save a session as a JSON object in Redis
@@ -26,7 +26,7 @@ export async function saveSession(phoneNumber, threadId, action, agentType, targ
         };
 
         // Store the session object as a JSON string in Redis
-        await client.set(phoneNumber, JSON.stringify(session),{
+        await client.set(phoneNumber, JSON.stringify(session), {
             EX: 7200  // Expiration time in seconds (2 hours)
         });
         console.log(`Session saved for phone number: ${phoneNumber}`);
@@ -44,7 +44,7 @@ export async function updateSessionWithPayment(phoneNumber, paymentDetails) {
             const session = JSON.parse(sessionData);
             session.payment = paymentDetails;
             await client.set(phoneNumber, JSON.stringify(session), {
-                EX: 86400  
+                EX: 86400
             });
 
             console.log(`Session updated with payment for phone number: ${phoneNumber}`);
@@ -65,7 +65,7 @@ export async function updateSessionWithNewThread(phoneNumber, threadId) {
             const session = JSON.parse(sessionData);
             session.threadId = threadId;
             await client.set(phoneNumber, JSON.stringify(session), {
-                EX: 86400  
+                EX: 86400
             });
 
             console.log(`Session restarted for phone number: ${phoneNumber}`);
@@ -103,17 +103,17 @@ export async function getSession(phoneNumber) {
 export async function deleteSession(phoneNumber) {
     try {
         const session = await getSession(phoneNumber);
-        if(session){
-        const result = await client.del(phoneNumber);
+        if (session) {
+            const result = await client.del(phoneNumber);
 
-        if (result === 1) {
-            console.log(`Session for phone number ${phoneNumber} deleted successfully.`);
-        } else {
-            console.log(`Session for phone number ${phoneNumber} does not exist.`);
+            if (result === 1) {
+                console.log(`Session for phone number ${phoneNumber} deleted successfully.`);
+            } else {
+                console.log(`Session for phone number ${phoneNumber} does not exist.`);
+            }
+            return session;
         }
-        return session;
-    }
-    return null;
+        return null;
     } catch (error) {
         logger.error(`Error deleting session from Redis: ${error}`);
         return null;
