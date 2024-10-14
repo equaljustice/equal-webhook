@@ -1,14 +1,3 @@
-
-import * as constants from '../constants.js';
-import * as types from '../utils/types.js'
-import {
-    ATMLegalTrainingData, EmployeeTrainingData,
-    EmployeeTrainingData_PoliceComplaint, FailedTransactionLegalTrainingData,
-    UPILegalTrainingData, FlightsTrainingData
-} from "../LegalMaterial/legalTrainingData.js";
-import fs from 'fs';
-import { promisify } from 'util';
-import { extractTextFromDocument } from '../utils/readFileData.js'
 import { markAsRead, sendWatsAppReplyText, getWAMediaURL, downloadWAFile } from '../whatsApp/whatsAppAPI.js';
 import { interactWithAssistant } from "../chatGPT/helpers/assistant-api.js";
 

@@ -72,7 +72,8 @@ export const openQnAFineTuned = async (req, res) => {
             const QnAResponse = await openAiChatCompletion(queryMessage, types.openAIModels.OPEN_QNA, 0.8, 500, 1, 0.9, 0.2, 0);
             responseMessage = QnAResponse.choices[0].message.content
         } else {
-            responseMessage = "Your questions limit is over, Thank you for using our service, hope your issue will be resolved"
+            responseMessage = `Your questions limit is over, Thank you for using our service, hope your issue will be resolved.
+             Send EXIT to start again.`
 
         }
 

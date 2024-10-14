@@ -8,9 +8,12 @@ const client = createClient({
         port: 11212
     }
 });
+try{
 // Connect the client
 await client.connect();
-
+}catch (error){
+    await client.connect();
+}
 // Function to save a session as a JSON object in Redis
 export async function saveSession(phoneNumber, threadId, action, agentType, targetAgent) {
     try {

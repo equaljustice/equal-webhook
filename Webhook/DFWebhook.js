@@ -2,11 +2,11 @@ import { urbanPincodes } from '../JSONs/urbanPincodes.js';
 import * as constants from '../constants.js';
 import * as types from '../utils/types.js'
 import { logger } from '../utils/logging.js';
-import {
-    ATMLegalTrainingData, EmployeeTrainingData,
-    EmployeeTrainingData_PoliceComplaint, FailedTransactionLegalTrainingData,
-    UPILegalTrainingData, FlightsTrainingData
-} from "../LegalMaterial/legalTrainingData.js";
+import { ATMLegalTrainingData } from "../LegalMaterial/ATM.js";
+import { EmployeeTrainingData, EmployeeTrainingData_PoliceComplaint } from "../LegalMaterial/EmpTermination.js"
+import { FailedTransactionLegalTrainingData } from "../LegalMaterial/FailedTransaction.js";
+import { UPILegalTrainingData } from "../LegalMaterial/UPI.js";
+import { FlightsTrainingData } from '../LegalMaterial/Flights.js';
 import { createLetter } from "../chatGPT/createDocuments.js";
 
 let option = "";
@@ -199,7 +199,7 @@ export const createDocWithFineTuned = async (req, res) => {
         docName = `Draft ${option}`;
         option = option.split(' ').join('_');
         let fileName = tag + '_' + option + '_' + threadId
-        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' +  fileName + '.docx';
+        fileURL = constants.PUBLIC_BUCKET_URL + '/' + threadId + '/' + fileName + '.docx';
         createLetter(tag, option, userInputData, legalTrainingData, threadId, openAiConfig, fileName);
 
         const responseJson = {
