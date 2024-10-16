@@ -73,7 +73,7 @@ export const openQnAFineTuned = async (req, res) => {
             responseMessage = QnAResponse.choices[0].message.content
         } else {
             responseMessage = `Your questions limit is over, Thank you for using our service, hope your issue will be resolved.
-             Send EXIT to start again.`
+             Reply EXIT to start new case.`
 
         }
 

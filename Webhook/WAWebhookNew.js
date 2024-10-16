@@ -31,7 +31,7 @@ const handleInteractiveButtons = async (message, from, phone_number_id) => {
 const handleTextMessage = async (message, from, phone_number_id) => {
 
     let response = {
-        answer: 'Please reply from one of the below option. Reply EXIT to start new use case'
+        answer: 'Please reply from one of the options. Reply \'Reset\' to change your answers in between the conversation.'
     }
     let options = {
         button: "Options",
@@ -100,11 +100,11 @@ const handleTextMessage = async (message, from, phone_number_id) => {
     }
 
     let session, threadId;
-    if (message.text.body == 'EXIT') {
+    if (message.text.body.toLowerCase() == 'exit') {
         session = await deleteSession(from);
         if (session && session.payment && session.payment.reference_id)
             sendWhatsAppOrderStatus('EqualJustice.ai', session.payment.reference_id, 'completed', 'Access removed', from, phone_number_id);
-        sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply Reset to change your responses.', from, phone_number_id);
+        sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply \'Exit\' to start new case.', from, phone_number_id);
         return;
     }
     session = await getSession(from);
@@ -128,7 +128,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                 payment: { transaction: { status: 'pending' } }
             }
             message.text = { "body": "hi" }
-            saveSession(from, threadId, DFResponse.payload.action, DFResponse.payload.agentType, DFResponse.payload.targetAgent);
+            saveSession(from, threadId, DFResponse.payload.action, DFResponse.payload.agentType, DFResponse.payload.targetAgent, session.payment);
             let reference_id = await generateId(8);
             if (DFResponse.payload.pricing) {
                 sendWhatsAppOrderForPayment("Please pay to proceed", DFResponse.payload.pricing, reference_id, from, phone_number_id);
@@ -167,7 +167,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             if ((session.payment && session.payment.transaction.status == 'success') || phone_number_id == '359476970593209')//payment found in redis session
             {
                 if (session.agentType == 'assistant') {
-                    response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId, session.action, session.targetAgent);
+                    response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId);
                     if (response.answer && response.answer != '')
                         response.answer = convertMarkdownToWhatsApp(response.answer);
                 }
@@ -181,20 +181,20 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             }
             else {
                 response = {
-                    answer: `Please send EXIT to start again`
+                    answer: `Please send \'Exit\' to start again`
                 }
             }
             break;
         case types.actions.Welcome:
-            sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply Reset to change your responses.', from, phone_number_id);
+            sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply \'Exit\' to start new case.', from, phone_number_id);
             sendWatsAppVideo(from, phone_number_id);
             return;
         case types.actions.Fallback:
-            sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply Reset to change your responses.', from, phone_number_id);
+            sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply \'Exit\' to start new case.', from, phone_number_id);
             return;
         default:
             response = {
-                answer: `This use case is under development, Please try again this later`
+                answer: `AI Training for this is under development, This service will be available soon.`
             }
     }
    sendAIResponse(session, response, message, from, phone_number_id);

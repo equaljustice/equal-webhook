@@ -265,7 +265,7 @@ export function sendWhatsAppOrderForPayment(textResponse, p, reference_id, to, p
               "type": "payment_gateway",
               "payment_gateway": {
                 "type": "razorpay",
-                "configuration_name": "LetterGenration",
+                "configuration_name": p.configName,
                 "razorpay": {
                   "receipt": "receipt-value",
                   "notes": {

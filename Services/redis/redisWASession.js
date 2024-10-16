@@ -15,14 +15,15 @@ try {
     await client.connect();
 }
 // Function to save a session as a JSON object in Redis
-export async function saveSession(phoneNumber, threadId, action, agentType, targetAgent) {
+export async function saveSession(phoneNumber, threadId, action, agentType, targetAgent, payment) {
     try {
         // Create the session object
         const session = {
             threadId: threadId,
             action: action,
             agentType: agentType,
-            targetAgent: targetAgent
+            targetAgent: targetAgent,
+            payment: payment
         };
 
         // Store the session object as a JSON string in Redis
