@@ -48,7 +48,7 @@ export async function extractTextFromDocument(filePath, mime_type) {
     }
     try {
         const dataBuffer = fs.readFileSync(filePath);
-        const fileType = mime_type || getFileType(url);
+        const fileType = mime_type || getFileType(filePath);
 
         if (!fileType) {
             throw new Error('Unsupported file type');
@@ -58,7 +58,7 @@ export async function extractTextFromDocument(filePath, mime_type) {
 
         if (fileType.endsWith('pdf')) {
             extractedText = await extractTextFromPDF(dataBuffer)
-        } else if (fileType.endsWith('document')) {
+        } else if (fileType.endsWith('document') || fileType.endsWith('docx')) {
             extractedText = await extractTextFromDOCX(dataBuffer);
         }
         logger.info(extractedText);
