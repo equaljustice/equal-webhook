@@ -129,13 +129,13 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             }
             message.text = { "body": "hi" }
             saveSession(from, threadId, DFResponse.payload.action, DFResponse.payload.agentType, DFResponse.payload.targetAgent, session.payment);
-            let reference_id = await generateId(8);
-            if (DFResponse.payload.pricing) {
+            if (DFResponse.payload.pricing && session.agentType == 'assistant') {
+                let reference_id = await generateId(8);
                 sendWhatsAppOrderForPayment("Please pay to proceed", DFResponse.payload.pricing, reference_id, from, phone_number_id);
                 return;
             }
-            session.payment = { transaction: { status: 'success' } }
-            updateSessionWithPayment(from, session.payment);
+            //session.payment = { transaction: { status: 'success' } }
+            //updateSessionWithPayment(from, session.payment); 
         }
         else if (DFResponse.payload && DFResponse.payload.action) {
             session = {
@@ -147,7 +147,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             return;
         }
     }
-    if (['restart','reset'].includes(message.text.body.toLowerCase())) {
+    if (['restart', 'reset'].includes(message.text.body.toLowerCase())) {
         if (session.agentType == 'assistant') {
             session.threadId = await createAssistantThread(from);
         }
@@ -164,21 +164,24 @@ const handleTextMessage = async (message, from, phone_number_id) => {
         case types.employee.Retrenchment:
         case types.travel.Flights:
         case types.employee.Offer:
-            if ((session.payment && session.payment.transaction.status == 'success') || phone_number_id == '359476970593209')//payment found in redis session
-            {
+            if ((session && session.targetAgent)) {
                 if (session.agentType == 'assistant') {
-                    response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId);
-                    if (response.answer && response.answer != '')
-                        response.answer = convertMarkdownToWhatsApp(response.answer);
+                    if ((session.payment && session.payment.transaction.status == 'success') || phone_number_id == '359476970593209')//payment found in redis session
+                    {
+                        response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId);
+                        if (response.answer && response.answer != '')
+                            response.answer = convertMarkdownToWhatsApp(response.answer);
+                    }
+                    else if (session.payment) {
+                        response = {
+                            answer: `Please complete payment to proceed further. If you have successfully paid, Please wait.`
+                        }
+                    }
                 }
                 else
                     response = await getCXResponse(message.text.body, session.targetAgent, session.threadId, 'en');
             }
-            else if (session.payment) {
-                response = {
-                    answer: `Please complete payment to proceed further. If you have successfully paid, Please wait.`
-                }
-            }
+
             else {
                 response = {
                     answer: `Please send \'Exit\' to start again`
@@ -197,12 +200,17 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                 answer: `AI Training for this is under development, This service will be available soon.`
             }
     }
-   sendAIResponse(session, response, message, from, phone_number_id);
+    sendAIResponse(session, response, message, from, phone_number_id);
 
 };
 
-const sendAIResponse = async(session, response, message, from, phone_number_id) =>{
+const sendAIResponse = async (session, response, message, from, phone_number_id) => {
     if (response.payload && response.answer) {
+        if (response.payload.pricing) {
+            let reference_id = await generateId(8);
+            sendWhatsAppOrderForPayment(response.answer, response.payload.pricing, reference_id, from, phone_number_id);
+            return;
+        }
         let options = DFchipsToButtonOrList(response.payload);
         //console.log("options from DFCX", JSON.stringify(options));
         // logger.info(`WhatsApp Reply ${from} :: ${message.text.body} :: Response:: ${response.answer}`);
@@ -213,7 +221,7 @@ const sendAIResponse = async(session, response, message, from, phone_number_id) 
         else if (options.name && options.name == 'cta_url') {
             sendWatsAppText(response.answer, from, phone_number_id);
             const fileSent = await sendWhatsAppFileLink('Here is link to download your document', options, 'Download Draft', 'EqualJustice.ai', from, phone_number_id);
-            if(fileSent){
+            if (fileSent) {
                 response = await getCXEventResponse('startQnA', session.targetAgent, session.threadId, 'en');
                 sendAIResponse(session, response, message, from, phone_number_id);
             }
@@ -301,8 +309,16 @@ export const getWhatsAppMsg = async (req, res) => {
                 ] */
                 //sendWatsAppWithButtons('We have received your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
                 sendWhatsAppOrderStatus('Access allowed for next 2 hours, Say Hi to continue', status.payment.reference_id, 'completed', 'Payment Received', status.recipient_id, phone_number_id);
-                let message = { "text": { "body": 'Hi' } };
-                handleTextMessage(message, status.recipient_id, phone_number_id);
+
+                let session = await getSession(from);
+                if (session && session.agentType == 'assistant') {
+                    response = await getCXEventResponse('payment-captured', session.targetAgent, session.threadId, 'en');
+                    sendAIResponse(session, response, message, from, phone_number_id);
+                }
+                else {
+                    let message = { "text": { "body": 'Hi' } };
+                    handleTextMessage(message, status.recipient_id, phone_number_id);
+                }
             }
             logger.info(JSON.stringify(status));
             //sendWhatsAppOrderStatus('Payment pending', status.payment.reference_id, status.status,status.recipient_id, phone_number_id)
