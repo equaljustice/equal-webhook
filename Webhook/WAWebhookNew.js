@@ -296,29 +296,8 @@ export const getWhatsAppMsg = async (req, res) => {
         let status = req.body.entry[0].changes[0].value.statuses[0]
         if (status.type == 'payment') {
             await updateSessionWithPayment(status.recipient_id, status.payment);
-            let phone_number_id = req.body.entry[0].changes[0].value.metadata.phone_number_id;
-            if (status.status == 'captured') {
-                /* let Hibutton = [
-                    {
-                        type: "reply",
-                        reply: {
-                            id: 'Hi',
-                            title: 'Hi'
-                        }
-                    }
-                ] */
-                //sendWatsAppWithButtons('We have received your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
-                sendWhatsAppOrderStatus('Access allowed for next 2 hours, Say Hi to continue', status.payment.reference_id, 'completed', 'Payment Received', status.recipient_id, phone_number_id);
-
-                let session = await getSession(from);
-                if (session && session.agentType == 'assistant') {
-                    response = await getCXEventResponse('payment-captured', session.targetAgent, session.threadId, 'en');
-                    sendAIResponse(session, response, message, from, phone_number_id);
-                }
-                else {
-                    let message = { "text": { "body": 'Hi' } };
-                    handleTextMessage(message, status.recipient_id, phone_number_id);
-                }
+           if (status.status == 'captured') {
+                handelPaymentStatus(req, res);
             }
             logger.info(JSON.stringify(status));
             //sendWhatsAppOrderStatus('Payment pending', status.payment.reference_id, status.status,status.recipient_id, phone_number_id)
@@ -335,6 +314,34 @@ export const getWhatsAppMsg = async (req, res) => {
         res.sendStatus(200);
     }
 };
+
+const handelPaymentStatus = async (req, res) => {
+    /* let Hibutton = [
+                        {
+                            type: "reply",
+                            reply: {
+                                id: 'Hi',
+                                title: 'Hi'
+                            }
+                        }
+                    ] */
+    //sendWatsAppWithButtons('We have received your payment, please say Hi to continue.', Hibutton, '', status.recipient_id, phone_number_id);
+    let status = req.body.entry[0].changes[0].value.statuses[0];
+    let phone_number_id = req.body.entry[0].changes[0].value.metadata.phone_number_id;
+            
+    sendWhatsAppOrderStatus('Access allowed for next 2 hours, Say Hi to continue', status.payment.reference_id, 'completed', 'Payment Received', status.recipient_id, phone_number_id);
+
+    let session = await getSession(status.recipient_id);
+    if (session && session.agentType == 'CX') {
+        response = await getCXEventResponse('payment-captured', session.targetAgent, session.threadId, 'en');
+        sendAIResponse(session, response, message, status.recipient_id, phone_number_id);
+    }
+    else {
+        let message = { "text": { "body": 'Hi' } };
+        handleTextMessage(message, status.recipient_id, phone_number_id);
+    }
+    res.sendStatus(200);
+}
 
 export const verifywhatsapp = async (req, res) => {
     if (req.query['hub.mode'] === 'subscribe' && req.query['hub.verify_token'] === 'equaljusticeai') {
