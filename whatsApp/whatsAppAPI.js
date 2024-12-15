@@ -19,7 +19,7 @@ async function callWhatsAppAPI(data, phone_number_id) {
 
   axios.request(config)
     .then((response) => {
-      //logger.info(`sent WA reply: ${data}`);
+      logger.info(`sent WA reply: ${data}`);
     })
     .catch((error) => {
       logger.error(error);
@@ -84,7 +84,7 @@ export async function markAsRead(message_id, phone_number_id) {
     "message_id": message_id
   });
 
-  callWhatsAppAPI(data, phone_number_id);
+  //callWhatsAppAPI(data, phone_number_id);
 }
 
 export async function getWAMediaURL(mediaId, phone_number_id) {

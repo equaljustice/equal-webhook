@@ -344,7 +344,6 @@ const handelPaymentStatus = async (req, res) => {
         let message = { "text": { "body": 'Hi' } };
         handleTextMessage(message, status.recipient_id, phone_number_id);
     }
-    res.sendStatus(200);
 }
 
 export const verifywhatsapp = async (req, res) => {

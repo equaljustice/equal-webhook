@@ -12,7 +12,7 @@ try {
     // Connect the client
     await client.connect();
 } catch (error) {
-    await client.connect();
+    logger.log(error);
 }
 // Function to save a session as a JSON object in Redis
 export async function saveSession(phoneNumber, threadId, action, agentType, targetAgent, payment) {
