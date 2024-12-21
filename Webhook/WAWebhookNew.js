@@ -129,7 +129,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                 interactions: 1
             }
             message.text = { "body": "hi" }
-            saveSession(from, threadId, DFResponse.payload.action, DFResponse.payload.agentType, DFResponse.payload.targetAgent, session.payment);
+            saveSession(from, threadId, DFResponse.payload.action, DFResponse.payload.agentType, DFResponse.payload.targetAgent, session.payment, session.interactions);
             // if (DFResponse.payload.pricing && session.agentType == 'assistant') {
             //     let reference_id = await generateId(8);
             //     sendWhatsAppOrderForPayment("Please pay to proceed", DFResponse.payload.pricing, reference_id, from, phone_number_id);
