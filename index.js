@@ -13,18 +13,21 @@
 // limitations under the License.
 
 import app from './app.js';
+import { closeRedisConnection } from './Services/redis/redisWASession.js';
 import {logger, initLogCorrelation} from './utils/logging.js';
 import {fetchProjectId} from './utils/metadata.js';
-
+import dotenv from 'dotenv';
+dotenv.config();
 /**
  * Initialize app and start Express server
  */
+
 const main = async () => {
   let project = process.env.GOOGLE_CLOUD_PROJECT;
   if (!project) {
     try {
-      project = await fetchProjectId();
-    } catch {
+      project = fetchProjectId();
+    } catch (err) {
       logger.warn('Could not fetch Project Id for tracing.');
     }
   }
@@ -32,7 +35,7 @@ const main = async () => {
   initLogCorrelation(project);
 
   // Start server listening on PORT env var
-  const PORT = process.env.PORT || 8080;
+  const PORT = process.env.PORT || 8088;
   app.listen(PORT, () => logger.info(`Listening on port ${PORT}`));
 };
 
@@ -41,6 +44,7 @@ const main = async () => {
  */
 process.on('SIGTERM', () => {
   // Clean up resources on shutdown
+  closeRedisConnection();
   logger.info('Caught SIGTERM.');
   logger.flush();
 });
