@@ -125,7 +125,7 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                 action: DFResponse.payload.action,
                 agentType: DFResponse.payload.agentType,
                 targetAgent: DFResponse.payload.targetAgent,
-                payment: { transaction: { status: 'pending' } },
+                payment: { transaction: { status: 'pending' }, linkSent: false },
                 interactions: 1
             }
             message.text = { "body": "hi" }
@@ -148,7 +148,9 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             return;
         }
     } else {
+        let DFResponse = await getActionFromDFES(message.text.body, from);
         session.interactions++;
+        saveSession(from, session.threadId, DFResponse.payload.action, DFResponse.payload.agentType, DFResponse.payload.targetAgent, session.payment, session.interactions);
     }
     if (['restart', 'reset'].includes(message.text.body.toLowerCase())) {
         if (session.agentType == 'assistant') {
@@ -176,10 +178,18 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                     }
                     else if ((session.interactions > 10 && session.payment && session.payment.transaction.status == 'pending') || phone_number_id == '359476970593209')//payment found in redis session
                     {
-                        let reference_id = await generateId(8);
-                        let DFResponse = await getActionFromDFES(message.text.body, from);
-                        sendWhatsAppOrderForPayment("Please pay to proceed", DFResponse.payload.pricing, reference_id, from, phone_number_id);
-                        return;
+                        if (!session.payment.linkSent){
+                            let reference_id = await generateId(8);
+                            let DFResponse = await getActionFromDFES(message.text.body, from);
+                            sendWhatsAppOrderForPayment("Please pay to proceed", DFResponse.payload.pricing, reference_id, from, phone_number_id);
+                            session.payment.linkSent = true;
+                            saveSession(from, session.threadId, DFResponse.payload.action, DFResponse.payload.agentType, DFResponse.payload.targetAgent, session.payment, session.interactions);
+                            return;
+                        } else {
+                            response = {
+                                answer: `Please complete the payment to proceed further. If you have successfully paid, please wait.`
+                            };
+                        }
                     }
                     else if (session.payment) {
                         response = {
