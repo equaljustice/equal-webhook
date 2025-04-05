@@ -103,11 +103,12 @@ export async function getWAMediaURL(mediaId, phone_number_id) {
       maxBodyLength: Infinity,
       url: `https://graph.facebook.com/v22.0/${mediaId}?phone_number_id=${phone_number_id}`,
       headers: {
-        'Authorization': process.env.WhatsApp_Token
+        'Authorization': `Bearer ${process.env.WhatsApp_Token}`
       }
     };
 
     const response = await axios.request(config)
+    logger.info(`mediaURL func response: ${response}`);
     //console.log("media", response.data)
     return response.data;
   } catch (error) {
@@ -124,7 +125,7 @@ export async function downloadWAFile(mediaUrl, filename) {
         maxBodyLength: Infinity,
         url: mediaUrl,
         headers: {
-          'Authorization': process.env.WhatsApp_Token,
+          'Authorization': `Bearer ${process.env.WhatsApp_Token}`,
         },
         responseType: 'stream',
       };
