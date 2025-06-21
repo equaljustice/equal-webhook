@@ -2,11 +2,12 @@ import { createClient } from 'redis';
 import { logger } from '../../utils/logging.js';
 
 const client = createClient({
-    password: process.env.Redis_pass,
-    socket: {
-        host: process.env.Redis_host,
-        port: 11212
-    }
+    // password: process.env.Redis_pass,
+    // socket: {
+    //     host: process.env.Redis_host,
+    //     port: 11212
+    // }
+    url: process.env.Redis_url
 });
 try {
     // Connect the client
