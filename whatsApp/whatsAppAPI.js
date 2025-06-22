@@ -6,10 +6,11 @@ import { trimString } from './DFchipsToButtons.js';
 import { checkFileAvailability } from '../CloudStorage/checkFileReadyness.js';
 
 async function callWhatsAppAPI(data, phone_number_id) {
+  console.log("Called whatsapp API")
   let config = {
     method: 'post',
     maxBodyLength: Infinity,
-    url: `https://graph.facebook.com/v22.0/${phone_number_id}/messages`,
+    url: `https://graph.facebook.com/v23.0/${phone_number_id}/messages`,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${process.env.WhatsApp_Token}`
@@ -101,7 +102,7 @@ export async function getWAMediaURL(mediaId, phone_number_id) {
     let config = {
       method: 'get',
       maxBodyLength: Infinity,
-      url: `https://graph.facebook.com/v22.0/${mediaId}?phone_number_id=${phone_number_id}`,
+      url: `https://graph.facebook.com/v23.0/${mediaId}?phone_number_id=${phone_number_id}`,
       headers: {
         'Authorization': `Bearer ${process.env.WhatsApp_Token}`
       }
