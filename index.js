@@ -35,7 +35,7 @@ const main = async () => {
   initLogCorrelation(project);
 
   // Start server listening on PORT env var
-  const PORT = process.env.PORT || 8088;
+  const PORT = process.env.PORT || 8080;
   app.listen(PORT, () => logger.info(`Listening on port ${PORT}`));
 };
 
