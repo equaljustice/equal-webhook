@@ -33,6 +33,7 @@
     "gcp-metadata": "^6.0.0",
     "google-auth-library": "^9.6.3",
     "jsonwebtoken": "^9.0.2",
+    "limiter": "^3.0.0",
     "mammoth": "^1.8.0",
     "mysql": "^2.18.1",
     "mysql2": "^3.9.4",
