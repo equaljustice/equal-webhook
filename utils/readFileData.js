@@ -1,5 +1,5 @@
-import pdfParse from 'pdf-parse';
-import mammoth from 'mammoth';
+// Conditional imports to prevent test file loading issues during module initialization
+let pdfParse, mammoth;
 import fs from 'fs';
 import { logger } from './logging.js';
 
@@ -35,6 +35,11 @@ async function extractTextFromPDF(data) {
     logger.debug(`Starting PDF text extraction - Data size: ${data.length} bytes`);
     
     try {
+        // Lazy load pdf-parse only when needed
+        if (!pdfParse) {
+            pdfParse = (await import('pdf-parse')).default;
+        }
+        
         const parsedData = await pdfParse(data);
         logger.info(`PDF text extraction completed - Pages: ${parsedData.numpages}, Text length: ${parsedData.text.length}`);
         return parsedData.text;
@@ -49,6 +54,11 @@ async function extractTextFromDOCX(data) {
     logger.debug(`Starting DOCX text extraction - Data size: ${data.length} bytes`);
     
     try {
+        // Lazy load mammoth only when needed
+        if (!mammoth) {
+            mammoth = (await import('mammoth')).default;
+        }
+        
         const result = await mammoth.extractRawText({ buffer: data });
         logger.info(`DOCX text extraction completed - Text length: ${result.value.length}`);
         return result.value;
