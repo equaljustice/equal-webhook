@@ -13,7 +13,51 @@ import { generateId } from '../utils/generateID.js';
 // ⚡ DUPLICATION PROTECTION: Prevent duplicate processing
 const processedMessages = new Set(); // In-memory cache for processed message IDs
 
-const handleInteractiveButtons = async (message, from, phone_number_id) => {
+// ⚡ TAT (Turnaround Time) tracking per webhook request
+const tatStore = new Map();
+
+function ensureTrace(webhookId) {
+    let trace = tatStore.get(webhookId);
+    if (!trace) {
+        trace = { requestStart: Date.now(), steps: {}, summaryLogged: false };
+        tatStore.set(webhookId, trace);
+    }
+    return trace;
+}
+
+function startStep(webhookId, stepName) {
+    if (!webhookId) return;
+    const trace = ensureTrace(webhookId);
+    if (!trace.steps[stepName]) trace.steps[stepName] = { count: 0, totalMs: 0, _start: null };
+    trace.steps[stepName]._start = Date.now();
+}
+
+function endStep(webhookId, stepName) {
+    if (!webhookId) return;
+    const trace = ensureTrace(webhookId);
+    const step = trace.steps[stepName];
+    if (!step || step._start == null) return;
+    const duration = Date.now() - step._start;
+    step.totalMs += duration;
+    step.count += 1;
+    step._start = null;
+}
+
+function logTatSummary(webhookId, context) {
+    if (!webhookId) return;
+    const trace = tatStore.get(webhookId);
+    if (!trace || trace.summaryLogged) return;
+    const totalMs = Date.now() - trace.requestStart;
+    const steps = Object.entries(trace.steps).map(([name, data]) => ({ step: name, count: data.count, totalMs: data.totalMs }));
+    logger.info(`TAT summary - ID: ${webhookId}${context ? `, Context: ${context}` : ''}`, {
+        totalMs: totalMs,
+        steps: steps
+    });
+    trace.summaryLogged = true;
+    tatStore.delete(webhookId);
+}
+
+const handleInteractiveButtons = async (message, from, phone_number_id, webhookId) => {
     logger.info(`Handling interactive buttons - From: ${from}, PhoneID: ${phone_number_id}, Type: ${message.interactive.type}`);
     
     switch (message.interactive.type) {
@@ -38,12 +82,13 @@ const handleInteractiveButtons = async (message, from, phone_number_id) => {
     }
 
     logger.debug(`Proceeding to handle text message for interactive button - From: ${from}`);
-    handleTextMessage(message, from, phone_number_id);
+    handleTextMessage(message, from, phone_number_id, webhookId);
 }
 
-const handleTextMessage = async (message, from, phone_number_id) => {
+const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
     const startTime = Date.now();
     logger.info(`Handling text message - From: ${from}, PhoneID: ${phone_number_id}, Text: ${message.text.body?.substring(0, 100)}...`);
+    startStep(webhookId, 'handleTextMessage');
 
     let response = {
         answer: 'Please reply from one of the options. Reply \'Reset\' to change your answers in between the conversation.'
@@ -123,32 +168,44 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             sendWhatsAppOrderStatus('EqualJustice.ai', session.payment.reference_id, 'completed', 'Access removed', from, phone_number_id);
         }
         sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply \'Exit\' to start new case.', from, phone_number_id);
+        logger.debug(`Exit options list sent - From: ${from}`, { options: options });
+        logTatSummary(webhookId, 'exit');
         return;
     }
     
     logger.debug(`Getting session for user - From: ${from}`);
+    startStep(webhookId, 'getSession');
     session = await getSession(from);
+    logger.debug(`Session retrieved - From: ${from}`, { session: session });
+    endStep(webhookId, 'getSession');
     
     if (!session) {
         logger.info(`No existing session found - Creating new session for: ${from}`);
+        startStep(webhookId, 'getActionFromDFES');
         let DFResponse = await getActionFromDFES(message.text.body, from);
-        logger.debug(`Dialogflow ES response received`, {
-            from: from,
+        logger.info(`Dialogflow ES response - From: ${from}`, { 
             fulfillmentText: DFResponse.fulfillmentText,
             hasPayload: !!DFResponse.payload,
             action: DFResponse.payload?.action,
-            agentType: DFResponse.payload?.agentType
+            agentType: DFResponse.payload?.agentType,
+            targetAgent: DFResponse.payload?.targetAgent,
+            pricing: DFResponse.payload?.pricing
         });
+        endStep(webhookId, 'getActionFromDFES');
         
         if (DFResponse.fulfillmentText) {
             logger.debug(`Sending fulfillment text - From: ${from}, Text: ${DFResponse.fulfillmentText}`);
             sendWatsAppText(DFResponse.fulfillmentText, from, phone_number_id);
+            logger.debug(`Fulfillment text sent - From: ${from}`, { text: DFResponse.fulfillmentText });
         }
         
         if (DFResponse.payload && DFResponse.payload.action && DFResponse.payload.agentType) {
             if (DFResponse.payload.agentType == 'assistant') {
                 logger.info(`Creating OpenAI assistant thread - From: ${from}`);
+                startStep(webhookId, 'createAssistantThread');
                 threadId = await createAssistantThread(from);
+                logger.info(`OpenAI assistant thread created - From: ${from}`, { threadId: threadId });
+                endStep(webhookId, 'createAssistantThread');
             } else {
                 logger.info(`Creating WhatsApp thread - From: ${from}`);
                 threadId = 'whatsApp-' + from + '-' + await generateId(8);
@@ -172,12 +229,16 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             });
             
             message.text = { "body": "hi" };
+            startStep(webhookId, 'saveSession');
             saveSession(from, session.threadId, session.action, session.agentType, session.targetAgent, session.pricing, session.payment, session.interactions);
+            endStep(webhookId, 'saveSession');
         } else if (DFResponse.payload && DFResponse.payload.action) {
             session = { action: DFResponse.payload.action };
         } else {
             logger.debug(`No specific action found, sending options menu - From: ${from}`);
             sendWatsAppWithList(response.answer, options, 'How can I help you Today?', 'EqualJustice.ai', from, phone_number_id);
+            logger.debug(`Options menu sent - From: ${from}`, { options: options });
+            logTatSummary(webhookId, 'no_specific_action');
             return;
         }
     }
@@ -187,13 +248,18 @@ const handleTextMessage = async (message, from, phone_number_id) => {
         
         if (session.agentType == 'assistant') {
             logger.info(`Creating new OpenAI assistant thread for restart - From: ${from}`);
+            startStep(webhookId, 'createAssistantThread');
             session.threadId = await createAssistantThread(from);
+            logger.info(`OpenAI assistant thread created for restart - From: ${from}`, { threadId: session.threadId });
+            endStep(webhookId, 'createAssistantThread');
         } else {
             logger.info(`Creating new WhatsApp thread for restart - From: ${from}`);
             session.threadId = 'whatsApp-' + from + '-' + await generateId(8);
         }
         
+        startStep(webhookId, 'updateSessionWithNewThread');
         updateSessionWithNewThread(from, session.threadId);
+        endStep(webhookId, 'updateSessionWithNewThread');
         message.text = { "body": "hi" };
         logger.info(`Session restarted with new thread - From: ${from}, New thread: ${session.threadId}`);
     }
@@ -206,8 +272,15 @@ const handleTextMessage = async (message, from, phone_number_id) => {
         case types.travel.Flights:
             if((session && session.agentType)){
                 logger.debug(`Getting CX response for action: ${session.action} - From: ${from}`);
+                startStep(webhookId, 'getCXResponse');
                 response = await getCXResponse(message.text.body, session.targetAgent, session.threadId, 'en');
-                logger.debug(`CX response received - Length: ${response.answer?.length || 0}, From: ${from}`);
+                logger.info(`CX response received - From: ${from}`, { 
+                    action: session.action,
+                    responseLength: response.answer?.length || 0,
+                    hasPayload: !!response.payload,
+                    sessionEnd: response.sessionEnd
+                });
+                endStep(webhookId, 'getCXResponse');
             } 
             else {
                 logger.warn(`No agent type found for action: ${session.action} - From: ${from}`);
@@ -220,13 +293,29 @@ const handleTextMessage = async (message, from, phone_number_id) => {
             if ((session && session.targetAgent)) {
                 if(session.interactions <= 10 || session.payment.transaction.status == 'success' || phone_number_id == '359476970593209'){
                     logger.info(`Using OpenAI assistant - Interactions: ${session.interactions}, Payment status: ${session.payment.transaction.status} - From: ${from}`);
+                    startStep(webhookId, 'interactWithAssistant');
                     response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId);
+                    logger.info(`OpenAI assistant response - From: ${from}`, { 
+                        interactions: session.interactions,
+                        responseLength: response.answer?.length || 0,
+                        hasPayload: !!response.payload,
+                        sessionEnd: response.sessionEnd
+                    });
+                    endStep(webhookId, 'interactWithAssistant');
                     if (response.answer && response.answer != '') {
                         logger.debug(`Converting markdown to WhatsApp format - From: ${from}`);
+                        startStep(webhookId, 'convertMarkdownToWhatsApp');
                         response.answer = convertMarkdownToWhatsApp(response.answer);
+                        logger.debug(`Markdown converted to WhatsApp format - From: ${from}`, { 
+                            originalLength: response.answer?.length || 0,
+                            convertedLength: response.answer?.length || 0
+                        });
+                        endStep(webhookId, 'convertMarkdownToWhatsApp');
                     }
                     session.interactions++;
+                    startStep(webhookId, 'saveSession');
                     saveSession(from, session.threadId, session.action, session.agentType, session.targetAgent, session.pricing, session.payment, session.interactions);
+                    endStep(webhookId, 'saveSession');
                     logger.debug(`Session updated - New interaction count: ${session.interactions} - From: ${from}`);
                 }
                 else if ((session.interactions > 10 && session.payment && session.payment.transaction.status == 'pending') || phone_number_id == '359476970593209') {
@@ -234,9 +323,15 @@ const handleTextMessage = async (message, from, phone_number_id) => {
                         logger.info(`Sending payment request - Interactions: ${session.interactions} - From: ${from}`);
                         let reference_id = await generateId(8);
                         sendWhatsAppOrderForPayment("Please pay to proceed", session.pricing, reference_id, from, phone_number_id);
+                        logger.info(`Payment request sent - From: ${from}`, { 
+                            referenceId: reference_id,
+                            pricing: session.pricing,
+                            interactions: session.interactions
+                        });
                         session.payment.linkSent = true;
                         session.interactions++;
                         saveSession(from, session.threadId, session.action, session.agentType, session.targetAgent, session.pricing, session.payment, session.interactions);
+                        logTatSummary(webhookId, 'payment_link_sent');
                         return;
                     } else {
                         logger.debug(`Payment link already sent - From: ${from}`);
@@ -262,10 +357,14 @@ const handleTextMessage = async (message, from, phone_number_id) => {
         case types.actions.Welcome:
             logger.debug(`Welcome action - From: ${from}`);
             sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply \'Exit\' to start new case.', from, phone_number_id);
+            logger.debug(`Welcome options sent - From: ${from}`, { options: options });
+            logTatSummary(webhookId, 'welcome');
             return;
         case types.actions.Fallback:
             logger.debug(`Fallback action - From: ${from}`);
             sendWatsAppWithList(response.answer, options, 'EqualJustice.ai', 'Reply \'Exit\' to start new case.', from, phone_number_id);
+            logger.debug(`Fallback options sent - From: ${from}`, { options: options });
+            logTatSummary(webhookId, 'fallback');
             return;
         default:
             logger.warn(`Unknown action: ${session.action} - From: ${from}`);
@@ -281,50 +380,102 @@ const handleTextMessage = async (message, from, phone_number_id) => {
         responseTime: `${totalTime}ms`,
         responseLength: response.answer?.length || 0
     });
+    endStep(webhookId, 'handleTextMessage');
     
-    sendAIResponse(session, response, message, from, phone_number_id);
+    sendAIResponse(session, response, message, from, phone_number_id, webhookId);
 };
 
-const sendAIResponse = async (session, response, message, from, phone_number_id) => {
+const sendAIResponse = async (session, response, message, from, phone_number_id, webhookId) => {
     logger.debug(`Sending AI response - From: ${from}, Response type: ${response.payload ? 'with payload' : 'text only'}`);
+    startStep(webhookId, 'sendAIResponse');
     
     if (response.payload && response.answer) {
         if (response.payload.pricing) {
             logger.info(`Sending payment request - From: ${from}`);
             let reference_id = await generateId(8);
             sendWhatsAppOrderForPayment(response.answer, response.payload.pricing, reference_id, from, phone_number_id);
+            logger.info(`Payment request sent from payload - From: ${from}`, { 
+                referenceId: reference_id,
+                pricing: response.payload.pricing,
+                answer: response.answer
+            });
+            endStep(webhookId, 'sendAIResponse');
+            logTatSummary(webhookId, 'pricing');
             return;
         }
         
+        startStep(webhookId, 'DFchipsToButtonOrList');
         let options = DFchipsToButtonOrList(response.payload);
+        logger.debug(`Payload converted to options - From: ${from}`, { 
+            hasButton: !!options.button,
+            optionsCount: Array.isArray(options) ? options.length : 'N/A',
+            optionsType: options.name || 'standard'
+        });
+        endStep(webhookId, 'DFchipsToButtonOrList');
         logger.debug(`Converted payload to options - Button: ${options.button}, Options count: ${Array.isArray(options) ? options.length : 'N/A'} - From: ${from}`);
         
         if (options.button) {
             logger.debug(`Sending list message - From: ${from}`);
             sendWatsAppWithList(response.answer, options, '', '', from, phone_number_id);
+            logger.debug(`List message sent - From: ${from}`, { 
+                hasButton: options.button,
+                optionsCount: Array.isArray(options) ? options.length : 'N/A'
+            });
         } else if (Array.isArray(options) && options.length > 0 && options.filter(option => option.type === 'reply')) {
             logger.debug(`Sending button message - From: ${from}`);
             sendWatsAppWithButtons(response.answer, options, '', from, phone_number_id);
+            logger.debug(`Button message sent - From: ${from}`, { 
+                optionsCount: options.length,
+                optionTypes: options.map(opt => opt.type)
+            });
         } else if (options.name && options.name == 'cta_url') {
             logger.debug(`Sending file link - From: ${from}`);
             sendWatsAppText(response.answer, from, phone_number_id);
+            logger.debug(`File link text sent - From: ${from}`, { 
+                answer: response.answer,
+                optionsName: options.name
+            });
             const fileSent = await sendWhatsAppFileLink('Here is link to download your document', options, 'Download Draft', 'EqualJustice.ai', from, phone_number_id);
+            logger.info(`File link sent - From: ${from}`, { 
+                fileSent: fileSent,
+                optionsName: options.name
+            });
             if (fileSent) {
                 logger.info(`File link sent successfully, getting CX event response - From: ${from}`);
+                startStep(webhookId, 'getCXEventResponse');
                 response = await getCXEventResponse('startQnA', session.targetAgent, session.threadId, 'en');
-                sendAIResponse(session, response, message, from, phone_number_id);
+                logger.info(`CX event response for file link - From: ${from}`, { 
+                    event: 'startQnA',
+                    responseLength: response.answer?.length || 0,
+                    hasPayload: !!response.payload
+                });
+                endStep(webhookId, 'getCXEventResponse');
+                sendAIResponse(session, response, message, from, phone_number_id, webhookId);
             }
         } else {
             logger.debug(`Sending text message - From: ${from}`);
             sendWatsAppText(response.answer, from, phone_number_id);
+            logger.debug(`Text message sent - From: ${from}`, { 
+                answer: response.answer,
+                answerLength: response.answer?.length || 0
+            });
         }
     } else if (response.answer && response.answer != '') {
         if (message) {
             logger.debug(`Sending reply message - From: ${from}`);
             sendWatsAppReplyText(response.answer, message.id, from, phone_number_id);
+            logger.debug(`Reply message sent - From: ${from}`, { 
+                messageId: message.id,
+                answer: response.answer,
+                answerLength: response.answer?.length || 0
+            });
         } else {
             logger.debug(`Sending text message - From: ${from}`);
             sendWatsAppText(response.answer, from, phone_number_id);
+            logger.debug(`Text message sent - From: ${from}`, { 
+                answer: response.answer,
+                answerLength: response.answer?.length || 0
+            });
         }
     }
     
@@ -336,9 +487,11 @@ const sendAIResponse = async (session, response, message, from, phone_number_id)
             sendWhatsAppOrderStatus('EqualJustice.ai', session.payment.reference_id, 'completed', 'Access removed', from, phone_number_id);
         }
     }
+    endStep(webhookId, 'sendAIResponse');
+    logTatSummary(webhookId, 'message_flow_end');
 }
 
-const handleDocumentMessage = async (message, from, phone_number_id) => {
+const handleDocumentMessage = async (message, from, phone_number_id, webhookId) => {
     const messageId = message.id;
     
     // ⚡ DUPLICATE CHECK: Prevent WhatsApp duplicate webhook processing
@@ -354,9 +507,10 @@ const handleDocumentMessage = async (message, from, phone_number_id) => {
         // ⚡ IMMEDIATE ACKNOWLEDGMENT: User feedback
         logger.info(`Processing document message - MessageID: ${messageId}, From: ${from}`);
         sendWatsAppText('We have received your document, Please wait while we are processing it.', from, phone_number_id);
+        logger.debug(`Document acknowledgment sent - From: ${from}`, { messageId: messageId });
         
         // ⚡ ASYNC PROCESSING: Don't block webhook response
-        processDocumentAsync(message, from, phone_number_id);
+        processDocumentAsync(message, from, phone_number_id, webhookId);
         
     } catch (error) {
         // ⚡ ERROR RECOVERY: Remove from processed set on error
@@ -366,27 +520,54 @@ const handleDocumentMessage = async (message, from, phone_number_id) => {
     }
 };
 
-const processDocumentAsync = async (message, from, phone_number_id) => {
+const processDocumentAsync = async (message, from, phone_number_id, webhookId) => {
     try {
         logger.debug(`Starting async document processing - From: ${from}`);
         
+        startStep(webhookId, 'getWAMediaURL');
         let media = await getWAMediaURL(message.document.id, phone_number_id);
+        logger.info(`WhatsApp media URL retrieved - From: ${from}`, { 
+            mediaId: message.document.id,
+            mimeType: media.mime_type,
+            hasUrl: !!media.url
+        });
+        endStep(webhookId, 'getWAMediaURL');
+        startStep(webhookId, 'downloadWAFile');
         let filePath = await downloadWAFile(media.url, message.document.id + '_' + message.document.filename);
+        logger.info(`File downloaded - From: ${from}`, { 
+            filePath: filePath,
+            filename: message.document.filename,
+            mediaId: message.document.id
+        });
+        endStep(webhookId, 'downloadWAFile');
         
         logger.info(`Document downloaded - Path: ${filePath}, From: ${from}`);
         
         // Add progress updates
         sendWatsAppText('Document downloaded, now extracting text...', from, phone_number_id);
+        logger.debug(`Document progress update sent - From: ${from}`, { filePath: filePath });
         
+        startStep(webhookId, 'extractTextFromDocument');
         let pdfContent = await extractTextFromDocument(filePath, media.mime_type);
+        logger.info(`Text extraction completed - From: ${from}`, { 
+            extractedLength: pdfContent?.length || 0,
+            mimeType: media.mime_type,
+            success: !!pdfContent
+        });
+        endStep(webhookId, 'extractTextFromDocument');
         
         if (pdfContent) {
             logger.info(`Text extraction successful - Length: ${pdfContent.length}, From: ${from}`);
             message.text = { "body": pdfContent };
-            await handleTextMessage(message, from, phone_number_id);
+            logger.debug(`Document text converted to message - From: ${from}`, { 
+                extractedLength: pdfContent.length,
+                messageType: 'text'
+            });
+            await handleTextMessage(message, from, phone_number_id, webhookId);
         } else {
             logger.warn(`Text extraction failed - From: ${from}`);
             sendWatsAppText('Could not extract text from your document. Please ensure it\'s a valid PDF or DOCX file.', from, phone_number_id);
+            logger.debug(`Document extraction failure message sent - From: ${from}`);
         }
         
         // Clean up
@@ -402,45 +583,64 @@ const processDocumentAsync = async (message, from, phone_number_id) => {
     }
 };
 
-const AnalyzeMessage = async (req, res) => {
+const AnalyzeMessage = async (req, res, webhookId) => {
     try {
         let message = req.body.entry[0].changes[0].value.messages[0];
         let phone_number_id = req.body.entry[0].changes[0].value.metadata.phone_number_id;
         
         logger.info(`Analyzing message - Type: ${message.type}, From: ${message.from}, PhoneID: ${phone_number_id}`);
+        startStep(webhookId, 'AnalyzeMessage');
         
         markAsRead(message.id, phone_number_id);
+        logger.debug(`Message marked as read - From: ${message.from}`, { messageId: message.id });
         
         switch (message.type) {
             case 'text':
                 logger.debug(`Processing text message - From: ${message.from}`);
-                await handleTextMessage(message, message.from, phone_number_id);
+                await handleTextMessage(message, message.from, phone_number_id, webhookId);
                 break;
             case 'document':
                 logger.debug(`Processing document message - From: ${message.from}`);
-                await handleDocumentMessage(message, message.from, phone_number_id);
+                await handleDocumentMessage(message, message.from, phone_number_id, webhookId);
                 break;
             case 'interactive':
                 logger.debug(`Processing interactive message - From: ${message.from}`);
-                await handleInteractiveButtons(message, message.from, phone_number_id);
+                await handleInteractiveButtons(message, message.from, phone_number_id, webhookId);
                 break;
             case 'image':
             case 'audio':
                 logger.debug(`Media message received (not processed) - Type: ${message.type}, From: ${message.from}`);
+                logger.debug(`Unprocessed media message details - From: ${message.from}`, { 
+                    messageType: message.type,
+                    messageId: message.id
+                });
                 break;
             case 'video':
                 logger.debug(`Video message received - From: ${message.from}`);
                 let media = await getWAMediaURL(message.video.id, phone_number_id);
                 logger.info(`Video media info - From: ${message.from}`, { media: media });
+                logger.debug(`Video message processed - From: ${message.from}`, { 
+                    videoId: message.video.id,
+                    mediaInfo: media
+                });
                 break;
             case 'reaction':
                 logger.debug(`Reaction message received - From: ${message.from}`);
+                logger.debug(`Reaction message details - From: ${message.from}`, { 
+                    messageId: message.id,
+                    reactionType: message.reaction?.type
+                });
                 break;
             default:
                 logger.warn(`Unknown message type: ${message.type} - From: ${message.from}`);
+                logger.debug(`Unknown message type details - From: ${message.from}`, { 
+                    messageType: message.type,
+                    messageId: message.id,
+                    messageBody: message
+                });
                 break;
         }
-
+        endStep(webhookId, 'AnalyzeMessage');
     } catch (error) {
         logger.error('Error analyzing message:', error);
     }
@@ -453,11 +653,14 @@ export const getWhatsAppMsg = async (req, res) => {
         headers: req.headers,
         timestamp: new Date().toISOString()
     });
+    ensureTrace(webhookId);
+    startStep(webhookId, 'getWhatsAppMsg');
     
     // ⚡ WEBHOOK TIMEOUT PROTECTION: Prevent WhatsApp retries
     const webhookTimeout = setTimeout(() => {
         logger.error(`WhatsApp webhook timeout - ID: ${webhookId}, Sending 408 status`);
-        res.sendStatus(408); // Request Timeout
+        try { res.sendStatus(408); } catch (_) {}
+        logTatSummary(webhookId, 'timeout_408');
     }, 19000); // 19 seconds (WhatsApp limit is 20s)
     
     try {
@@ -467,11 +670,17 @@ export const getWhatsAppMsg = async (req, res) => {
             
             if (status.type == 'payment') {
                 logger.info(`Payment status update - Recipient: ${status.recipient_id}, Status: ${status.status}, Webhook ID: ${webhookId}`);
+                startStep(webhookId, 'updateSessionWithPayment');
                 await updateSessionWithPayment(status.recipient_id, status.payment);
+                logger.info(`Session updated with payment - Recipient: ${status.recipient_id}`, { 
+                    paymentStatus: status.status,
+                    paymentData: status.payment
+                });
+                endStep(webhookId, 'updateSessionWithPayment');
                 
                 if (status.status == 'captured') {
                     logger.info(`Payment captured - Processing payment status - Webhook ID: ${webhookId}`);
-                    await handelPaymentStatus(req, res);
+                    await handelPaymentStatus(req, res, webhookId);
                 }
                 
                 logger.info(`Payment status processed successfully - Webhook ID: ${webhookId}`);
@@ -479,12 +688,14 @@ export const getWhatsAppMsg = async (req, res) => {
             
             clearTimeout(webhookTimeout);
             res.sendStatus(200);
+            endStep(webhookId, 'getWhatsAppMsg');
+            logTatSummary(webhookId, 'status');
             
         } else if (hasMessagesArray(req.body)) {
             logger.info(`Processing message array - Webhook ID: ${webhookId}, Message count: ${req.body.entry[0].changes[0].value.messages.length}`);
             
             // ⚡ ASYNC PROCESSING: Don't block webhook response
-            await AnalyzeMessage(req, res);
+            await AnalyzeMessage(req, res, webhookId);
             
             clearTimeout(webhookTimeout);
             res.sendStatus(200);
@@ -494,6 +705,8 @@ export const getWhatsAppMsg = async (req, res) => {
             logger.debug(`No actionable content in webhook - Webhook ID: ${webhookId}`);
             clearTimeout(webhookTimeout);
             res.sendStatus(200);
+            endStep(webhookId, 'getWhatsAppMsg');
+            logTatSummary(webhookId, 'no_action');
         }
         
     } catch (error) {
@@ -505,10 +718,12 @@ export const getWhatsAppMsg = async (req, res) => {
             body: req.body
         });
         res.sendStatus(500);
+        endStep(webhookId, 'getWhatsAppMsg');
+        logTatSummary(webhookId, 'error');
     }
 };
 
-const handelPaymentStatus = async (req, res) => {
+const handelPaymentStatus = async (req, res, webhookId) => {
     logger.info('Handling payment status update');
     
     let status = req.body.entry[0].changes[0].value.statuses[0];
@@ -521,16 +736,27 @@ const handelPaymentStatus = async (req, res) => {
     });
 
     sendWhatsAppOrderStatus('Access allowed for next 2 hours, Say Hi to continue', status.payment.reference_id, 'completed', 'Payment Received', status.recipient_id, phone_number_id);
+    logger.info(`Payment completion status sent - Recipient: ${status.recipient_id}`, { 
+        referenceId: status.payment.reference_id,
+        status: 'completed'
+    });
 
     let session = await getSession(status.recipient_id);
     if (session && session.agentType == 'CX') {
         logger.info(`Getting CX event response for payment captured - Recipient: ${status.recipient_id}`);
+        startStep(webhookId, 'getCXEventResponse');
         let response = await getCXEventResponse('payment-captured', session.targetAgent, session.threadId, 'en');
-        sendAIResponse(session, response, null, status.recipient_id, phone_number_id);
+        logger.info(`CX event response for payment captured - Recipient: ${status.recipient_id}`, { 
+            event: 'payment-captured',
+            responseLength: response.answer?.length || 0,
+            hasPayload: !!response.payload
+        });
+        endStep(webhookId, 'getCXEventResponse');
+        sendAIResponse(session, response, null, status.recipient_id, phone_number_id, webhookId);
     } else {
         logger.info(`Creating welcome message for payment completion - Recipient: ${status.recipient_id}`);
         let message = { "text": { "body": 'Hi' } };
-        handleTextMessage(message, status.recipient_id, phone_number_id);
+        handleTextMessage(message, status.recipient_id, phone_number_id, webhookId);
     }
 }
 
