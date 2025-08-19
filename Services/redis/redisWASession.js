@@ -7,7 +7,7 @@ const client = createClient({
     //     host: process.env.Redis_host,
     //     port: 11212
     // }
-    url: process.env.Redis_url
+    url: process.env.Redis_url_custom
 });
 try {
     // Connect the client
