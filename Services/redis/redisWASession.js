@@ -7,7 +7,7 @@ const client = createClient({
     //     host: process.env.Redis_host,
     //     port: 11212
     // }
-    url: process.env.Redis_url_upstash_custom
+    url: process.env.Redis_url
 });
 try {
     // Connect the client
