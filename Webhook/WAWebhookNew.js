@@ -49,10 +49,17 @@ function logTatSummary(webhookId, context) {
     if (!trace || trace.summaryLogged) return;
     const totalMs = Date.now() - trace.requestStart;
     const steps = Object.entries(trace.steps).map(([name, data]) => ({ step: name, count: data.count, totalMs: data.totalMs }));
+    
+    // Add processing status to context
+    const processingStatus = trace.steps['AnalyzeMessage'] ? 'completed' : 'background_processing';
+    
     logger.info(`TAT summary - ID: ${webhookId}${context ? `, Context: ${context}` : ''}`, {
         totalMs: totalMs,
-        steps: steps
+        processingStatus: processingStatus,
+        steps: steps,
+        backgroundProcessing: !trace.steps['AnalyzeMessage']
     });
+    
     trace.summaryLogged = true;
     tatStore.delete(webhookId);
 }
@@ -695,11 +702,25 @@ export const getWhatsAppMsg = async (req, res) => {
             logger.info(`Processing message array - Webhook ID: ${webhookId}, Message count: ${req.body.entry[0].changes[0].value.messages.length}`);
             
             // ⚡ ASYNC PROCESSING: Don't block webhook response
-            await AnalyzeMessage(req, res, webhookId);
+            // Remove await to make processing truly asynchronous
+            AnalyzeMessage(req, res, webhookId).catch(error => {
+                logger.error(`Background message processing error - Webhook ID: ${webhookId}`, {
+                    error: error.message,
+                    stack: error.stack
+                });
+                // Ensure TAT summary is logged even on error
+                logTatSummary(webhookId, 'background_error');
+            });
             
+            // Add safety timeout to log TAT summary if not logged within 30 seconds
+            setTimeout(() => {
+                logTatSummary(webhookId, 'background_timeout_safety');
+            }, 30000);
+            
+            // Respond immediately to prevent timeout
             clearTimeout(webhookTimeout);
             res.sendStatus(200);
-            logger.info(`Message array processed successfully - Webhook ID: ${webhookId}`);
+            logger.info(`Webhook response sent immediately - Processing continues in background - Webhook ID: ${webhookId}`);
             
         } else {
             logger.debug(`No actionable content in webhook - Webhook ID: ${webhookId}`);
