@@ -13,10 +13,18 @@
 // limitations under the License.
 
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { pinoHttp, logger } from './utils/logging.js';
 import APIrouter from './routes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 const app = express();
 app.use(express.json())
+
 // Use request-based logger for log correlation
 app.use((req, res, next) => {
   logger.info(req.body);
@@ -25,7 +33,18 @@ app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   next();
 })
+
 app.use(pinoHttp);
+
+// Serve admin dashboard static files using Express static middleware
+// This is more reliable than route-based serving
+const adminDashboardPath = path.join(process.cwd(), 'admin-dashboard/out');
+app.use('/admin', express.static(adminDashboardPath, {
+  index: 'index.html',
+  fallthrough: true
+}));
+
+// API routes
 app.use("/", APIrouter);
 
 export default app;

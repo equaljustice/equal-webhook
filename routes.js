@@ -188,43 +188,43 @@ APIrouter.get('/admin/conversation/:phoneNumber', authenticateToken, async (req,
     }
 });
 
-// Admin Dashboard Static Files - Serve the built Next.js app (MUST BE LAST)
-APIrouter.get('/admin', (req, res) => {
-    console.log('Serving admin dashboard index.html');
-    const indexPath = path.join(process.cwd(), 'admin-dashboard/out/index.html');
-    if (require('fs').existsSync(indexPath)) {
-        res.sendFile(indexPath);
-    } else {
-        console.error('Admin dashboard index.html not found at:', indexPath);
-        res.status(404).send('Admin dashboard not found. Please build the dashboard first.');
-    }
-});
-
-APIrouter.get('/admin/*', (req, res) => {
-    console.log('Admin static file requested:', req.path);
+// Debug route to check admin dashboard files
+APIrouter.get('/debug/admin-files', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    const adminPath = path.join(process.cwd(), 'admin-dashboard/out');
     
-    // Remove /admin prefix from the request path
-    const filePath = req.path.replace('/admin', '');
-    
-    // Serve static files from the admin-dashboard/out directory
-    const fullPath = path.join(process.cwd(), 'admin-dashboard/out', filePath);
-    
-    console.log('Looking for file:', fullPath);
-    
-    // Check if file exists
-    if (require('fs').existsSync(fullPath)) {
-        console.log('File found, serving:', fullPath);
-        res.sendFile(fullPath);
-    } else {
-        // If file doesn't exist, serve index.html (for client-side routing)
-        console.log('File not found, serving index.html');
-        const indexPath = path.join(process.cwd(), 'admin-dashboard/out/index.html');
-        if (require('fs').existsSync(indexPath)) {
-            res.sendFile(indexPath);
+    try {
+        if (fs.existsSync(adminPath)) {
+            const files = fs.readdirSync(adminPath);
+            const indexPath = path.join(adminPath, 'index.html');
+            res.json({ 
+                success: true,
+                adminPath: adminPath,
+                exists: true, 
+                files: files,
+                indexPath: indexPath,
+                indexExists: fs.existsSync(indexPath),
+                currentDir: process.cwd(),
+                dirContents: fs.readdirSync(process.cwd())
+            });
         } else {
-            console.error('Admin dashboard index.html not found at:', indexPath);
-            res.status(404).send('Admin dashboard not found. Please build the dashboard first.');
+            res.json({ 
+                success: false,
+                exists: false, 
+                error: 'Admin dashboard out directory not found',
+                adminPath: adminPath,
+                currentDir: process.cwd(),
+                dirContents: fs.readdirSync(process.cwd())
+            });
         }
+    } catch (error) {
+        res.json({ 
+            success: false,
+            error: error.message,
+            adminPath: adminPath,
+            currentDir: process.cwd()
+        });
     }
 });
 
