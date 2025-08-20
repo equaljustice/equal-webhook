@@ -35,14 +35,14 @@ const main = async () => {
   // Initialize request-based logger with project Id
   initLogCorrelation(project);
 
-  // Validate payment configuration
+  // Validate payment configuration (optional, don't fail if validation fails)
   try {
     const paymentValidation = validatePaymentConfig();
     if (paymentValidation.errors.length > 0) {
       logger.error('Payment configuration errors found', {
         errors: paymentValidation.errors
       });
-      // Don't exit, just log the errors and continue
+      // Don't exit, just log the errors and continue with defaults
     }
     
     if (paymentValidation.warnings.length > 0) {
@@ -56,6 +56,7 @@ const main = async () => {
       stack: error.stack
     });
     // Don't exit, continue with default configuration
+    console.log('Continuing with default payment configuration...');
   }
 
   // Start server listening on PORT env var

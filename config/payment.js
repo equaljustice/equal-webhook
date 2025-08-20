@@ -6,43 +6,71 @@ import { logger } from '../utils/logging.js';
  */
 class PaymentConfig {
     constructor() {
-        this.enabled = this.parseBoolean(process.env.PAYMENT_ENABLED, true);
-        this.freeInteractions = this.parseInt(process.env.PAYMENT_FREE_INTERACTIONS, 10);
-        this.accessDurationHours = this.parseInt(process.env.PAYMENT_ACCESS_DURATION_HOURS, 2);
-        this.debugMode = this.parseBoolean(process.env.PAYMENT_DEBUG_MODE, false);
-        this.whitelistPhones = this.parseWhitelist(process.env.PAYMENT_WHITELIST_PHONES);
-        
-        this.logConfiguration();
+        try {
+            this.enabled = this.parseBoolean(process.env.PAYMENT_ENABLED, true);
+            this.freeInteractions = this.parseInt(process.env.PAYMENT_FREE_INTERACTIONS, 10);
+            this.accessDurationHours = this.parseInt(process.env.PAYMENT_ACCESS_DURATION_HOURS, 2);
+            this.debugMode = this.parseBoolean(process.env.PAYMENT_DEBUG_MODE, false);
+            this.whitelistPhone = this.parseWhitelist(process.env.PAYMENT_WHITELIST_PHONE);
+            
+            this.logConfiguration();
+        } catch (error) {
+            // Fallback to default configuration if any error occurs
+            console.warn('Error loading payment configuration, using defaults:', error.message);
+            this.enabled = true;
+            this.freeInteractions = 10;
+            this.accessDurationHours = 2;
+            this.debugMode = false;
+            this.whitelistPhone = null;
+            
+            this.logConfiguration();
+        }
     }
 
     /**
      * Parse boolean environment variable with fallback
      */
     parseBoolean(value, defaultValue = false) {
-        if (value === undefined || value === null) return defaultValue;
-        if (typeof value === 'boolean') return value;
-        if (typeof value === 'string') {
-            const lowerValue = value.toLowerCase().trim();
-            return lowerValue === 'true' || lowerValue === '1' || lowerValue === 'yes';
+        try {
+            if (value === undefined || value === null) return defaultValue;
+            if (typeof value === 'boolean') return value;
+            if (typeof value === 'string') {
+                const lowerValue = value.toLowerCase().trim();
+                return lowerValue === 'true' || lowerValue === '1' || lowerValue === 'yes';
+            }
+            return defaultValue;
+        } catch (error) {
+            console.warn('Error parsing boolean value:', value, 'using default:', defaultValue);
+            return defaultValue;
         }
-        return defaultValue;
     }
 
     /**
      * Parse integer environment variable with fallback
      */
     parseInt(value, defaultValue = 0) {
-        if (value === undefined || value === null) return defaultValue;
-        const parsed = parseInt(value, 10);
-        return isNaN(parsed) ? defaultValue : parsed;
+        try {
+            if (value === undefined || value === null) return defaultValue;
+            const parsed = parseInt(value, 10);
+            return isNaN(parsed) ? defaultValue : parsed;
+        } catch (error) {
+            console.warn('Error parsing integer value:', value, 'using default:', defaultValue);
+            return defaultValue;
+        }
     }
 
     /**
-     * Parse whitelist phones from comma-separated string
+     * Parse whitelist phone from string
      */
     parseWhitelist(value) {
-        if (!value) return [];
-        return value.split(',').map(phone => phone.trim()).filter(phone => phone.length > 0);
+        try {
+            if (!value) return null;
+            const phone = value.trim();
+            return phone.length > 0 ? phone : null;
+        } catch (error) {
+            console.warn('Error parsing whitelist phone:', value, 'using null');
+            return null;
+        }
     }
 
     /**
@@ -55,8 +83,8 @@ class PaymentConfig {
                 freeInteractions: this.freeInteractions,
                 accessDurationHours: this.accessDurationHours,
                 debugMode: this.debugMode,
-                whitelistPhonesCount: this.whitelistPhones.length,
-                whitelistPhones: this.debugMode ? this.whitelistPhones : '[REDACTED]'
+                            whitelistPhone: this.whitelistPhone ? '[SET]' : '[NOT_SET]',
+            whitelistPhoneValue: this.debugMode ? this.whitelistPhone : '[REDACTED]'
             });
         } catch (error) {
             // Fallback logging if logger is not available
@@ -65,7 +93,7 @@ class PaymentConfig {
                 freeInteractions: this.freeInteractions,
                 accessDurationHours: this.accessDurationHours,
                 debugMode: this.debugMode,
-                whitelistPhonesCount: this.whitelistPhones.length
+                whitelistPhone: this.whitelistPhone ? '[SET]' : '[NOT_SET]'
             });
         }
     }
@@ -81,7 +109,7 @@ class PaymentConfig {
      * Check if a phone number is whitelisted (bypasses payment)
      */
     isPhoneWhitelisted(phoneNumberId) {
-        return this.whitelistPhones.includes(phoneNumberId);
+        return this.whitelistPhone === phoneNumberId;
     }
 
     /**

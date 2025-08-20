@@ -95,36 +95,46 @@ export function validatePaymentConfig() {
     const errors = [];
     const warnings = [];
 
-    // Check required environment variables
-    if (process.env.PAYMENT_ENABLED === undefined) {
-        warnings.push('PAYMENT_ENABLED not set, using default: true');
-    }
+    // Check required environment variables (these are optional, just warn if missing)
+    try {
+        if (process.env.PAYMENT_ENABLED === undefined) {
+            warnings.push('PAYMENT_ENABLED not set, using default: true');
+        }
 
-    if (process.env.PAYMENT_FREE_INTERACTIONS === undefined) {
-        warnings.push('PAYMENT_FREE_INTERACTIONS not set, using default: 10');
+        if (process.env.PAYMENT_FREE_INTERACTIONS === undefined) {
+            warnings.push('PAYMENT_FREE_INTERACTIONS not set, using default: 10');
+        }
+    } catch (error) {
+        warnings.push('Error checking environment variables: ' + error.message);
     }
 
     // Validate numeric values
-    if (paymentConfig.freeInteractions < 0) {
-        errors.push('PAYMENT_FREE_INTERACTIONS must be non-negative');
-    }
+    try {
+        if (paymentConfig.freeInteractions < 0) {
+            errors.push('PAYMENT_FREE_INTERACTIONS must be non-negative');
+        }
 
-    if (paymentConfig.accessDurationHours <= 0) {
-        errors.push('PAYMENT_ACCESS_DURATION_HOURS must be positive');
-    }
+        if (paymentConfig.accessDurationHours <= 0) {
+            errors.push('PAYMENT_ACCESS_DURATION_HOURS must be positive');
+        }
 
-    if (paymentConfig.accessDurationHours > 24) {
-        warnings.push('PAYMENT_ACCESS_DURATION_HOURS is set to more than 24 hours');
+        if (paymentConfig.accessDurationHours > 24) {
+            warnings.push('PAYMENT_ACCESS_DURATION_HOURS is set to more than 24 hours');
+        }
+    } catch (error) {
+        warnings.push('Error validating numeric values: ' + error.message);
     }
 
     // Validate whitelist format
-    if (process.env.PAYMENT_WHITELIST_PHONES) {
-        const phones = process.env.PAYMENT_WHITELIST_PHONES.split(',');
-        for (const phone of phones) {
-            if (phone.trim().length === 0) {
-                warnings.push('Empty phone number found in PAYMENT_WHITELIST_PHONES');
+    try {
+        if (process.env.PAYMENT_WHITELIST_PHONE) {
+            const phone = process.env.PAYMENT_WHITELIST_PHONE.trim();
+            if (phone.length === 0) {
+                warnings.push('Empty phone number found in PAYMENT_WHITELIST_PHONE');
             }
         }
+    } catch (error) {
+        warnings.push('Error validating PAYMENT_WHITELIST_PHONE: ' + error.message);
     }
 
     return { errors, warnings };
@@ -139,7 +149,8 @@ export function getPaymentConfigSummary() {
         freeInteractions: paymentConfig.freeInteractions,
         accessDurationHours: paymentConfig.accessDurationHours,
         debugMode: paymentConfig.debugMode,
-        whitelistPhonesCount: paymentConfig.whitelistPhones.length,
+        whitelistPhone: paymentConfig.whitelistPhone,
+        whitelistPhoneSet: !!paymentConfig.whitelistPhone,
         accessDurationMs: paymentConfig.getAccessDurationMs(),
         accessDurationSeconds: paymentConfig.getAccessDurationSeconds()
     };

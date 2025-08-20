@@ -21,7 +21,7 @@ The payment system can be completely controlled through environment variables, a
 | `PAYMENT_FREE_INTERACTIONS` | integer | `10` | Number of free interactions before payment is required |
 | `PAYMENT_ACCESS_DURATION_HOURS` | integer | `2` | Duration of access after successful payment (in hours) |
 | `PAYMENT_DEBUG_MODE` | boolean | `false` | Enable detailed payment flow logging |
-| `PAYMENT_WHITELIST_PHONES` | string | `""` | Comma-separated list of phone IDs that bypass payment |
+| `PAYMENT_WHITELIST_PHONE` | string | `""` | Single phone ID that bypasses payment |
 
 ### Configuration Examples
 
@@ -40,9 +40,9 @@ PAYMENT_FREE_INTERACTIONS=20
 PAYMENT_ACCESS_DURATION_HOURS=4
 ```
 
-#### Whitelist Specific Phones
+#### Whitelist Specific Phone
 ```bash
-PAYMENT_WHITELIST_PHONES=359476970593209,1234567890
+PAYMENT_WHITELIST_PHONE=359476970593209
 ```
 
 #### Enable Debug Mode
@@ -57,7 +57,7 @@ PAYMENT_DEBUG_MODE=true
 Payment is required when ALL of the following conditions are met:
 
 1. **Payment is globally enabled** (`PAYMENT_ENABLED=true`)
-2. **Phone is not whitelisted** (not in `PAYMENT_WHITELIST_PHONES`)
+2. **Phone is not whitelisted** (not equal to `PAYMENT_WHITELIST_PHONE`)
 3. **User has exceeded free interactions** (interactions > `PAYMENT_FREE_INTERACTIONS`)
 4. **Payment is not already successful** (payment status ≠ 'success')
 
@@ -66,7 +66,7 @@ Payment is required when ALL of the following conditions are met:
 Payment is automatically bypassed when:
 
 - `PAYMENT_ENABLED=false` (global disable)
-- Phone number is in whitelist
+- Phone number matches whitelist
 - Emergency mode is activated
 - Test mode is enabled
 
@@ -147,8 +147,9 @@ Response includes payment configuration status:
         "enabled": true,
         "freeInteractions": 10,
         "accessDurationHours": 2,
-        "debugMode": false,
-        "whitelistPhonesCount": 1
+                 "debugMode": false,
+         "whitelistPhone": "359476970593209",
+         "whitelistPhoneSet": true
       }
     }
   }
@@ -232,7 +233,7 @@ PAYMENT_FREE_INTERACTIONS=1
 PAYMENT_DEBUG_MODE=true
 
 # Test with whitelist
-PAYMENT_WHITELIST_PHONES=test_phone_id
+PAYMENT_WHITELIST_PHONE=test_phone_id
 ```
 
 ## Migration Guide
@@ -262,7 +263,7 @@ When changing payment configuration:
 1. **Payment not working**: Check `PAYMENT_ENABLED` setting
 2. **Users charged too early**: Verify `PAYMENT_FREE_INTERACTIONS` value
 3. **Access expires too quickly**: Check `PAYMENT_ACCESS_DURATION_HOURS`
-4. **Whitelist not working**: Verify phone number format and commas
+4. **Whitelist not working**: Verify phone number format
 
 ### Debug Mode
 
