@@ -9,6 +9,7 @@ import { createDocWithFineTuned } from './Webhook/DFWebhook.js';
 import { authenticate, authenticateToken } from './Services/authenticate.js';
 import { listFiles, downloadFile } from './UI-APIs/getGCSFiles.js';
 import { getWhatsAppMsg, verifywhatsapp } from './Webhook/WAWebhookNew.js';
+import { validateWhatsAppConfig, getWhatsAppAPIMetrics } from './whatsApp/whatsAppAPI.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/getStates', getStates);
@@ -16,7 +17,46 @@ APIrouter.use('/getCities/:stateCode', getCities);
 APIrouter.post('/webhook_QnAFineTuned', openQnAFineTuned);
 APIrouter.post('/webhook_createDocWithFineTuned', createDocWithFineTuned);
 APIrouter.post('/whatsappMessage', getWhatsAppMsg);
-APIrouter.get('/whatsappMessage', verifywhatsapp)
+APIrouter.get('/whatsappMessage', verifywhatsapp);
+
+// ⚡ HEALTH CHECK: Monitor WhatsApp API configuration and connectivity
+APIrouter.get('/health/whatsapp', (req, res) => {
+    const healthCheck = {
+        timestamp: new Date().toISOString(),
+        status: 'unknown',
+        checks: {}
+    };
+    
+    try {
+        // Check WhatsApp configuration
+        const configValidation = validateWhatsAppConfig();
+        healthCheck.checks.configuration = {
+            status: configValidation.valid ? 'healthy' : 'unhealthy',
+            errors: configValidation.errors
+        };
+        
+        // Include API metrics
+        const metrics = getWhatsAppAPIMetrics();
+        healthCheck.checks.apiMetrics = {
+            status: 'info',
+            data: metrics
+        };
+        
+        // Overall health status
+        const allChecksHealthy = Object.values(healthCheck.checks)
+            .every(check => check.status === 'healthy');
+        
+        healthCheck.status = allChecksHealthy ? 'healthy' : 'unhealthy';
+        
+        const statusCode = allChecksHealthy ? 200 : 503;
+        res.status(statusCode).json(healthCheck);
+        
+    } catch (error) {
+        healthCheck.status = 'error';
+        healthCheck.error = error.message;
+        res.status(503).json(healthCheck);
+    }
+});
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 APIrouter.get('/secured', (req, res) => {

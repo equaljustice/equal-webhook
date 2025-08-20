@@ -1,7 +1,7 @@
 import * as types from '../utils/types.js';
 import { logger } from '../utils/logging.js';
 import { extractTextFromDocument, deleteFile } from '../utils/readFileData.js';
-import { markAsRead, sendWatsAppText, sendWatsAppReplyText, getWAMediaURL, downloadWAFile, sendWatsAppWithButtons, sendWatsAppWithList, sendWhatsAppFileLink, sendWatsAppVideo, sendWhatsAppOrderForPayment, sendWhatsAppOrderStatus } from '../whatsApp/whatsAppAPI.js';
+import { markAsRead, sendWatsAppText, sendWatsAppReplyText, getWAMediaURL, downloadWAFile, sendWatsAppWithButtons, sendWatsAppWithList, sendWhatsAppFileLink, sendWatsAppVideo, sendWhatsAppOrderForPayment, sendWhatsAppOrderStatus, validateWhatsAppConfig } from '../whatsApp/whatsAppAPI.js';
 import { interactWithAssistant, createAssistantThread } from "../chatGPT/helpers/assistant-api.js";
 import { deleteSession, getSession, saveSession, updateSessionWithNewThread, updateSessionWithPayment } from '../Services/redis/redisWASession.js';
 import { getActionFromDFES } from '../Services/Dialogflow/detectIntentES.js';
@@ -622,27 +622,68 @@ const sendAIResponse = async (session, response, message, from, phone_number_id,
             });
         } else if (options.name && options.name == 'cta_url') {
             logger.debug(`Sending file link - From: ${from}`);
-            sendWatsAppText(response.answer, from, phone_number_id);
-            logger.debug(`File link text sent - From: ${from}`, { 
-                answer: response.answer,
-                optionsName: options.name
-            });
-            const fileSent = await sendWhatsAppFileLink('Here is link to download your document', options, 'Download Draft', 'EqualJustice.ai', from, phone_number_id);
-            logger.info(`File link sent - From: ${from}`, { 
-                fileSent: fileSent,
-                optionsName: options.name
-            });
-            if (fileSent) {
-                logger.info(`File link sent successfully, getting CX event response - From: ${from}`);
-                startStep(webhookId, 'getCXEventResponse');
-                response = await getCXEventResponse('startQnA', session.targetAgent, session.threadId, 'en');
-                logger.info(`CX event response for file link - From: ${from}`, { 
-                    event: 'startQnA',
-                    responseLength: response.answer?.length || 0,
-                    hasPayload: !!response.payload
+            
+            try {
+                // Send introductory text first
+                await sendWatsAppText(response.answer, from, phone_number_id);
+                logger.debug(`File link text sent - From: ${from}`, { 
+                    answer: response.answer,
+                    optionsName: options.name
                 });
-                endStep(webhookId, 'getCXEventResponse');
-                sendAIResponse(session, response, message, from, phone_number_id, webhookId);
+            } catch (textError) {
+                logger.warn(`Failed to send file link text - From: ${from}`, { 
+                    error: textError.message
+                });
+                // Continue with file link even if text fails
+            }
+            
+            try {
+                const fileSent = await sendWhatsAppFileLink('Here is link to download your document', options, 'Download Draft', 'EqualJustice.ai', from, phone_number_id);
+                logger.info(`File link process completed - From: ${from}`, { 
+                    fileSent: fileSent,
+                    optionsName: options.name
+                });
+                
+                if (fileSent) {
+                    logger.info(`File link sent successfully, getting CX event response - From: ${from}`);
+                    try {
+                        startStep(webhookId, 'getCXEventResponse');
+                        response = await getCXEventResponse('startQnA', session.targetAgent, session.threadId, 'en');
+                        logger.info(`CX event response for file link - From: ${from}`, { 
+                            event: 'startQnA',
+                            responseLength: response.answer?.length || 0,
+                            hasPayload: !!response.payload
+                        });
+                        endStep(webhookId, 'getCXEventResponse');
+                        sendAIResponse(session, response, message, from, phone_number_id, webhookId);
+                    } catch (cxError) {
+                        logger.error(`Failed to get CX event response after file link - From: ${from}`, {
+                            error: cxError.message,
+                            stack: cxError.stack
+                        });
+                        endStep(webhookId, 'getCXEventResponse');
+                        // Don't continue with further AI response if CX fails
+                    }
+                } else {
+                    logger.warn(`File link was not sent successfully - From: ${from}. User has been notified of the issue.`);
+                    // File link function already handled fallback messaging
+                }
+                
+            } catch (fileLinkError) {
+                logger.error(`Critical error in file link process - From: ${from}`, {
+                    error: fileLinkError.message,
+                    stack: fileLinkError.stack,
+                    options: options
+                });
+                
+                // ⚡ EMERGENCY FALLBACK: Ensure user gets some response
+                try {
+                    await sendWatsAppText("We're experiencing technical difficulties with file delivery. Our team will send your document directly via email shortly.", from, phone_number_id);
+                } catch (emergencyError) {
+                    logger.error(`Emergency fallback message also failed - From: ${from}`, {
+                        error: emergencyError.message
+                    });
+                }
             }
         } else {
             logger.debug(`Sending text message - From: ${from}`);
@@ -898,6 +939,22 @@ export const getWhatsAppMsg = async (req, res) => {
     });
     ensureTrace(webhookId);
     startStep(webhookId, 'getWhatsAppMsg');
+    
+    // ⚡ PRE-FLIGHT CHECK: Validate WhatsApp configuration before processing
+    const configValidation = validateWhatsAppConfig();
+    if (!configValidation.valid) {
+        logger.error(`WhatsApp configuration invalid - Webhook ID: ${webhookId}`, {
+            errors: configValidation.errors,
+            webhookId
+        });
+        res.status(503).json({ 
+            error: 'Service temporarily unavailable', 
+            details: 'WhatsApp API configuration issues',
+            webhookId 
+        });
+        logTatSummary(webhookId, 'config_error');
+        return;
+    }
     
     // ⚡ WEBHOOK TIMEOUT PROTECTION: Prevent WhatsApp retries
     const webhookTimeout = setTimeout(() => {
