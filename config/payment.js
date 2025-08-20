@@ -11,7 +11,7 @@ const paymentConfig = {
     accessDurationHours: 2,
     
     // Test phone numbers that bypass payment (for development/testing)
-    testPhoneNumbers: ['8130363763'],
+    testPhoneNumbers: ['918130363763'],
     
     /**
      * Initialize payment config with logging
