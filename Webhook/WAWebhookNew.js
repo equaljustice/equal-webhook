@@ -299,18 +299,33 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                     session = { action: DFResponse.payload.action };
                 } else {
                     logger.debug(`No specific action found, sending options menu - From: ${from}`);
-                    try {
-                        sendWatsAppWithList(response.answer, options, 'How can I help you Today?', 'EqualJustice.ai', from, phone_number_id);
-                        logger.debug(`Options menu sent - From: ${from}`, { options: options });
-                        logTatSummary(webhookId, 'no_specific_action');
-                        return;
-                    } catch (optionsError) {
-                        logger.error(`Failed to send options menu - From: ${from}`, {
-                            error: optionsError.message,
-                            stack: optionsError.stack
-                        });
-                        throw optionsError;
-                    }
+                            try {
+            const result = await sendWatsAppWithList(response.answer, options, 'How can I help you Today?', 'EqualJustice.ai', from, phone_number_id);
+            
+            // Handle WhatsApp API failures gracefully
+            if (result && result.success === false) {
+                logger.warn(`WhatsApp options menu failed - From: ${from}`, {
+                    error: result.error,
+                    errorType: result.errorType,
+                    retryable: result.retryable
+                });
+                // Don't throw error, just log and continue
+                logTatSummary(webhookId, 'whatsapp_api_failure');
+                return;
+            }
+            
+            logger.debug(`Options menu sent - From: ${from}`, { options: options });
+            logTatSummary(webhookId, 'no_specific_action');
+            return;
+        } catch (optionsError) {
+            logger.error(`Failed to send options menu - From: ${from}`, {
+                error: optionsError.message,
+                stack: optionsError.stack
+            });
+            // Don't throw error, just log and continue
+            logTatSummary(webhookId, 'options_menu_error');
+            return;
+        }
                 }
             } catch (dfError) {
                 logger.error(`Dialogflow processing failed - From: ${from}`, {

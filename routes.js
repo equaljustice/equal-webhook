@@ -1,7 +1,7 @@
 //const APIrouter = require('express').Router();
 import express from 'express';
-import { getCities, getStates } from './UI-APIs/StateCity.js';
 import path from 'path';
+import { getCities, getStates } from './UI-APIs/StateCity.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { openQnAFineTuned } from './Webhook/DFQnA.js';
@@ -11,6 +11,17 @@ import { listFiles, downloadFile } from './UI-APIs/getGCSFiles.js';
 import { getWhatsAppMsg, verifywhatsapp } from './Webhook/WAWebhookNew.js';
 import { validateWhatsAppConfig, getWhatsAppAPIMetrics } from './whatsApp/whatsAppAPI.js';
 import { getPaymentConfigSummary } from './utils/paymentUtils.js';
+import { 
+    getAllSessions, 
+    getSessionByPhone, 
+    getAllFiles, 
+    getFilesByThread, 
+    getWhatsAppFailures, 
+    getSystemHealth, 
+    getConversationHistory, 
+    deleteSession, 
+    getDashboardSummary 
+} from './admin/adminAPI.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/getStates', getStates);
@@ -50,13 +61,29 @@ APIrouter.get('/health/whatsapp', (req, res) => {
             data: paymentConfig
         };
         
+        // Check for recent WhatsApp API failures
+        const recentFailures = metrics.failedCalls || 0;
+        const totalCalls = metrics.totalCalls || 0;
+        const failureRate = totalCalls > 0 ? (recentFailures / totalCalls) * 100 : 0;
+        
+        healthCheck.checks.whatsappConnectivity = {
+            status: failureRate < 10 ? 'healthy' : 'degraded',
+            data: {
+                failureRate: `${failureRate.toFixed(2)}%`,
+                recentFailures,
+                totalCalls,
+                lastFailure: metrics.lastFailureTime || 'none'
+            }
+        };
+        
         // Overall health status
-        const allChecksHealthy = Object.values(healthCheck.checks)
-            .every(check => check.status === 'healthy');
+        const criticalChecks = ['configuration', 'whatsappConnectivity'];
+        const allCriticalChecksHealthy = criticalChecks
+            .every(check => healthCheck.checks[check]?.status === 'healthy');
         
-        healthCheck.status = allChecksHealthy ? 'healthy' : 'unhealthy';
+        healthCheck.status = allCriticalChecksHealthy ? 'healthy' : 'degraded';
         
-        const statusCode = allChecksHealthy ? 200 : 503;
+        const statusCode = allCriticalChecksHealthy ? 200 : 503;
         res.status(statusCode).json(healthCheck);
         
     } catch (error) {
@@ -78,5 +105,100 @@ APIrouter.get('/download/:threadId/:filename', (req, res) => {
 APIrouter.get('/list-files/:folder', authenticateToken, listFiles);
 APIrouter.get('/downloadFile/:folder/:filename', downloadFile);
 APIrouter.post('/login', authenticate);
+
+// Admin Dashboard Routes
+APIrouter.get('/admin/dashboard', authenticateToken, async (req, res) => {
+    try {
+        const summary = await getDashboardSummary();
+        res.json(summary);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+APIrouter.get('/admin/sessions', authenticateToken, async (req, res) => {
+    try {
+        const sessions = await getAllSessions();
+        res.json(sessions);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+APIrouter.get('/admin/sessions/:phoneNumber', authenticateToken, async (req, res) => {
+    try {
+        const session = await getSessionByPhone(req.params.phoneNumber);
+        res.json(session);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+APIrouter.delete('/admin/sessions/:phoneNumber', authenticateToken, async (req, res) => {
+    try {
+        const result = await deleteSession(req.params.phoneNumber);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+APIrouter.get('/admin/files', authenticateToken, async (req, res) => {
+    try {
+        const files = await getAllFiles();
+        res.json(files);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+APIrouter.get('/admin/files/thread/:threadId', authenticateToken, async (req, res) => {
+    try {
+        const files = await getFilesByThread(req.params.threadId);
+        res.json(files);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+APIrouter.get('/admin/whatsapp-failures', authenticateToken, async (req, res) => {
+    try {
+        const failures = await getWhatsAppFailures();
+        res.json(failures);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+APIrouter.get('/admin/system-health', authenticateToken, async (req, res) => {
+    try {
+        const health = await getSystemHealth();
+        res.json(health);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+APIrouter.get('/admin/conversation/:phoneNumber', authenticateToken, async (req, res) => {
+    try {
+        const conversation = await getConversationHistory(req.params.phoneNumber, req.query.limit);
+        res.json(conversation);
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Admin Dashboard Route - Serve the built Next.js app
+APIrouter.get('/admin*', (req, res) => {
+    // Remove /admin prefix from the request path
+    const filePath = req.path.replace('/admin', '');
+    
+    // Default to index.html if no specific file is requested
+    const finalPath = filePath === '/' ? '/index.html' : filePath;
+    
+    // Serve static files from the admin-dashboard/out directory
+    res.sendFile(path.join(process.cwd(), 'admin-dashboard/out', finalPath));
+});
+
 // Export the router
 export default APIrouter;

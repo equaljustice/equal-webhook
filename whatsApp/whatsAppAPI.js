@@ -177,7 +177,7 @@ async function callWhatsAppAPI(data, phone_number_id) {
         let config = {
             method: 'post',
             maxBodyLength: Infinity,
-            timeout: 10000,  // ⚡ TIMEOUT: 10 second max
+            timeout: 8000,  // ⚡ TIMEOUT: 8 second max (reduced from 10s)
             url: `https://graph.facebook.com/v23.0/${phone_number_id}/messages`,
             headers: {
                 'Content-Type': 'application/json',
@@ -311,7 +311,21 @@ async function callWhatsAppAPI(data, phone_number_id) {
         // ⚡ METRICS: Record failed API call
         recordApiCall(false, error);
         
-        throw error;
+        // ⚡ GRACEFUL DEGRADATION: Don't crash the application, return a structured error
+        const structuredError = {
+            success: false,
+            error: error.message,
+            errorType: error.constructor.name,
+            requestId: requestId,
+            phoneNumberId: phone_number_id,
+            timestamp: new Date().toISOString(),
+            retryable: isRetryableError && (retryCount || 0) < maxRetries
+        };
+        
+        // Log the error but don't throw to prevent application crashes
+        logger.error(`WhatsApp API call failed - RequestID: ${requestId}`, structuredError);
+        
+        return structuredError;
     }
 }
 
@@ -336,7 +350,20 @@ export async function sendWatsAppText(textResponse, to, phone_number_id) {
         dataSize: data.length
     });
 
-    return callWhatsAppAPI(data, phone_number_id);
+    const result = await callWhatsAppAPI(data, phone_number_id);
+    
+    // Handle structured error responses
+    if (result && result.success === false) {
+        logger.warn(`WhatsApp text message failed - To: ${to}`, {
+            error: result.error,
+            errorType: result.errorType,
+            requestId: result.requestId,
+            retryable: result.retryable
+        });
+        return result; // Return error object instead of throwing
+    }
+    
+    return result;
 }
 
 export async function sendWatsAppReplyText(textResponse, message_id, to, phone_number_id) {

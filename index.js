@@ -59,6 +59,25 @@ const main = async () => {
     console.log('Continuing with default payment configuration...');
   }
 
+  // Global error handlers to prevent crashes
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception - Application will continue running', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+    // Don't exit, just log the error
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection - Application will continue running', {
+      reason: reason,
+      promise: promise,
+      timestamp: new Date().toISOString()
+    });
+    // Don't exit, just log the error
+  });
+
   // Start server listening on PORT env var
   const PORT = process.env.PORT || 8080;
   app.listen(PORT, () => logger.info(`Listening on port ${PORT}`));

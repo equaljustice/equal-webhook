@@ -27,5 +27,10 @@ RUN npm ci --only=production
 # Copy local code to the container image.
 COPY . ./
 
+# Build the admin dashboard
+RUN cd admin-dashboard && \
+    npm ci && \
+    npm run build
+
 # Run the web service on container startup.
 ENTRYPOINT [ "node", "index.js" ]
