@@ -10,6 +10,7 @@ import { authenticate, authenticateToken } from './Services/authenticate.js';
 import { listFiles, downloadFile } from './UI-APIs/getGCSFiles.js';
 import { getWhatsAppMsg, verifywhatsapp } from './Webhook/WAWebhookNew.js';
 import { validateWhatsAppConfig, getWhatsAppAPIMetrics } from './whatsApp/whatsAppAPI.js';
+import { getPaymentConfigSummary } from './utils/paymentUtils.js';
 const APIrouter = express.Router();
 
 APIrouter.use('/getStates', getStates);
@@ -40,6 +41,13 @@ APIrouter.get('/health/whatsapp', (req, res) => {
         healthCheck.checks.apiMetrics = {
             status: 'info',
             data: metrics
+        };
+        
+        // Include payment configuration
+        const paymentConfig = getPaymentConfigSummary();
+        healthCheck.checks.paymentConfig = {
+            status: 'info',
+            data: paymentConfig
         };
         
         // Overall health status

@@ -16,6 +16,7 @@ import app from './app.js';
 import { closeRedisConnection } from './Services/redis/redisWASession.js';
 import {logger, initLogCorrelation} from './utils/logging.js';
 import {fetchProjectId} from './utils/metadata.js';
+import { validatePaymentConfig } from './utils/paymentUtils.js';
 import dotenv from 'dotenv';
 dotenv.config();
 /**
@@ -33,6 +34,21 @@ const main = async () => {
   }
   // Initialize request-based logger with project Id
   initLogCorrelation(project);
+
+  // Validate payment configuration
+  const paymentValidation = validatePaymentConfig();
+  if (paymentValidation.errors.length > 0) {
+    logger.error('Payment configuration errors found', {
+      errors: paymentValidation.errors
+    });
+    process.exit(1);
+  }
+  
+  if (paymentValidation.warnings.length > 0) {
+    logger.warn('Payment configuration warnings', {
+      warnings: paymentValidation.warnings
+    });
+  }
 
   // Start server listening on PORT env var
   const PORT = process.env.PORT || 8080;

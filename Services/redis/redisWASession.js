@@ -1,5 +1,6 @@
 import { createClient } from 'redis';
 import { logger } from '../../utils/logging.js';
+import paymentConfig from '../../config/payment.js';
 
 const client = createClient({
     // password: process.env.Redis_pass,
@@ -31,7 +32,7 @@ export async function saveSession(phoneNumber, threadId, action, agentType, targ
 
         // Store the session object as a JSON string in Redis
         await client.set(phoneNumber, JSON.stringify(session), {
-            EX: 7200  // Expiration time in seconds (2 hours)
+            EX: paymentConfig.getAccessDurationSeconds()  // Configurable expiration time
         });
         console.log(`Session saved for phone number: ${phoneNumber}`);
         console.log(session);
@@ -49,7 +50,7 @@ export async function updateSessionWithPayment(phoneNumber, paymentDetails) {
             const session = JSON.parse(sessionData);
             session.payment = paymentDetails;
             await client.set(phoneNumber, JSON.stringify(session), {
-                EX: 86400
+                EX: paymentConfig.getAccessDurationSeconds()
             });
 
             console.log(`Session updated with payment for phone number: ${phoneNumber}`);
@@ -70,7 +71,7 @@ export async function updateSessionWithNewThread(phoneNumber, threadId) {
             const session = JSON.parse(sessionData);
             session.threadId = threadId;
             await client.set(phoneNumber, JSON.stringify(session), {
-                EX: 86400
+                EX: paymentConfig.getAccessDurationSeconds()
             });
 
             console.log(`Session restarted for phone number: ${phoneNumber}`);

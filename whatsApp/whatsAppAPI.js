@@ -769,10 +769,14 @@ export async function sendWhatsAppFileLink(textResponse, file, header = '', foot
     }
 }
 
+import paymentConfig from '../config/payment.js';
+
 export function sendWhatsAppOrderForPayment(textResponse, p, reference_id, to, phone_number_id) {
     logger.info(`Sending WhatsApp payment order - To: ${to}, PhoneID: ${phone_number_id}, Reference: ${reference_id}, Amount: ${p.sale_amount + p.tax - p.discount}`);
     
-    const expirationTime = Math.floor((Date.now() + 6960000) / 1000).toString(); // 1hour58min
+    // Use configurable access duration (default 2 hours) minus 2 minutes for buffer
+    const expirationBufferMs = 2 * 60 * 1000; // 2 minutes buffer
+    const expirationTime = Math.floor((Date.now() + paymentConfig.getAccessDurationMs() - expirationBufferMs) / 1000).toString();
     
     let data = JSON.stringify({
         "messaging_product": "whatsapp",

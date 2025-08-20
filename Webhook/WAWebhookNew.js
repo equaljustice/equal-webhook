@@ -9,6 +9,7 @@ import { getCXEventResponse, getCXResponse } from '../Services/Dialogflow/detect
 import { DFchipsToButtonOrList } from '../whatsApp/DFchipsToButtons.js';
 import { convertMarkdownToWhatsApp } from '../whatsApp/markdownToWA.js';
 import { generateId } from '../utils/generateID.js';
+import paymentConfig from '../config/payment.js';
 
 // ⚡ DUPLICATION PROTECTION: Prevent duplicate processing
 const processedMessages = new Set(); // In-memory cache for processed message IDs
@@ -380,8 +381,8 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                 break;
             case types.employee.Offer:
                 if ((session && session.targetAgent)) {
-                    if(session.interactions <= 10 || session.payment.transaction.status == 'success' || phone_number_id == '359476970593209'){
-                        logger.info(`Using OpenAI assistant - Interactions: ${session.interactions}, Payment status: ${session.payment.transaction.status} - From: ${from}`);
+                    if(paymentConfig.hasFreeInteractionsRemaining(session, phone_number_id) || session.payment.transaction.status == 'success'){
+                        logger.info(`Using OpenAI assistant - Interactions: ${session.interactions}, Payment status: ${session.payment.transaction.status}, Free interactions remaining: ${paymentConfig.getRemainingFreeInteractions(session, phone_numberId)} - From: ${from}`);
                         startStep(webhookId, 'interactWithAssistant');
                         try {
                             response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId);
@@ -432,9 +433,8 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                             // Continue without saving
                         }
                     }
-                    else if ((session.interactions > 10 && session.payment && session.payment.transaction.status == 'pending') || phone_number_id == '359476970593209') {
-                        if (!session.payment.linkSent){
-                            logger.info(`Sending payment request - Interactions: ${session.interactions} - From: ${from}`);
+                    else if (paymentConfig.isPaymentRequiredButNotSent(session, phone_number_id)) {
+                        logger.info(`Sending payment request - Interactions: ${session.interactions}, Free interactions: ${paymentConfig.freeInteractions} - From: ${from}`);
                             let reference_id = await generateId(8);
                             try {
                                 sendWhatsAppOrderForPayment("Please pay to proceed", session.pricing, reference_id, from, phone_number_id);
@@ -462,7 +462,13 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                             };
                         }
                     }
-                    else if (session.payment) {
+                    else if (paymentConfig.isPaymentLinkAlreadySent(session, phone_number_id)) {
+                        logger.debug(`Payment link already sent - From: ${from}`);
+                        response = {
+                            answer: `Please complete the payment to proceed further. If you have successfully paid, please wait.`
+                        };
+                    }
+                    else if (session.payment && session.payment.transaction.status === 'pending') {
                         logger.debug(`Payment pending - From: ${from}`);
                         response = {
                             answer: `Please complete payment to proceed further. If you have successfully paid, Please wait.`
@@ -1064,7 +1070,8 @@ const handelPaymentStatus = async (req, res, webhookId) => {
         phoneId: phone_number_id
     });
 
-    sendWhatsAppOrderStatus('Access allowed for next 2 hours, Say Hi to continue', status.payment.reference_id, 'completed', 'Payment Received', status.recipient_id, phone_number_id);
+    const accessDurationText = paymentConfig.accessDurationHours === 1 ? '1 hour' : `${paymentConfig.accessDurationHours} hours`;
+    sendWhatsAppOrderStatus(`Access allowed for next ${accessDurationText}, Say Hi to continue`, status.payment.reference_id, 'completed', 'Payment Received', status.recipient_id, phone_number_id);
     logger.info(`Payment completion status sent - Recipient: ${status.recipient_id}`, { 
         referenceId: status.payment.reference_id,
         status: 'completed'
