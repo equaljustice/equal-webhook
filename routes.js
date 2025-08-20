@@ -106,7 +106,46 @@ APIrouter.get('/list-files/:folder', authenticateToken, listFiles);
 APIrouter.get('/downloadFile/:folder/:filename', downloadFile);
 APIrouter.post('/login', authenticate);
 
-// Admin Dashboard Routes
+// Admin Dashboard Static Files - Serve the built Next.js app
+APIrouter.get('/admin', (req, res) => {
+    console.log('Serving admin dashboard index.html');
+    const indexPath = path.join(process.cwd(), 'admin-dashboard/out/index.html');
+    if (require('fs').existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        console.error('Admin dashboard index.html not found at:', indexPath);
+        res.status(404).send('Admin dashboard not found. Please build the dashboard first.');
+    }
+});
+
+APIrouter.get('/admin/*', (req, res) => {
+    console.log('Admin route requested:', req.path);
+    // Remove /admin prefix from the request path
+    const filePath = req.path.replace('/admin', '');
+    
+    // Serve static files from the admin-dashboard/out directory
+    const fullPath = path.join(process.cwd(), 'admin-dashboard/out', filePath);
+    
+    console.log('Looking for file:', fullPath);
+    
+    // Check if file exists
+    if (require('fs').existsSync(fullPath)) {
+        console.log('File found, serving:', fullPath);
+        res.sendFile(fullPath);
+    } else {
+        // If file doesn't exist, serve index.html (for client-side routing)
+        console.log('File not found, serving index.html');
+        const indexPath = path.join(process.cwd(), 'admin-dashboard/out/index.html');
+        if (require('fs').existsSync(indexPath)) {
+            res.sendFile(indexPath);
+        } else {
+            console.error('Admin dashboard index.html not found at:', indexPath);
+            res.status(404).send('Admin dashboard not found. Please build the dashboard first.');
+        }
+    }
+});
+
+// Admin Dashboard API Routes
 APIrouter.get('/admin/dashboard', authenticateToken, async (req, res) => {
     try {
         const summary = await getDashboardSummary();
@@ -188,17 +227,7 @@ APIrouter.get('/admin/conversation/:phoneNumber', authenticateToken, async (req,
     }
 });
 
-// Admin Dashboard Route - Serve the built Next.js app
-APIrouter.get('/admin*', (req, res) => {
-    // Remove /admin prefix from the request path
-    const filePath = req.path.replace('/admin', '');
-    
-    // Default to index.html if no specific file is requested
-    const finalPath = filePath === '/' ? '/index.html' : filePath;
-    
-    // Serve static files from the admin-dashboard/out directory
-    res.sendFile(path.join(process.cwd(), 'admin-dashboard/out', finalPath));
-});
+
 
 // Export the router
 export default APIrouter;
