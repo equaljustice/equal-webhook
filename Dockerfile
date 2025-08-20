@@ -29,7 +29,7 @@ COPY . ./
 
 # Build the admin dashboard
 RUN cd admin-dashboard && \
-    npm ci && \
+    npm install && \
     npm run build
 
 # Run the web service on container startup.
