@@ -11,6 +11,9 @@ import { convertMarkdownToWhatsApp } from '../whatsApp/markdownToWA.js';
 import { generateId } from '../utils/generateID.js';
 import paymentConfig from '../config/payment.js';
 
+// Initialize payment configuration
+paymentConfig.init();
+
 // ⚡ DUPLICATION PROTECTION: Prevent duplicate processing
 const processedMessages = new Set(); // In-memory cache for processed message IDs
 
@@ -81,7 +84,26 @@ const handleInteractiveButtons = async (message, from, phone_number_id, webhookI
             logger.info(`Payment interaction received - Status: ${message.interactive.payment.status}, From: ${from}`);
             if (message.interactive.payment.status == 'success') {
                 logger.info(`Payment successful - Reference: ${message.interactive.payment.reference_id}, From: ${from}`);
-                sendWhatsAppOrderStatus('Payment Received', message.interactive.payment.reference_id, 'processing', 'Access requested for next 2 hours', from, phone_number_id);
+                
+                // Update session payment status for interactive payment
+                try {
+                    await updateSessionWithPayment(from, {
+                        reference_id: message.interactive.payment.reference_id,
+                        transaction: { status: 'success' },
+                        interactive_payment: message.interactive.payment,
+                        payment_method: 'interactive',
+                        timestamp: new Date().toISOString()
+                    });
+                    logger.info(`Session payment status updated to success via interactive payment - From: ${from}`);
+                } catch (paymentUpdateError) {
+                    logger.error(`Failed to update session payment status via interactive payment - From: ${from}`, {
+                        error: paymentUpdateError.message,
+                        reference_id: message.interactive.payment.reference_id
+                    });
+                }
+                
+                const accessDurationText = paymentConfig.accessDurationHours === 1 ? '1 hour' : `${paymentConfig.accessDurationHours} hours`;
+                sendWhatsAppOrderStatus(`Payment Received - Access granted for next ${accessDurationText}`, message.interactive.payment.reference_id, 'processing', 'Access requested', from, phone_number_id);
             }
             return;
         default:
@@ -410,8 +432,8 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                 break;
             case types.employee.Offer:
                 if ((session && session.targetAgent)) {
-                    if(paymentConfig.hasFreeInteractionsRemaining(session, phone_number_id) || session.payment.transaction.status == 'success'){
-                        logger.info(`Using OpenAI assistant - Interactions: ${session.interactions}, Payment status: ${session.payment.transaction.status}, Free interactions remaining: ${paymentConfig.getRemainingFreeInteractions(session, phone_numberId)} - From: ${from}`);
+                    if(paymentConfig.hasFreeInteractionsRemaining(session, phone_number_id) || paymentConfig.hasValidPayment(session, phone_number_id)){
+                        logger.info(`Using OpenAI assistant - Interactions: ${session.interactions}, Payment status: ${session.payment?.transaction?.status || 'none'}, Free interactions remaining: ${paymentConfig.getRemainingFreeInteractions(session, phone_number_id)} - From: ${from}`);
                         startStep(webhookId, 'interactWithAssistant');
                         try {
                             response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId);
@@ -491,7 +513,7 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                             answer: `Please complete the payment to proceed further. If you have successfully paid, please wait.`
                         };
                     }
-                    else if (session.payment && session.payment.transaction.status === 'pending') {
+                    else if (paymentConfig.isPaymentPending(session, phone_number_id)) {
                         logger.debug(`Payment pending - From: ${from}`);
                         response = {
                             answer: `Please complete payment to proceed further. If you have successfully paid, Please wait.`
@@ -999,17 +1021,33 @@ export const getWhatsAppMsg = async (req, res) => {
             
             if (status.type == 'payment') {
                 logger.info(`Payment status update - Recipient: ${status.recipient_id}, Status: ${status.status}, Webhook ID: ${webhookId}`);
-                startStep(webhookId, 'updateSessionWithPayment');
-                await updateSessionWithPayment(status.recipient_id, status.payment);
-                logger.info(`Session updated with payment - Recipient: ${status.recipient_id}`, { 
-                    paymentStatus: status.status,
-                    paymentData: status.payment
-                });
-                endStep(webhookId, 'updateSessionWithPayment');
                 
+                // Only update session when payment is actually successful
                 if (status.status == 'captured') {
                     logger.info(`Payment captured - Processing payment status - Webhook ID: ${webhookId}`);
+                    startStep(webhookId, 'updateSessionWithPayment');
+                    
+                    // Update session with success status
+                    try {
+                        await updateSessionWithPayment(status.recipient_id, {
+                            reference_id: status.payment.reference_id,
+                            transaction: { status: 'success' },
+                            webhook_payment: status.payment,
+                            webhook_status: status.status,
+                            capture_timestamp: new Date().toISOString()
+                        });
+                        logger.info(`Session payment status updated to success - Recipient: ${status.recipient_id}`);
+                    } catch (updateError) {
+                        logger.error(`Failed to update session payment status - Recipient: ${status.recipient_id}`, {
+                            error: updateError.message,
+                            payment: status.payment
+                        });
+                    }
+                    
+                    endStep(webhookId, 'updateSessionWithPayment');
                     await handelPaymentStatus(req, res, webhookId);
+                } else {
+                    logger.info(`Payment status '${status.status}' - no session update needed - Webhook ID: ${webhookId}`);
                 }
                 
                 logger.info(`Payment status processed successfully - Webhook ID: ${webhookId}`);
@@ -1101,6 +1139,12 @@ const handelPaymentStatus = async (req, res, webhookId) => {
     });
 
     let session = await getSession(status.recipient_id);
+    logger.info(`Retrieved session for payment completion - Recipient: ${status.recipient_id}`, {
+        hasSession: !!session,
+        agentType: session?.agentType,
+        paymentStatus: session?.payment?.transaction?.status,
+        interactions: session?.interactions
+    });
     if (session && session.agentType == 'CX') {
         logger.info(`Getting CX event response for payment captured - Recipient: ${status.recipient_id}`);
         startStep(webhookId, 'getCXEventResponse');
