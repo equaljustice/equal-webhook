@@ -36,18 +36,26 @@ const main = async () => {
   initLogCorrelation(project);
 
   // Validate payment configuration
-  const paymentValidation = validatePaymentConfig();
-  if (paymentValidation.errors.length > 0) {
-    logger.error('Payment configuration errors found', {
-      errors: paymentValidation.errors
+  try {
+    const paymentValidation = validatePaymentConfig();
+    if (paymentValidation.errors.length > 0) {
+      logger.error('Payment configuration errors found', {
+        errors: paymentValidation.errors
+      });
+      // Don't exit, just log the errors and continue
+    }
+    
+    if (paymentValidation.warnings.length > 0) {
+      logger.warn('Payment configuration warnings', {
+        warnings: paymentValidation.warnings
+      });
+    }
+  } catch (error) {
+    logger.error('Error validating payment configuration', {
+      error: error.message,
+      stack: error.stack
     });
-    process.exit(1);
-  }
-  
-  if (paymentValidation.warnings.length > 0) {
-    logger.warn('Payment configuration warnings', {
-      warnings: paymentValidation.warnings
-    });
+    // Don't exit, continue with default configuration
   }
 
   // Start server listening on PORT env var

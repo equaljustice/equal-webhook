@@ -49,14 +49,25 @@ class PaymentConfig {
      * Log current payment configuration
      */
     logConfiguration() {
-        logger.info('Payment configuration loaded', {
-            enabled: this.enabled,
-            freeInteractions: this.freeInteractions,
-            accessDurationHours: this.accessDurationHours,
-            debugMode: this.debugMode,
-            whitelistPhonesCount: this.whitelistPhones.length,
-            whitelistPhones: this.debugMode ? this.whitelistPhones : '[REDACTED]'
-        });
+        try {
+            logger.info('Payment configuration loaded', {
+                enabled: this.enabled,
+                freeInteractions: this.freeInteractions,
+                accessDurationHours: this.accessDurationHours,
+                debugMode: this.debugMode,
+                whitelistPhonesCount: this.whitelistPhones.length,
+                whitelistPhones: this.debugMode ? this.whitelistPhones : '[REDACTED]'
+            });
+        } catch (error) {
+            // Fallback logging if logger is not available
+            console.log('Payment configuration loaded with defaults:', {
+                enabled: this.enabled,
+                freeInteractions: this.freeInteractions,
+                accessDurationHours: this.accessDurationHours,
+                debugMode: this.debugMode,
+                whitelistPhonesCount: this.whitelistPhones.length
+            });
+        }
     }
 
     /**
