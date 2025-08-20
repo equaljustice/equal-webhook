@@ -13,6 +13,12 @@ const paymentConfig = {
     // Test phone numbers that bypass payment (for development/testing)
     testPhoneNumbers: ['918130363763'],
     
+    // Debug mode for additional logging
+    debugMode: process.env.PAYMENT_DEBUG === 'true',
+    
+    // Whitelist phone from environment (optional)
+    whitelistPhone: process.env.PAYMENT_WHITELIST_PHONE || null,
+    
     /**
      * Initialize payment config with logging
      */
@@ -20,7 +26,12 @@ const paymentConfig = {
         console.log('Payment Configuration Initialized:', {
             freeInteractions: this.freeInteractions,
             accessDurationHours: this.accessDurationHours,
+            accessDurationSeconds: this.getAccessDurationSeconds(),
+            accessDurationMs: this.getAccessDurationMs(),
             testPhoneNumbers: this.testPhoneNumbers.length,
+            debugMode: this.debugMode,
+            whitelistPhone: this.whitelistPhone,
+            paymentEnabled: this.isPaymentEnabled(),
             timestamp: new Date().toISOString()
         });
     },
@@ -138,6 +149,51 @@ const paymentConfig = {
             session.payment.transaction.status === 'pending' &&
             session.interactions > this.freeInteractions
         );
+    },
+    
+    /**
+     * Get access duration in seconds for Redis expiration
+     * @returns {number} - Access duration in seconds
+     */
+    getAccessDurationSeconds() {
+        return this.accessDurationHours * 60 * 60; // Convert hours to seconds
+    },
+    
+    /**
+     * Get access duration in milliseconds for JavaScript date calculations
+     * @returns {number} - Access duration in milliseconds
+     */
+    getAccessDurationMs() {
+        return this.accessDurationHours * 60 * 60 * 1000; // Convert hours to milliseconds
+    },
+    
+    /**
+     * Check if payment is globally enabled (for feature flags)
+     * @returns {boolean} - True if payment is enabled
+     */
+    isPaymentEnabled() {
+        // Check environment variable, default to true
+        return process.env.PAYMENT_ENABLED !== 'false';
+    },
+    
+    /**
+     * Check if phone number is whitelisted (bypass payment)
+     * @param {string} phoneNumberId - Phone number to check
+     * @returns {boolean} - True if phone is whitelisted
+     */
+    isPhoneWhitelisted(phoneNumberId) {
+        // Check test phone numbers
+        if (this.testPhoneNumbers.includes(phoneNumberId)) {
+            return true;
+        }
+        
+        // Check environment whitelist
+        const whitelistPhone = process.env.PAYMENT_WHITELIST_PHONE;
+        if (whitelistPhone && whitelistPhone.trim() === phoneNumberId) {
+            return true;
+        }
+        
+        return false;
     }
 };
 

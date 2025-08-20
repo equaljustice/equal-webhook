@@ -48,12 +48,34 @@ export async function updateSessionWithPayment(phoneNumber, paymentDetails) {
         const sessionData = await client.get(phoneNumber);
         if (sessionData) {
             const session = JSON.parse(sessionData);
-            session.payment = paymentDetails;
+            
+            // Preserve existing payment data and merge with new details
+            if (session.payment) {
+                // Keep existing linkSent status and transaction info
+                session.payment = {
+                    ...session.payment,
+                    ...paymentDetails,
+                    transaction: {
+                        ...session.payment.transaction,
+                        status: 'success', // Mark as successful when payment details are received
+                        ...paymentDetails.transaction
+                    }
+                };
+            } else {
+                session.payment = {
+                    ...paymentDetails,
+                    transaction: { status: 'success' }
+                };
+            }
+            
             await client.set(phoneNumber, JSON.stringify(session), {
                 EX: paymentConfig.getAccessDurationSeconds()
             });
 
-            console.log(`Session updated with payment for phone number: ${phoneNumber}`);
+            console.log(`Session updated with payment for phone number: ${phoneNumber}`, {
+                paymentStatus: session.payment.transaction.status,
+                linkSent: session.payment.linkSent
+            });
         } else {
             console.log(`No session found for phone number: ${phoneNumber}`);
         }
