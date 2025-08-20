@@ -435,31 +435,25 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                     }
                     else if (paymentConfig.isPaymentRequiredButNotSent(session, phone_number_id)) {
                         logger.info(`Sending payment request - Interactions: ${session.interactions}, Free interactions: ${paymentConfig.freeInteractions} - From: ${from}`);
-                            let reference_id = await generateId(8);
-                            try {
-                                sendWhatsAppOrderForPayment("Please pay to proceed", session.pricing, reference_id, from, phone_number_id);
-                                logger.info(`Payment request sent - From: ${from}`, { 
-                                    referenceId: reference_id,
-                                    pricing: session.pricing,
-                                    interactions: session.interactions
-                                });
-                                session.payment.linkSent = true;
-                                session.interactions++;
-                                saveSession(from, session.threadId, session.action, session.agentType, session.targetAgent, session.pricing, session.payment, session.interactions);
-                                logTatSummary(webhookId, 'payment_link_sent');
-                                return;
-                            } catch (paymentError) {
-                                logger.error(`Failed to send payment request - From: ${from}`, {
-                                    error: paymentError.message,
-                                    stack: paymentError.stack
-                                });
-                                throw paymentError;
-                            }
-                        } else {
-                            logger.debug(`Payment link already sent - From: ${from}`);
-                            response = {
-                                answer: `Please complete the payment to proceed further. If you have successfully paid, please wait.`
-                            };
+                        let reference_id = await generateId(8);
+                        try {
+                            sendWhatsAppOrderForPayment("Please pay to proceed", session.pricing, reference_id, from, phone_number_id);
+                            logger.info(`Payment request sent - From: ${from}`, { 
+                                referenceId: reference_id,
+                                pricing: session.pricing,
+                                interactions: session.interactions
+                            });
+                            session.payment.linkSent = true;
+                            session.interactions++;
+                            saveSession(from, session.threadId, session.action, session.agentType, session.targetAgent, session.pricing, session.payment, session.interactions);
+                            logTatSummary(webhookId, 'payment_link_sent');
+                            return;
+                        } catch (paymentError) {
+                            logger.error(`Failed to send payment request - From: ${from}`, {
+                                error: paymentError.message,
+                                stack: paymentError.stack
+                            });
+                            throw paymentError;
                         }
                     }
                     else if (paymentConfig.isPaymentLinkAlreadySent(session, phone_number_id)) {

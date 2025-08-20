@@ -83,8 +83,8 @@ class PaymentConfig {
                 freeInteractions: this.freeInteractions,
                 accessDurationHours: this.accessDurationHours,
                 debugMode: this.debugMode,
-                            whitelistPhone: this.whitelistPhone ? '[SET]' : '[NOT_SET]',
-            whitelistPhoneValue: this.debugMode ? this.whitelistPhone : '[REDACTED]'
+                whitelistPhone: this.whitelistPhone ? '[SET]' : '[NOT_SET]',
+                whitelistPhoneValue: this.debugMode ? this.whitelistPhone : '[REDACTED]'
             });
         } catch (error) {
             // Fallback logging if logger is not available
