@@ -172,10 +172,23 @@ export async function createAssistantThread() {
     logger.info('Creating new OpenAI assistant thread');
     try {
         const threadResponse = await openai.beta.threads.create();
-        logger.info(`Assistant thread created successfully: ${threadResponse.id}`);
+        logger.info(`OpenAI assistant thread created successfully`, {
+            threadId: threadResponse.id,
+            threadType: 'openai_assistant',
+            timestamp: new Date().toISOString(),
+            openaiResponse: {
+                id: threadResponse.id,
+                object: threadResponse.object,
+                created_at: threadResponse.created_at
+            }
+        });
         return threadResponse.id;
     } catch (error) {
-        logger.error('Error creating assistant thread:', error);
+        logger.error('Error creating assistant thread', {
+            error: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+        });
         throw error;
     }
 }

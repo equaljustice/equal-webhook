@@ -28,9 +28,22 @@ export async function saveThreadId(phoneNumber, threadId) {
             EX: 172800 // 2 days in seconds
         });
         console.log(`Thread created and stored for phone number: ${phoneNumber}, Thread ID: ${threadId}`);
+        
+        // Enhanced logging for thread storage
+        const logData = {
+            event: 'thread_stored_in_redis',
+            phoneNumber: phoneNumber,
+            threadId: threadId,
+            storageType: 'redis',
+            expirationSeconds: 172800,
+            timestamp: new Date().toISOString()
+        };
+        console.log('Thread storage log:', JSON.stringify(logData));
+        
         return threadId;
     } catch (error) {
         console.error('Error interacting with Redis:', error);
+        throw error;
     }
 }
 

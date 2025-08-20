@@ -239,7 +239,12 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                         startStep(webhookId, 'createAssistantThread');
                         try {
                             threadId = await createAssistantThread(from);
-                            logger.info(`OpenAI assistant thread created - From: ${from}`, { threadId: threadId });
+                            logger.info(`OpenAI assistant thread created successfully`, {
+                                from: from,
+                                threadId: threadId,
+                                threadType: 'openai_assistant',
+                                timestamp: new Date().toISOString()
+                            });
                         } catch (threadError) {
                             logger.error(`Failed to create OpenAI assistant thread - From: ${from}`, {
                                 error: threadError.message,
@@ -250,7 +255,15 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                         endStep(webhookId, 'createAssistantThread');
                     } else {
                         logger.info(`Creating WhatsApp thread - From: ${from}`);
-                        threadId = 'whatsApp-' + from + '-' + await generateId(8);
+                        const generatedId = await generateId(8);
+                        threadId = 'whatsApp-' + from + '-' + generatedId;
+                        logger.info(`WhatsApp thread created successfully`, {
+                            from: from,
+                            threadId: threadId,
+                            threadType: 'whatsApp',
+                            generatedId: generatedId,
+                            timestamp: new Date().toISOString()
+                        });
                     }
                     
                     session = {
@@ -316,7 +329,13 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                 startStep(webhookId, 'createAssistantThread');
                 try {
                     session.threadId = await createAssistantThread(from);
-                    logger.info(`OpenAI assistant thread created for restart - From: ${from}`, { threadId: session.threadId });
+                    logger.info(`OpenAI assistant thread created for restart successfully`, {
+                        from: from,
+                        threadId: session.threadId,
+                        threadType: 'openai_assistant_restart',
+                        previousThreadId: session.threadId,
+                        timestamp: new Date().toISOString()
+                    });
                 } catch (restartError) {
                     logger.error(`Failed to create restart thread - From: ${from}`, {
                         error: restartError.message,
@@ -327,7 +346,17 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                 endStep(webhookId, 'createAssistantThread');
             } else {
                 logger.info(`Creating new WhatsApp thread for restart - From: ${from}`);
-                session.threadId = 'whatsApp-' + from + '-' + await generateId(8);
+                const generatedId = await generateId(8);
+                const previousThreadId = session.threadId;
+                session.threadId = 'whatsApp-' + from + '-' + generatedId;
+                logger.info(`WhatsApp thread created for restart successfully`, {
+                    from: from,
+                    threadId: session.threadId,
+                    threadType: 'whatsApp_restart',
+                    previousThreadId: previousThreadId,
+                    generatedId: generatedId,
+                    timestamp: new Date().toISOString()
+                });
             }
             
             startStep(webhookId, 'updateSessionWithNewThread');
