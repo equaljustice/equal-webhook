@@ -126,18 +126,94 @@ function validateAPICallParams(data, phone_number_id) {
     
     if (!data) {
         errors.push('data payload is required');
-    } else {
-        try {
-            const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
-            if (!parsedData.messaging_product || parsedData.messaging_product !== 'whatsapp') {
-                errors.push('Invalid messaging_product in data payload');
-            }
-            if (!parsedData.to) {
-                errors.push('Missing recipient (to) in data payload');
-            }
-        } catch (parseError) {
-            errors.push('Invalid JSON in data payload');
+        return errors;
+    }
+    
+    try {
+        const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+        
+        // ⚡ BASIC STRUCTURE VALIDATION
+        if (!parsedData.messaging_product || parsedData.messaging_product !== 'whatsapp') {
+            errors.push('Invalid messaging_product in data payload');
         }
+        
+        if (!parsedData.to) {
+            errors.push('Missing recipient (to) in data payload');
+        } else {
+            // ⚡ PHONE NUMBER VALIDATION: WhatsApp format
+            const phoneNumber = parsedData.to.toString();
+            if (!/^\d{10,15}$/.test(phoneNumber)) {
+                errors.push(`Invalid phone number format: ${phoneNumber} (must be 10-15 digits)`);
+            }
+        }
+        
+        if (!parsedData.type) {
+            errors.push('Missing message type in data payload');
+        }
+        
+        // ⚡ TYPE-SPECIFIC VALIDATION
+        switch (parsedData.type) {
+            case 'text':
+                if (!parsedData.text || !parsedData.text.body) {
+                    errors.push('Missing text.body for text message');
+                } else if (parsedData.text.body.length > 4096) {
+                    errors.push(`Text message too long: ${parsedData.text.body.length} chars (max 4096)`);
+                }
+                break;
+                
+            case 'interactive':
+                if (!parsedData.interactive) {
+                    errors.push('Missing interactive object for interactive message');
+                } else {
+                    const interactive = parsedData.interactive;
+                    
+                    if (!interactive.type) {
+                        errors.push('Missing interactive.type');
+                    }
+                    
+                    // Validate interactive message limits
+                    if (interactive.body && interactive.body.text && interactive.body.text.length > 1024) {
+                        errors.push(`Interactive body text too long: ${interactive.body.text.length} chars (max 1024)`);
+                    }
+                    
+                    if (interactive.header && interactive.header.text && interactive.header.text.length > 60) {
+                        errors.push(`Interactive header text too long: ${interactive.header.text.length} chars (max 60)`);
+                    }
+                    
+                    if (interactive.footer && interactive.footer.text && interactive.footer.text.length > 60) {
+                        errors.push(`Interactive footer text too long: ${interactive.footer.text.length} chars (max 60)`);
+                    }
+                    
+                    // Validate CTA URL format
+                    if (interactive.type === 'cta_url') {
+                        if (!interactive.action || !interactive.action.parameters || !interactive.action.parameters.url) {
+                            errors.push('Missing URL parameters for cta_url interactive message');
+                        } else {
+                            try {
+                                new URL(interactive.action.parameters.url);
+                            } catch (urlError) {
+                                errors.push(`Invalid URL format in cta_url: ${interactive.action.parameters.url}`);
+                            }
+                        }
+                    }
+                }
+                break;
+                
+            case 'document':
+                if (!parsedData.document) {
+                    errors.push('Missing document object for document message');
+                }
+                break;
+        }
+        
+        // ⚡ PAYLOAD SIZE VALIDATION
+        const payloadSize = JSON.stringify(parsedData).length;
+        if (payloadSize > 1048576) { // 1MB limit
+            errors.push(`Payload too large: ${payloadSize} bytes (max 1MB)`);
+        }
+        
+    } catch (parseError) {
+        errors.push(`Invalid JSON in data payload: ${parseError.message}`);
     }
     
     return errors;
@@ -151,10 +227,18 @@ async function callWhatsAppAPI(data, phone_number_id) {
         // ⚡ INPUT VALIDATION: Check parameters before making API call
         const validationErrors = validateAPICallParams(data, phone_number_id);
         if (validationErrors.length > 0) {
+            // ⚡ LOG PAYLOAD FOR DEBUGGING: Include sanitized payload in validation errors
+            const sanitizedPayload = typeof data === 'string' ? JSON.parse(data) : data;
+            if (sanitizedPayload.to) {
+                sanitizedPayload.to = sanitizedPayload.to.toString().substring(0, 5) + '***';
+            }
+            
             logger.error(`WhatsApp API Validation Error - RequestID: ${requestId}`, {
                 errors: validationErrors,
                 phoneNumberId: phone_number_id,
-                requestId
+                requestId,
+                sanitizedPayload: sanitizedPayload,
+                payloadSize: JSON.stringify(data).length
             });
             throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
         }
@@ -261,7 +345,8 @@ async function callWhatsAppAPI(data, phone_number_id) {
                 ? JSON.stringify(error.response.data) 
                 : error.response.data;
             
-            logger.error(`WhatsApp API HTTP Error - RequestID: ${requestId}`, {
+            // ⚡ ENHANCED 400 ERROR LOGGING: Capture specific WhatsApp API validation errors
+            const errorLogData = {
                 ...errorContext,
                 httpStatus: error.response.status,
                 httpStatusText: error.response.statusText,
@@ -269,7 +354,51 @@ async function callWhatsAppAPI(data, phone_number_id) {
                 responseHeaders: error.response.headers,
                 hasValidToken: !!process.env.WhatsApp_Token && process.env.WhatsApp_Token.length > 10,
                 tokenPrefix: process.env.WhatsApp_Token ? process.env.WhatsApp_Token.substring(0, 10) + '...' : 'missing'
-            });
+            };
+            
+            // Add specific analysis for 400 errors
+            if (error.response.status === 400) {
+                errorLogData.errorCategory = 'validation_error';
+                errorLogData.commonCauses = [
+                    'Invalid phone number format',
+                    'Message content violates WhatsApp policies', 
+                    'Invalid message structure/format',
+                    'Missing required fields',
+                    'Exceeded character limits'
+                ];
+                
+                // Try to parse WhatsApp error details
+                try {
+                    const parsedError = typeof error.response.data === 'string' 
+                        ? JSON.parse(error.response.data) 
+                        : error.response.data;
+                    
+                    if (parsedError.error) {
+                        errorLogData.whatsappError = {
+                            message: parsedError.error.message,
+                            type: parsedError.error.type,
+                            code: parsedError.error.code,
+                            error_subcode: parsedError.error.error_subcode,
+                            fbtrace_id: parsedError.error.fbtrace_id
+                        };
+                        
+                        // Add specific suggestions based on error codes
+                        if (parsedError.error.code === 100) {
+                            errorLogData.suggestion = 'Invalid parameter - check phone number format and message structure';
+                        } else if (parsedError.error.code === 131030) {
+                            errorLogData.suggestion = 'Recipient phone number not valid for WhatsApp Business API';
+                        } else if (parsedError.error.code === 131026) {
+                            errorLogData.suggestion = 'Message template or content violates WhatsApp policy';
+                        } else if (parsedError.error.code === 131021) {
+                            errorLogData.suggestion = 'Recipient has not accepted our new Terms of Service';
+                        }
+                    }
+                } catch (parseError) {
+                    errorLogData.parseError = 'Could not parse WhatsApp error response';
+                }
+            }
+            
+            logger.error(`WhatsApp API HTTP Error - RequestID: ${requestId}`, errorLogData);
         } else if (error.request) {
             // Request was made but no response received (network/timeout issues)
             logger.error(`WhatsApp API Network Error - RequestID: ${requestId}`, {
@@ -292,7 +421,7 @@ async function callWhatsAppAPI(data, phone_number_id) {
             });
         }
         
-        // ⚡ ADDITIONAL CONTEXT: Log request payload (sanitized)
+        // ⚡ ADDITIONAL CONTEXT: Log request payload (sanitized) - especially for 400 errors
         const sanitizedData = typeof data === 'string' ? JSON.parse(data) : data;
         if (sanitizedData) {
             // Remove sensitive data but keep structure for debugging
@@ -300,12 +429,43 @@ async function callWhatsAppAPI(data, phone_number_id) {
                 messaging_product: sanitizedData.messaging_product,
                 recipient_type: sanitizedData.recipient_type,
                 type: sanitizedData.type,
-                to: sanitizedData.to ? sanitizedData.to.substring(0, 5) + '...' : undefined,
+                to: sanitizedData.to ? sanitizedData.to.toString().substring(0, 5) + '***' : undefined,
                 hasText: !!sanitizedData.text,
                 hasInteractive: !!sanitizedData.interactive,
                 textLength: sanitizedData.text?.body?.length || 0
             };
-            logger.debug(`Request payload context - RequestID: ${requestId}`, debugData);
+            
+            // ⚡ ENHANCED DEBUG FOR 400 ERRORS: Include more details
+            if (error.response?.status === 400) {
+                debugData.detailedPayload = {
+                    ...sanitizedData,
+                    to: sanitizedData.to ? sanitizedData.to.toString().substring(0, 5) + '***' : undefined
+                };
+                
+                if (sanitizedData.interactive) {
+                    debugData.interactiveDetails = {
+                        type: sanitizedData.interactive.type,
+                        hasBody: !!sanitizedData.interactive.body,
+                        bodyTextLength: sanitizedData.interactive.body?.text?.length || 0,
+                        hasHeader: !!sanitizedData.interactive.header,
+                        headerTextLength: sanitizedData.interactive.header?.text?.length || 0,
+                        hasFooter: !!sanitizedData.interactive.footer,
+                        footerTextLength: sanitizedData.interactive.footer?.text?.length || 0,
+                        hasAction: !!sanitizedData.interactive.action
+                    };
+                    
+                    if (sanitizedData.interactive.type === 'cta_url' && sanitizedData.interactive.action) {
+                        debugData.ctaUrlDetails = {
+                            hasParameters: !!sanitizedData.interactive.action.parameters,
+                            hasUrl: !!sanitizedData.interactive.action.parameters?.url,
+                            hasDisplayText: !!sanitizedData.interactive.action.parameters?.display_text,
+                            urlPreview: sanitizedData.interactive.action.parameters?.url?.substring(0, 50) + '...' || 'none'
+                        };
+                    }
+                }
+            }
+            
+            logger.error(`Request payload context for ${error.response?.status || 'unknown'} error - RequestID: ${requestId}`, debugData);
         }
         
         // ⚡ METRICS: Record failed API call
