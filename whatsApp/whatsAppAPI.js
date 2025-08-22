@@ -641,7 +641,20 @@ export async function sendWatsAppWithRedirectButton(textResponse, file, header =
 }
 
 export async function sendWhatsAppFileLink(textResponse, file, header = '', footer = '', to, phone_number_id) {
-    logger.info(`Sending WhatsApp file link - To: ${to}, PhoneID: ${phone_number_id}, File: ${file?.name || 'unknown'}, Text length: ${textResponse?.length || 0}`);
+    const startTime = Date.now();
+    const linkRequestId = `filelink_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    
+    logger.info(`Starting WhatsApp file link process`, {
+        to: to,
+        phoneNumberId: phone_number_id,
+        fileName: file?.name || 'unknown',
+        textLength: textResponse?.length || 0,
+        header: header,
+        footer: footer,
+        fileUrl: file?.parameters?.url,
+        linkRequestId: linkRequestId,
+        timestamp: new Date().toISOString()
+    });
     
     try {
         // ⚡ VALIDATION: Check if file object is properly structured
@@ -675,41 +688,112 @@ export async function sendWhatsAppFileLink(textResponse, file, header = '', foot
         }
         
         while (!fileAvailable && counter < 10) {
-            logger.debug(`File availability check #${counter + 1}/10 - URL: ${file.parameters.url}`);
+            const attemptStart = Date.now();
+            logger.info(`File availability check attempt ${counter + 1}/10`, {
+                to: to,
+                fileUrl: file.parameters.url,
+                attempt: counter + 1,
+                maxAttempts: 10,
+                elapsedTimeMs: Date.now() - startTime,
+                timestamp: new Date().toISOString()
+            });
             
             try {
                 fileAvailable = await checkFileAvailability(file.parameters.url);
-            } catch (checkError) {
-                logger.warn(`File availability check failed - To: ${to}, Attempt: ${counter + 1}`, {
-                    error: checkError.message,
+                
+                const attemptTime = Date.now() - attemptStart;
+                logger.debug(`File availability check completed`, {
+                    to: to,
+                    attempt: counter + 1,
+                    fileAvailable: fileAvailable,
+                    attemptTimeMs: attemptTime,
                     url: file.parameters.url
+                });
+                
+            } catch (checkError) {
+                const attemptTime = Date.now() - attemptStart;
+                logger.warn(`File availability check failed`, {
+                    to: to,
+                    attempt: counter + 1,
+                    maxAttempts: 10,
+                    error: checkError.message,
+                    attemptTimeMs: attemptTime,
+                    url: file.parameters.url,
+                    errorType: checkError.constructor.name
                 });
                 fileAvailable = false;
             }
             
             if (fileAvailable) {
-                logger.info(`File available after ${counter + 1} checks - URL: ${file.parameters.url}`);
+                const totalWaitTime = Date.now() - startTime;
+                logger.info(`File became available - sending to user`, {
+                    to: to,
+                    checksRequired: counter + 1,
+                    totalWaitTimeMs: totalWaitTime,
+                    url: file.parameters.url,
+                    fileName: file.name || 'unknown'
+                });
                 
                 try {
+                    logger.debug(`Attempting to send WhatsApp redirect button`, {
+                        to: to,
+                        textResponse: textResponse?.substring(0, 100) + '...',
+                        header: header,
+                        footer: footer,
+                        fileName: file.name
+                    });
+                    
                     await sendWatsAppWithRedirectButton(textResponse, file, header, footer, to, phone_number_id);
-                    logger.info(`File redirect button sent successfully - To: ${to}`);
+                    
+                    logger.info(`File redirect button sent successfully`, {
+                        to: to,
+                        fileName: file.name || 'unknown',
+                        url: file.parameters.url,
+                        checksRequired: counter + 1,
+                        totalWaitTimeMs: totalWaitTime,
+                        deliveryMethod: 'whatsapp_cta_button'
+                    });
                     return true;
+                    
                 } catch (redirectError) {
-                    logger.error(`Failed to send file redirect button - To: ${to}`, {
+                    logger.error(`Failed to send file redirect button`, {
+                        to: to,
+                        fileName: file.name || 'unknown',
                         error: redirectError.message,
                         stack: redirectError.stack,
-                        file: file
+                        file: file,
+                        totalWaitTimeMs: totalWaitTime
                     });
                     
                     // ⚡ FALLBACK: Send file URL as plain text if WhatsApp redirect button fails
                     try {
                         const fallbackMessage = `Your document is ready! Download it here: ${file.parameters.url}`;
+                        
+                        logger.info(`Attempting fallback text message delivery`, {
+                            to: to,
+                            fallbackMessage: fallbackMessage,
+                            fileName: file.name || 'unknown'
+                        });
+                        
                         await sendWatsAppText(fallbackMessage, to, phone_number_id);
-                        logger.info(`Fallback file URL sent as text - To: ${to}`);
+                        
+                        logger.info(`Fallback file URL sent as text message`, {
+                            to: to,
+                            fileName: file.name || 'unknown',
+                            url: file.parameters.url,
+                            deliveryMethod: 'plain_text_fallback',
+                            totalWaitTimeMs: totalWaitTime
+                        });
                         return true;
+                        
                     } catch (fallbackError) {
-                        logger.error(`Fallback file URL also failed - To: ${to}`, {
-                            error: fallbackError.message
+                        logger.error(`All delivery methods failed for file`, {
+                            to: to,
+                            fileName: file.name || 'unknown',
+                            url: file.parameters.url,
+                            redirectError: redirectError.message,
+                            fallbackError: fallbackError.message,
+                            totalWaitTimeMs: totalWaitTime
                         });
                         return false;
                     }
@@ -718,51 +802,149 @@ export async function sendWhatsAppFileLink(textResponse, file, header = '', foot
             
             // ⚡ PROGRESSIVE DELAY: 3s, 6s, 9s, 12s, 15s instead of fixed 15s
             const delay = checkInterval * (counter + 1);
-            logger.debug(`File not available, waiting ${delay}ms before next check`);
+            
+            logger.debug(`File not available yet - scheduling next check`, {
+                to: to,
+                attempt: counter + 1,
+                nextCheckInMs: delay,
+                totalElapsedMs: Date.now() - startTime,
+                url: file.parameters.url
+            });
+            
             await new Promise(resolve => setTimeout(resolve, delay));
             counter++;
             
             // ⚡ USER UPDATES: Keep user informed (with error handling)
             try {
+                let updateMessage = null;
                 if (counter === 3) {
-                    logger.info(`Sending progress update #1 to user ${to}`);
-                    await sendWatsAppText("Still processing your document, please wait...", to, phone_number_id);
+                    updateMessage = "Still processing your document, please wait...";
                 } else if (counter === 6) {
-                    logger.info(`Sending progress update #2 to user ${to}`);
-                    await sendWatsAppText("Document processing is taking longer than expected...", to, phone_number_id);
+                    updateMessage = "Document processing is taking longer than expected...";
                 }
+                
+                if (updateMessage) {
+                    logger.info(`Sending progress update to user`, {
+                        to: to,
+                        updateNumber: counter === 3 ? 1 : 2,
+                        message: updateMessage,
+                        elapsedTimeMs: Date.now() - startTime
+                    });
+                    
+                    await sendWatsAppText(updateMessage, to, phone_number_id);
+                    
+                    logger.debug(`Progress update sent successfully`, {
+                        to: to,
+                        updateNumber: counter === 3 ? 1 : 2,
+                        elapsedTimeMs: Date.now() - startTime
+                    });
+                }
+                
             } catch (updateError) {
-                logger.warn(`Failed to send progress update - To: ${to}`, { error: updateError.message });
+                logger.warn(`Failed to send progress update`, {
+                    to: to,
+                    updateAttempt: counter === 3 ? 1 : 2,
+                    error: updateError.message,
+                    elapsedTimeMs: Date.now() - startTime
+                });
                 // Continue processing even if update messages fail
             }
         }
         
         // ⚡ USER FEEDBACK: Clear communication on failure
         if (!fileAvailable) {
-            logger.warn(`File processing timeout after ${counter} checks - URL: ${file.parameters.url}`);
+            const totalTimeoutTime = Date.now() - startTime;
+            
+            logger.error(`File processing timeout - file never became available`, {
+                to: to,
+                checksPerformed: counter,
+                maxChecks: 10,
+                totalTimeoutTimeMs: totalTimeoutTime,
+                totalTimeoutTimeMinutes: (totalTimeoutTime / 60000).toFixed(2),
+                url: file.parameters.url,
+                fileName: file.name || 'unknown',
+                checkInterval: checkInterval,
+                maxWaitTime: maxWaitTime,
+                lastCheckStatus: 'unavailable'
+            });
             
             try {
-                await sendWatsAppText("Document processing is taking longer than expected. Please try again in a few minutes.", to, phone_number_id);
+                const timeoutMessage = "Document processing is taking longer than expected. Please try again in a few minutes.";
+                
+                logger.info(`Sending timeout notification to user`, {
+                    to: to,
+                    message: timeoutMessage,
+                    totalTimeoutTimeMs: totalTimeoutTime
+                });
+                
+                await sendWatsAppText(timeoutMessage, to, phone_number_id);
+                
+                logger.debug(`Timeout notification sent successfully`, {
+                    to: to,
+                    totalTimeoutTimeMs: totalTimeoutTime
+                });
+                
             } catch (timeoutError) {
-                logger.error(`Failed to send timeout message - To: ${to}`, { error: timeoutError.message });
+                logger.error(`Failed to send timeout notification`, {
+                    to: to,
+                    timeoutError: timeoutError.message,
+                    totalTimeoutTimeMs: totalTimeoutTime,
+                    originalUrl: file.parameters.url
+                });
             }
         }
         
         return false;
         
     } catch (error) {
-        logger.error(`Critical error in sendWhatsAppFileLink - To: ${to}`, {
+        const totalErrorTime = Date.now() - startTime;
+        
+        logger.error(`Critical error in sendWhatsAppFileLink`, {
+            to: to,
+            phoneNumberId: phone_number_id,
+            linkRequestId: linkRequestId,
             error: error.message,
             stack: error.stack,
-            file: file,
-            textResponse: textResponse?.substring(0, 100)
+            errorType: error.constructor.name,
+            file: {
+                name: file?.name || 'unknown',
+                hasParameters: !!(file?.parameters),
+                hasUrl: !!(file?.parameters?.url),
+                url: file?.parameters?.url?.substring(0, 100) + '...' || 'none'
+            },
+            textResponse: textResponse?.substring(0, 100) + '...' || 'none',
+            totalErrorTimeMs: totalErrorTime,
+            timestamp: new Date().toISOString()
         });
         
-        // ⚡ EMERGENCY FALLBACK: Send basic message
+        // ⚡ EMERGENCY FALLBACK: Send basic message with enhanced logging
         try {
-            await sendWatsAppText("There was an issue processing your document. Our team will review and send it to you shortly.", to, phone_number_id);
+            const emergencyMessage = "There was an issue processing your document. Our team will review and send it to you shortly.";
+            
+            logger.info(`Sending emergency fallback message`, {
+                to: to,
+                linkRequestId: linkRequestId,
+                message: emergencyMessage,
+                originalError: error.message
+            });
+            
+            await sendWatsAppText(emergencyMessage, to, phone_number_id);
+            
+            logger.info(`Emergency fallback message sent successfully`, {
+                to: to,
+                linkRequestId: linkRequestId,
+                totalErrorTimeMs: totalErrorTime
+            });
+            
         } catch (emergencyError) {
-            logger.error(`Emergency fallback also failed - To: ${to}`, { error: emergencyError.message });
+            logger.error(`Emergency fallback also failed - complete failure`, {
+                to: to,
+                linkRequestId: linkRequestId,
+                originalError: error.message,
+                emergencyError: emergencyError.message,
+                totalErrorTimeMs: totalErrorTime,
+                criticalFailure: true
+            });
         }
         
         return false;
