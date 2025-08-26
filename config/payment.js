@@ -12,7 +12,7 @@ const paymentConfig = {
     
     // Test phone numbers that bypass payment (for development/testing)
     // Note: These should be user phone numbers (from), not phone_number_id
-    testPhoneNumbers: ['918130363763', '91971794491', '919650938605'],
+    testPhoneNumbers: ['918130363763', '91971794491'],
     
     // Debug mode for additional logging
     debugMode: process.env.PAYMENT_DEBUG === 'true',
