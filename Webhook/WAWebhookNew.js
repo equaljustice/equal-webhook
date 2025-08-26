@@ -10,6 +10,8 @@ import { DFchipsToButtonOrList } from '../whatsApp/DFchipsToButtons.js';
 import { convertMarkdownToWhatsApp } from '../whatsApp/markdownToWA.js';
 import { generateId } from '../utils/generateID.js';
 import paymentConfig from '../config/payment.js';
+import { createLetter } from '../chatGPT/createDocuments.js';
+import * as constants from '../constants.js';
 
 // Initialize payment configuration
 paymentConfig.init();
@@ -688,11 +690,48 @@ const sendAIResponse = async (session, response, message, from, phone_number_id,
                 // Continue with file link even if text fails
             }
             
+            // ⚡ NEW: Check if document needs to be created first
+            let documentCreated = false;
+            if (options.parameters && options.parameters.url) {
+                try {
+                    // ⚡ DOCUMENT CREATION: Create document if it doesn't exist or URL indicates generation needed
+                    // Pass phone_number_id in options for progress messages
+                    const optionsWithPhoneId = { ...options, phone_number_id: phone_number_id };
+                    documentCreated = await handleDocumentCreationForWhatsApp(session, from, optionsWithPhoneId, webhookId);
+                    
+                    if (documentCreated) {
+                        logger.info(`Document created successfully for WhatsApp user - From: ${from}`);
+                        // Update the options URL if document was created with new URL
+                        if (documentCreated.fileURL) {
+                            options.parameters.url = documentCreated.fileURL;
+                            logger.debug(`Updated file URL after creation - From: ${from}`, { 
+                                newUrl: documentCreated.fileURL 
+                            });
+                        }
+                    }
+                } catch (docCreationError) {
+                    logger.error(`Document creation failed for WhatsApp user - From: ${from}`, {
+                        error: docCreationError.message,
+                        stack: docCreationError.stack
+                    });
+                    
+                    // ⚡ FALLBACK: Inform user about document creation issue
+                    try {
+                        await sendWatsAppText("We're preparing your document. This may take a few minutes. Please wait while we generate your legal document.", from, phone_number_id);
+                    } catch (fallbackError) {
+                        logger.error(`Failed to send document creation fallback message - From: ${from}`, {
+                            error: fallbackError.message
+                        });
+                    }
+                }
+            }
+            
             try {
                 const fileSent = await sendWhatsAppFileLink('Here is link to download your document', options, 'Download Draft', 'EqualJustice.ai', from, phone_number_id);
                 logger.info(`File link process completed - From: ${from}`, { 
                     fileSent: fileSent,
-                    optionsName: options.name
+                    optionsName: options.name,
+                    documentWasCreated: documentCreated
                 });
                 
                 if (fileSent) {
@@ -978,6 +1017,219 @@ const AnalyzeMessage = async (req, res, webhookId) => {
         // Ensure we end the step even on error
         endStep(webhookId, 'AnalyzeMessage');
         throw error; // Re-throw to be caught by the caller
+    }
+};
+
+// ⚡ NEW FUNCTION: Handle document creation for WhatsApp file links
+const handleDocumentCreationForWhatsApp = async (session, from, options, webhookId) => {
+    const startTime = Date.now();
+    logger.info(`Starting document creation for WhatsApp user - From: ${from}`, {
+        sessionId: session?.threadId,
+        action: session?.action,
+        targetAgent: session?.targetAgent?.assistantId,
+        hasOptions: !!options,
+        hasUrl: !!(options?.parameters?.url),
+        timestamp: new Date().toISOString()
+    });
+
+    try {
+        // ⚡ DETERMINE DOCUMENT TYPE: Based on session action and current context
+        let documentType = 'General';
+        let tag = '';
+        let letterOption = 'DEFAULT';
+        
+        // Map session action to document types (similar to DFWebhook.js logic)
+        if (session?.action) {
+            switch (session.action) {
+                case types.transaction.ATM:
+                    tag = types.transaction.ATM;
+                    documentType = 'ATM Complaint';
+                    letterOption = 'BANK_NODAL_OFFICER'; // Default option
+                    break;
+                case types.transaction.UPI:
+                    tag = types.transaction.UPI;
+                    documentType = 'UPI Complaint';
+                    letterOption = 'BANK_NODAL_OFFICER';
+                    break;
+                case types.transaction.FAILED_TRANSACTION:
+                    tag = types.transaction.FAILED_TRANSACTION;
+                    documentType = 'Failed Transaction Complaint';
+                    letterOption = 'BANK_NODAL_OFFICER';
+                    break;
+                case types.employee.Retrenchment:
+                    tag = types.employee.Retrenchment;
+                    documentType = 'Employment Termination';
+                    letterOption = 'LABOUR_COMMISSIONER';
+                    break;
+                case types.travel.Flights:
+                    tag = types.travel.Flights;
+                    documentType = 'Flight Complaint';
+                    letterOption = 'AIRLINE_NODAL_OFFICER';
+                    break;
+                case types.employee.Offer:
+                    tag = types.employee.Offer;
+                    documentType = 'Employment Offer Analysis';
+                    letterOption = 'LEGAL_ANALYSIS';
+                    break;
+                default:
+                    tag = 'General';
+                    letterOption = 'GENERAL_LEGAL_ADVICE';
+            }
+        }
+
+        logger.debug(`Document type determined - From: ${from}`, {
+            documentType: documentType,
+            tag: tag,
+            letterOption: letterOption,
+            sessionAction: session?.action
+        });
+
+        // ⚡ PREPARE DOCUMENT CREATION PARAMETERS
+        const sessionId = session?.threadId || `whatsapp-${from}-${Date.now()}`;
+        const fileName = `${tag}_${letterOption}_${sessionId}`;
+        
+        // ⚡ USER INPUT DATA: Extract from session or create minimal data
+        let userInputData = {
+            phoneNumber: from,
+            requestType: documentType,
+            generatedVia: 'WhatsApp',
+            timestamp: new Date().toISOString()
+        };
+
+        // ⚡ ADD SESSION DATA: If available from previous interactions
+        if (session?.targetAgent?.context) {
+            userInputData = { ...userInputData, ...session.targetAgent.context };
+        }
+
+        // ⚡ OPENAI CONFIGURATION: Same as DFWebhook.js
+        const openAiConfig = {
+            model: types.openAIModels.GPT4o,
+            temperature: 0.25,
+            max_tokens: 2500,
+            n: 1,
+            top_p: 1,
+            frequency_penalty: 0,
+            presence_penalty: 0,
+        };
+
+        // ⚡ LEGAL TRAINING DATA: Import and use appropriate training data
+        let legalTrainingData = '';
+        try {
+            switch (tag) {
+                case types.transaction.ATM:
+                    const { ATMLegalTrainingData } = await import("../LegalMaterial/ATM.js");
+                    legalTrainingData = ATMLegalTrainingData;
+                    break;
+                case types.transaction.UPI:
+                    const { UPILegalTrainingData } = await import("../LegalMaterial/UPI.js");
+                    legalTrainingData = UPILegalTrainingData;
+                    break;
+                case types.transaction.FAILED_TRANSACTION:
+                    const { FailedTransactionLegalTrainingData } = await import("../LegalMaterial/FailedTransaction.js");
+                    legalTrainingData = FailedTransactionLegalTrainingData;
+                    break;
+                case types.employee.Retrenchment:
+                    const { EmployeeTrainingData } = await import("../LegalMaterial/EmpTermination.js");
+                    legalTrainingData = EmployeeTrainingData;
+                    break;
+                case types.travel.Flights:
+                    const { FlightsTrainingData } = await import("../LegalMaterial/Flights.js");
+                    legalTrainingData = FlightsTrainingData;
+                    break;
+                default:
+                    legalTrainingData = 'General legal advice based on Indian law and consumer protection guidelines.';
+            }
+            
+            logger.debug(`Legal training data loaded - From: ${from}`, {
+                tag: tag,
+                hasTrainingData: !!legalTrainingData,
+                trainingDataLength: typeof legalTrainingData === 'string' ? legalTrainingData.length : 'object'
+            });
+            
+        } catch (trainingDataError) {
+            logger.warn(`Failed to load legal training data - From: ${from}`, {
+                tag: tag,
+                error: trainingDataError.message
+            });
+            legalTrainingData = 'General legal advice and document preparation guidelines.';
+        }
+
+        // ⚡ DOCUMENT CREATION: Call the createLetter function
+        logger.info(`Creating document - From: ${from}`, {
+            tag: tag,
+            letterOption: letterOption,
+            fileName: fileName,
+            sessionId: sessionId,
+            openAiModel: openAiConfig.model
+        });
+
+        startStep(webhookId, 'createDocumentForWhatsApp');
+        
+        // Send progress message to user
+        try {
+            // Extract phone_number_id from the webhook context - we'll pass it in as a parameter
+            const phone_number_id = options?.phone_number_id || session?.phone_number_id || '';
+            if (phone_number_id) {
+                await sendWatsAppText(`Creating your ${documentType} document. This may take 1-2 minutes. Please wait...`, from, phone_number_id);
+            }
+        } catch (progressError) {
+            logger.warn(`Failed to send document creation progress message - From: ${from}`, {
+                error: progressError.message
+            });
+        }
+
+        const documentResult = await createLetter(tag, letterOption, userInputData, legalTrainingData, sessionId, openAiConfig, fileName);
+        
+        endStep(webhookId, 'createDocumentForWhatsApp');
+
+        const creationTime = Date.now() - startTime;
+        logger.info(`Document created successfully for WhatsApp user - From: ${from}`, {
+            fileName: fileName,
+            sessionId: sessionId,
+            creationTimeMs: creationTime,
+            documentResult: documentResult
+        });
+
+        // ⚡ CONSTRUCT FILE URL: Same pattern as DFWebhook.js
+        const fileURL = `${constants.PUBLIC_BUCKET_URL}/${sessionId}/${fileName}.docx`;
+        
+        logger.info(`Document creation completed - From: ${from}`, {
+            fileURL: fileURL,
+            fileName: fileName,
+            documentType: documentType,
+            creationTimeMs: creationTime
+        });
+
+        return {
+            success: true,
+            fileURL: fileURL,
+            fileName: fileName,
+            documentType: documentType,
+            sessionId: sessionId,
+            creationTime: creationTime
+        };
+
+    } catch (error) {
+        const creationTime = Date.now() - startTime;
+        
+        logger.error(`Document creation failed for WhatsApp user - From: ${from}`, {
+            error: error.message,
+            stack: error.stack,
+            sessionId: session?.threadId,
+            action: session?.action,
+            creationTimeMs: creationTime,
+            timestamp: new Date().toISOString()
+        });
+
+        endStep(webhookId, 'createDocumentForWhatsApp');
+        
+        // ⚡ DON'T THROW: Return error info instead to allow graceful handling
+        return {
+            success: false,
+            error: error.message,
+            errorType: error.constructor.name,
+            creationTime: creationTime
+        };
     }
 };
 
