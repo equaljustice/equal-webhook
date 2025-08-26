@@ -77,7 +77,10 @@ export function DFchipsToButtonOrList(DFPayload) {
           }
         };
         
-        console.log('CTA URL option created from download:', ctaOption);
+        console.log('✅ CTA URL option created from download:', ctaOption);
+        console.log('✅ CTA validation - URL:', ctaOption.parameters.url);
+        console.log('✅ CTA validation - Display text:', ctaOption.parameters.display_text);
+        console.log('✅ CTA validation - Name:', ctaOption.name);
         return ctaOption;
       }
       else if (content.type === 'info' && content.actionLink) {
@@ -97,7 +100,9 @@ export function DFchipsToButtonOrList(DFPayload) {
             }
           };
           
-          console.log('CTA URL option created from info:', ctaOption);
+          console.log('✅ CTA URL option created from info:', ctaOption);
+          console.log('✅ Info CTA validation - URL:', ctaOption.parameters.url);
+          console.log('✅ Info CTA validation - Display text:', ctaOption.parameters.display_text);
           return ctaOption;
           
         } catch (urlError) {

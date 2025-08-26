@@ -243,6 +243,15 @@ async function callWhatsAppAPI(data, phone_number_id) {
         // ⚡ INPUT VALIDATION: Check parameters before making API call
         const validationErrors = validateAPICallParams(data, phone_number_id);
         if (validationErrors.length > 0) {
+            // ⚡ CONSOLE DEBUG: Show validation failures immediately
+            console.error('=== PRE-VALIDATION FAILED ===');
+            console.error('Request ID:', requestId);
+            console.error('Validation Errors:', validationErrors);
+            console.error('Phone Number ID:', phone_number_id);
+            console.error('Data Type:', typeof data);
+            console.error('Raw Data:', data);
+            console.error('============================');
+            
             // ⚡ LOG PAYLOAD FOR DEBUGGING: Include sanitized payload in validation errors
             const sanitizedPayload = typeof data === 'string' ? JSON.parse(data) : data;
             if (sanitizedPayload.to) {
@@ -256,7 +265,13 @@ async function callWhatsAppAPI(data, phone_number_id) {
                 sanitizedPayload: sanitizedPayload,
                 payloadSize: JSON.stringify(data).length
             });
-            throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+            
+            const validationError = new Error(`Validation failed: ${validationErrors.join(', ')}`);
+            validationError.isValidationError = true;
+            validationError.validationErrors = validationErrors;
+            throw validationError;
+        } else {
+            console.log(`✅ Pre-validation passed - RequestID: ${requestId}, DataType: ${typeof data}, Size: ${JSON.stringify(data).length}`);
         }
         
         // ⚡ CONFIG VALIDATION: Ensure WhatsApp token is available
@@ -394,6 +409,15 @@ async function callWhatsAppAPI(data, phone_number_id) {
                 ];
                 
                 // ⚡ LOG REQUEST PAYLOAD for 400 errors to debug
+                console.error('=== WHATSAPP 400 ERROR DEBUG ===');
+                console.error('Request ID:', requestId);
+                console.error('Phone Number ID:', phone_number_id);
+                console.error('Payload Size:', JSON.stringify(data).length);
+                console.error('Raw Data Type:', typeof data);
+                console.error('Raw Data:', data);
+                console.error('Parsed Data:', typeof data === 'string' ? JSON.parse(data) : data);
+                console.error('==============================');
+                
                 logger.error(`Request payload context for 400 error - RequestID: ${requestId}`, {
                     requestPayload: data,
                     sanitizedPayload: JSON.stringify(data).replace(/("url":\s*")[^"]*(")/g, '$1[REDACTED_URL]$2'),
@@ -854,10 +878,10 @@ export async function sendWatsAppWithRedirectButton(textResponse, file, header =
         
         // ⚡ CONDITIONAL HEADER: Only include header if it has content
         const interactive = {
-            "type": "cta_url",
-            "body": {
-                "text": sanitizedBody
-            },
+                "type": "cta_url",
+                "body": {
+                    "text": sanitizedBody
+                },
             "action": ctaAction
         };
         
@@ -872,7 +896,7 @@ export async function sendWatsAppWithRedirectButton(textResponse, file, header =
         // Add footer only if it has content
         if (sanitizedFooter && sanitizedFooter.trim().length > 0) {
             interactive.footer = {
-                "text": sanitizedFooter
+                    "text": sanitizedFooter
             };
         }
         
@@ -883,6 +907,14 @@ export async function sendWatsAppWithRedirectButton(textResponse, file, header =
             "type": "interactive",
             "interactive": interactive
         });
+
+        // ⚡ DEBUG: Log final structure being sent to WhatsApp API
+        console.log('=== REDIRECT BUTTON DEBUG ===');
+        console.log('To:', to);
+        console.log('Interactive Object:', JSON.stringify(interactive, null, 2));
+        console.log('Full Payload:', JSON.stringify(JSON.parse(data), null, 2));
+        console.log('Payload Size:', data.length);
+        console.log('============================');
 
         logger.debug(`WhatsApp redirect button data prepared`, {
             to: to,
