@@ -189,10 +189,26 @@ function validateAPICallParams(data, phone_number_id) {
                         if (!interactive.action || !interactive.action.parameters || !interactive.action.parameters.url) {
                             errors.push('Missing URL parameters for cta_url interactive message');
                         } else {
+                            // Validate URL format and protocol
                             try {
-                                new URL(interactive.action.parameters.url);
+                                const urlObj = new URL(interactive.action.parameters.url);
+                                if (urlObj.protocol !== 'https:') {
+                                    errors.push(`CTA URL must use HTTPS protocol, got: ${urlObj.protocol}`);
+                                }
                             } catch (urlError) {
                                 errors.push(`Invalid URL format in cta_url: ${interactive.action.parameters.url}`);
+                            }
+                            
+                            // Validate action structure
+                            if (!interactive.action.name || interactive.action.name !== 'cta_url') {
+                                errors.push('CTA URL action must have name "cta_url"');
+                            }
+                            
+                            // Validate display text
+                            if (!interactive.action.parameters.display_text) {
+                                errors.push('Missing display_text for cta_url action');
+                            } else if (interactive.action.parameters.display_text.length > 20) {
+                                errors.push(`CTA URL display_text too long: ${interactive.action.parameters.display_text.length} chars (max 20)`);
                             }
                         }
                     }
@@ -377,6 +393,15 @@ async function callWhatsAppAPI(data, phone_number_id) {
                     'Exceeded character limits'
                 ];
                 
+                // ⚡ LOG REQUEST PAYLOAD for 400 errors to debug
+                logger.error(`Request payload context for 400 error - RequestID: ${requestId}`, {
+                    requestPayload: data,
+                    sanitizedPayload: JSON.stringify(data).replace(/("url":\s*")[^"]*(")/g, '$1[REDACTED_URL]$2'),
+                    payloadSize: JSON.stringify(data).length,
+                    phoneNumberId: phone_number_id,
+                    timestamp: new Date().toISOString()
+                });
+                
                 // Try to parse WhatsApp error details
                 try {
                     const parsedError = typeof error.response.data === 'string' 
@@ -401,6 +426,30 @@ async function callWhatsAppAPI(data, phone_number_id) {
                             errorLogData.suggestion = 'Message template or content violates WhatsApp policy';
                         } else if (parsedError.error.code === 131021) {
                             errorLogData.suggestion = 'Recipient has not accepted our new Terms of Service';
+                        }
+                        
+                        // ⚡ DETAILED ANALYSIS: Check specific payload issues
+                        if (data.type === 'interactive') {
+                            errorLogData.interactiveAnalysis = {
+                                hasButtons: !!(data.interactive?.action?.buttons),
+                                buttonCount: data.interactive?.action?.buttons?.length || 0,
+                                hasBody: !!(data.interactive?.body?.text),
+                                bodyLength: data.interactive?.body?.text?.length || 0,
+                                hasHeader: !!(data.interactive?.header),
+                                hasFooter: !!(data.interactive?.footer),
+                                actionType: data.interactive?.action?.type
+                            };
+                            
+                            // Check for CTA URL issues
+                            if (data.interactive?.action?.type === 'cta_url') {
+                                const ctaUrl = data.interactive?.action?.parameters?.url;
+                                errorLogData.ctaAnalysis = {
+                                    hasUrl: !!ctaUrl,
+                                    urlLength: ctaUrl?.length || 0,
+                                    urlStartsWith: ctaUrl ? ctaUrl.substring(0, 20) : 'none',
+                                    isHttps: ctaUrl?.startsWith('https://') || false
+                                };
+                            }
                         }
                     }
                 } catch (parseError) {
@@ -774,30 +823,65 @@ export async function sendWatsAppWithRedirectButton(textResponse, file, header =
             throw new Error('Invalid file object: missing required parameters for WhatsApp CTA button');
         }
         
-        // ⚡ SANITIZE: Ensure text fields don't exceed WhatsApp limits
-        const sanitizedHeader = header ? header.substring(0, 60) : '';
-        const sanitizedFooter = footer ? footer.substring(0, 60) : '';
-        const sanitizedBody = textResponse ? textResponse.substring(0, 1024) : '';
+        // ⚡ URL VALIDATION: Ensure URL is valid and HTTPS
+        try {
+            const urlObj = new URL(file.parameters.url);
+            if (urlObj.protocol !== 'https:') {
+                throw new Error(`URL must use HTTPS protocol, got: ${urlObj.protocol}`);
+            }
+        } catch (urlError) {
+            logger.error(`Invalid URL for CTA button - To: ${to}`, {
+                url: file.parameters.url,
+                error: urlError.message
+            });
+            throw new Error(`Invalid URL for CTA button: ${urlError.message}`);
+        }
         
-        let data = JSON.stringify({
+        // ⚡ SANITIZE: Ensure text fields don't exceed WhatsApp limits
+        const sanitizedHeader = header ? trimString(header, 60) : '';
+        const sanitizedFooter = footer ? trimString(footer, 60) : '';
+        const sanitizedBody = textResponse ? trimString(textResponse, 1024) : '';
+        const sanitizedDisplayText = trimString(file.parameters.display_text, 20);
+        
+        // ⚡ FIX: Create proper CTA URL action structure according to WhatsApp API
+        const ctaAction = {
+            "name": "cta_url",
+            "parameters": {
+                "display_text": sanitizedDisplayText,
+                "url": file.parameters.url
+            }
+        };
+        
+        // ⚡ CONDITIONAL HEADER: Only include header if it has content
+        const interactive = {
+            "type": "cta_url",
+            "body": {
+                "text": sanitizedBody
+            },
+            "action": ctaAction
+        };
+        
+        // Add header only if it has content
+        if (sanitizedHeader && sanitizedHeader.trim().length > 0) {
+            interactive.header = {
+                "type": "text",
+                "text": sanitizedHeader
+            };
+        }
+        
+        // Add footer only if it has content
+        if (sanitizedFooter && sanitizedFooter.trim().length > 0) {
+            interactive.footer = {
+                "text": sanitizedFooter
+            };
+        }
+        
+        const data = JSON.stringify({
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": to,
             "type": "interactive",
-            "interactive": {
-                "type": "cta_url",
-                "header": {
-                    "type": "text",
-                    "text": sanitizedHeader
-                },
-                "body": {
-                    "text": sanitizedBody
-                },
-                "footer": {
-                    "text": sanitizedFooter
-                },
-                "action": file
-            }
+            "interactive": interactive
         });
 
         logger.debug(`WhatsApp redirect button data prepared`, {

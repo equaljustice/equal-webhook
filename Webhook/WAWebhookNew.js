@@ -495,16 +495,34 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                             action: session.action,
                             responseLength: response.answer?.length || 0,
                             hasPayload: !!response.payload,
-                            sessionEnd: response.sessionEnd
+                            sessionEnd: response.sessionEnd,
+                            processingTime: response.processingTime
                         });
                         endStep(webhookId, 'getCXResponse');
                     } catch (cxError) {
                         logger.error(`CX response failed - From: ${from}`, {
                             error: cxError.message,
                             stack: cxError.stack,
-                            action: session.action
+                            action: session.action,
+                            queryType: cxError.queryType,
+                            totalTime: cxError.totalTime,
+                            isTimeout: cxError.message?.includes('timeout'),
+                            isDialogflowError: cxError.isDialogflowError,
+                            invalidConfig: cxError.invalidConfig,
+                            invalidQuery: cxError.invalidQuery
                         });
-                        throw cxError;
+                        
+                        // ⚡ GRACEFUL DEGRADATION: Provide fallback response for Dialogflow failures
+                        if (cxError.isDialogflowError || cxError.message?.includes('timeout')) {
+                            logger.warn(`Providing fallback response due to Dialogflow error - From: ${from}`);
+                            response = {
+                                answer: "I'm experiencing some technical difficulties. Please try again in a few moments, or contact our support team if the issue persists.",
+                                payload: null,
+                                sessionEnd: false
+                            };
+                        } else {
+                            throw cxError;
+                        }
                     }
                 } 
                 else {
@@ -824,16 +842,34 @@ const sendAIResponse = async (session, response, message, from, phone_number_id,
                         logger.info(`CX event response for file link - From: ${from}`, { 
                             event: 'startQnA',
                             responseLength: response.answer?.length || 0,
-                            hasPayload: !!response.payload
+                            hasPayload: !!response.payload,
+                            processingTime: response.processingTime
                         });
                         endStep(webhookId, 'getCXEventResponse');
                         sendAIResponse(session, response, message, from, phone_number_id, webhookId);
                     } catch (cxError) {
                         logger.error(`Failed to get CX event response after file link - From: ${from}`, {
                             error: cxError.message,
-                            stack: cxError.stack
+                            stack: cxError.stack,
+                            event: 'startQnA',
+                            queryType: cxError.queryType,
+                            totalTime: cxError.totalTime,
+                            isTimeout: cxError.message?.includes('timeout'),
+                            isDialogflowError: cxError.isDialogflowError
                         });
                         endStep(webhookId, 'getCXEventResponse');
+                        
+                        // ⚡ GRACEFUL DEGRADATION: Send basic completion message if Dialogflow fails
+                        if (cxError.isDialogflowError || cxError.message?.includes('timeout')) {
+                            logger.warn(`Providing fallback completion message due to Dialogflow error - From: ${from}`);
+                            try {
+                                await sendWatsAppText("Your document has been generated successfully! You can use it for your legal needs.", from, phone_number_id);
+                            } catch (fallbackError) {
+                                logger.error(`Failed to send fallback completion message - From: ${from}`, {
+                                    error: fallbackError.message
+                                });
+                            }
+                        }
                         // Don't continue with further AI response if CX fails
                     }
                 } else {
