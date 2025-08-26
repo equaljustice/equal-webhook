@@ -106,6 +106,88 @@ const handleInteractiveButtons = async (message, from, phone_number_id, webhookI
                 
                 const accessDurationText = paymentConfig.accessDurationHours === 1 ? '1 hour' : `${paymentConfig.accessDurationHours} hours`;
                 sendWhatsAppOrderStatus(`Payment Received - Access granted for next ${accessDurationText}`, message.interactive.payment.reference_id, 'processing', 'Access requested', from, phone_number_id);
+                
+                // ⚡ TRIGGER DOCUMENT GENERATION: After interactive payment success
+                logger.info(`Interactive payment successful - checking for document generation needs - From: ${from}`);
+                try {
+                    let session = await getSession(from);
+                    if (session && session.agentType == 'CX') {
+                        logger.info(`Getting CX event response for interactive payment success - From: ${from}`);
+                        
+                        let response = await getCXEventResponse('payment-captured', session.targetAgent, session.threadId, 'en');
+                        logger.info(`CX event response for interactive payment - From: ${from}`, { 
+                            event: 'payment-captured',
+                            responseLength: response.answer?.length || 0,
+                            hasPayload: !!response.payload
+                        });
+                        
+                        // Check if response includes document generation
+                        if (response.payload && response.payload.richContent) {
+                            const hasCtaUrl = response.payload.richContent.some(content => 
+                                content.some(item => item.type === 'info' && item.actionLink)
+                            );
+                            
+                            if (hasCtaUrl) {
+                                logger.info(`Interactive payment response includes document download - triggering generation - From: ${from}`);
+                                
+                                // Send progress message
+                                await sendWatsAppText("Payment confirmed! Generating your document...", from, phone_number_id);
+                                
+                                // Extract CTA URL info
+                                const ctaInfo = response.payload.richContent.find(content => 
+                                    content.find(item => item.type === 'info' && item.actionLink)
+                                );
+                                const ctaItem = ctaInfo?.find(item => item.type === 'info' && item.actionLink);
+                                
+                                if (ctaItem && ctaItem.actionLink) {
+                                    const documentOptions = {
+                                        name: 'cta_url',
+                                        parameters: { url: ctaItem.actionLink },
+                                        phone_number_id: phone_number_id
+                                    };
+                                    
+                                    // Generate document
+                                    const documentCreated = await handleDocumentCreationForWhatsApp(session, from, documentOptions, webhookId);
+                                    
+                                    if (documentCreated && documentCreated.success) {
+                                        logger.info(`Document auto-generated after interactive payment - From: ${from}`, {
+                                            fileName: documentCreated.fileName,
+                                            fileURL: documentCreated.fileURL
+                                        });
+                                        
+                                        // Update response with actual file URL
+                                        if (ctaItem) {
+                                            ctaItem.actionLink = documentCreated.fileURL;
+                                        }
+                                        
+                                        // Send response with working download link
+                                        sendAIResponse(session, response, message, from, phone_number_id, webhookId);
+                                    } else {
+                                        logger.error(`Document auto-generation failed after interactive payment - From: ${from}`, {
+                                            error: documentCreated?.error
+                                        });
+                                        
+                                        // Send original response
+                                        sendAIResponse(session, response, message, from, phone_number_id, webhookId);
+                                    }
+                                } else {
+                                    sendAIResponse(session, response, message, from, phone_number_id, webhookId);
+                                }
+                            } else {
+                                // No document needed
+                                sendAIResponse(session, response, message, from, phone_number_id, webhookId);
+                            }
+                        } else {
+                            // No payload
+                            sendAIResponse(session, response, message, from, phone_number_id, webhookId);
+                        }
+                    }
+                } catch (interactivePaymentError) {
+                    logger.error(`Error processing interactive payment document generation - From: ${from}`, {
+                        error: interactivePaymentError.message,
+                        stack: interactivePaymentError.stack
+                    });
+                }
             }
             return;
         default:
@@ -434,8 +516,8 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                 break;
             case types.employee.Offer:
                 if ((session && session.targetAgent)) {
-                    if(paymentConfig.hasFreeInteractionsRemaining(session, phone_number_id) || paymentConfig.hasValidPayment(session, phone_number_id)){
-                        logger.info(`Using OpenAI assistant - Interactions: ${session.interactions}, Payment status: ${session.payment?.transaction?.status || 'none'}, Free interactions remaining: ${paymentConfig.getRemainingFreeInteractions(session, phone_number_id)} - From: ${from}`);
+                    if(paymentConfig.hasFreeInteractionsRemaining(session, from) || paymentConfig.hasValidPayment(session, from)){
+                        logger.info(`Using OpenAI assistant - Interactions: ${session.interactions}, Payment status: ${session.payment?.transaction?.status || 'none'}, Free interactions remaining: ${paymentConfig.getRemainingFreeInteractions(session, from)} - From: ${from}`);
                         startStep(webhookId, 'interactWithAssistant');
                         try {
                             response = await interactWithAssistant(message.text.body, from, session.targetAgent.assistantId, session.threadId);
@@ -486,7 +568,7 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                             // Continue without saving
                         }
                     }
-                    else if (paymentConfig.isPaymentRequiredButNotSent(session, phone_number_id)) {
+                    else if (paymentConfig.isPaymentRequiredButNotSent(session, from)) {
                         logger.info(`Sending payment request - Interactions: ${session.interactions}, Free interactions: ${paymentConfig.freeInteractions} - From: ${from}`);
                         let reference_id = await generateId(8);
                         try {
@@ -509,13 +591,13 @@ const handleTextMessage = async (message, from, phone_number_id, webhookId) => {
                             throw paymentError;
                         }
                     }
-                    else if (paymentConfig.isPaymentLinkAlreadySent(session, phone_number_id)) {
+                    else if (paymentConfig.isPaymentLinkAlreadySent(session, from)) {
                         logger.debug(`Payment link already sent - From: ${from}`);
                         response = {
                             answer: `Please complete the payment to proceed further. If you have successfully paid, please wait.`
                         };
                     }
-                    else if (paymentConfig.isPaymentPending(session, phone_number_id)) {
+                    else if (paymentConfig.isPaymentPending(session, from)) {
                         logger.debug(`Payment pending - From: ${from}`);
                         response = {
                             answer: `Please complete payment to proceed further. If you have successfully paid, Please wait.`
@@ -1407,7 +1489,82 @@ const handelPaymentStatus = async (req, res, webhookId) => {
             hasPayload: !!response.payload
         });
         endStep(webhookId, 'getCXEventResponse');
-        sendAIResponse(session, response, null, status.recipient_id, phone_number_id, webhookId);
+        
+        // ⚡ CHECK FOR DOCUMENT GENERATION: If response includes CTA URL, trigger document creation
+        if (response.payload && response.payload.richContent) {
+            const hasCtaUrl = response.payload.richContent.some(content => 
+                content.some(item => item.type === 'info' && item.actionLink)
+            );
+            
+            if (hasCtaUrl) {
+                logger.info(`Payment captured response includes document download - triggering automatic generation - Recipient: ${status.recipient_id}`);
+                
+                // ⚡ AUTOMATIC DOCUMENT GENERATION: Don't wait for user to click, generate immediately
+                try {
+                    // Send immediate progress message
+                    await sendWatsAppText("Payment received! Generating your document now...", status.recipient_id, phone_number_id);
+                    
+                    // Extract CTA URL info for document creation
+                    const ctaInfo = response.payload.richContent.find(content => 
+                        content.find(item => item.type === 'info' && item.actionLink)
+                    );
+                    const ctaItem = ctaInfo?.find(item => item.type === 'info' && item.actionLink);
+                    
+                    if (ctaItem && ctaItem.actionLink) {
+                        // Create options structure similar to sendAIResponse
+                        const documentOptions = {
+                            name: 'cta_url',
+                            parameters: { url: ctaItem.actionLink },
+                            phone_number_id: phone_number_id
+                        };
+                        
+                        // ⚡ TRIGGER DOCUMENT CREATION: Same logic as in sendAIResponse but without waiting for user click
+                        const documentCreated = await handleDocumentCreationForWhatsApp(session, status.recipient_id, documentOptions, webhookId);
+                        
+                        if (documentCreated && documentCreated.success) {
+                            logger.info(`Document auto-generated after payment - Recipient: ${status.recipient_id}`, {
+                                fileName: documentCreated.fileName,
+                                fileURL: documentCreated.fileURL
+                            });
+                            
+                            // Update the response with the actual file URL
+                            if (ctaItem) {
+                                ctaItem.actionLink = documentCreated.fileURL;
+                            }
+                            
+                            // Send the updated response with working file link
+                            sendAIResponse(session, response, null, status.recipient_id, phone_number_id, webhookId);
+                        } else {
+                            logger.error(`Document auto-generation failed after payment - Recipient: ${status.recipient_id}`, {
+                                error: documentCreated?.error
+                            });
+                            
+                            // Send original response, which will handle file link failure gracefully
+                            sendAIResponse(session, response, null, status.recipient_id, phone_number_id, webhookId);
+                        }
+                    } else {
+                        logger.warn(`CTA URL structure not found in payment response - Recipient: ${status.recipient_id}`);
+                        sendAIResponse(session, response, null, status.recipient_id, phone_number_id, webhookId);
+                    }
+                    
+                } catch (autoGenError) {
+                    logger.error(`Error in automatic document generation after payment - Recipient: ${status.recipient_id}`, {
+                        error: autoGenError.message,
+                        stack: autoGenError.stack
+                    });
+                    
+                    // Fallback to normal response flow
+                    sendAIResponse(session, response, null, status.recipient_id, phone_number_id, webhookId);
+                }
+            } else {
+                // No document generation needed, proceed normally
+                sendAIResponse(session, response, null, status.recipient_id, phone_number_id, webhookId);
+            }
+        } else {
+            // No payload or richContent, proceed normally
+            sendAIResponse(session, response, null, status.recipient_id, phone_number_id, webhookId);
+        }
+        
     } else {
         logger.info(`Creating welcome message for payment completion - Recipient: ${status.recipient_id}`);
         let message = { "text": { "body": 'Hi' } };

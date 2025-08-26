@@ -129,16 +129,16 @@ function validateAPICallParams(data, phone_number_id) {
         return errors;
     }
     
-    try {
-        const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+        try {
+            const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
         
         // ⚡ BASIC STRUCTURE VALIDATION
-        if (!parsedData.messaging_product || parsedData.messaging_product !== 'whatsapp') {
-            errors.push('Invalid messaging_product in data payload');
-        }
+            if (!parsedData.messaging_product || parsedData.messaging_product !== 'whatsapp') {
+                errors.push('Invalid messaging_product in data payload');
+            }
         
-        if (!parsedData.to) {
-            errors.push('Missing recipient (to) in data payload');
+            if (!parsedData.to) {
+                errors.push('Missing recipient (to) in data payload');
         } else {
             // ⚡ PHONE NUMBER VALIDATION: WhatsApp format
             const phoneNumber = parsedData.to.toString();
