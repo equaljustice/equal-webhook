@@ -261,7 +261,7 @@ async function callWhatsAppAPI(data, phone_number_id) {
         let config = {
             method: 'post',
             maxBodyLength: Infinity,
-            timeout: 10000,  // ⚡ TIMEOUT: 10 second max
+            timeout: 30000,  // ⚡ TIMEOUT: Increased to 30 seconds for WhatsApp API
             url: `https://graph.facebook.com/v23.0/${phone_number_id}/messages`,
             headers: {
                 'Content-Type': 'application/json',
@@ -298,23 +298,32 @@ async function callWhatsAppAPI(data, phone_number_id) {
             return callWhatsAppAPI(data, phone_number_id); // Retry
         }
         
-        // ⚡ RETRY LOGIC: Handle temporary network issues (5xx errors, timeouts)
+        // ⚡ ENHANCED RETRY LOGIC: Handle timeouts and network issues
         const isRetryableError = 
             (error.code === 'ECONNRESET' || 
              error.code === 'ETIMEDOUT' || 
              error.code === 'ENOTFOUND' ||
+             error.code === 'ECONNABORTED' ||  // Axios timeout
+             error.message?.includes('timeout') ||  // Various timeout messages
              (error.response?.status >= 500 && error.response?.status < 600));
         
         // Add retry count to prevent infinite loops
         const retryCount = error.retryCount || 0;
-        const maxRetries = 2;
+        const maxRetries = 3;  // Increased retries for timeout issues
         
         if (isRetryableError && retryCount < maxRetries) {
-            const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
+            // ⚡ ADAPTIVE RETRY DELAY: Longer delays for timeout errors
+            const baseDelay = error.code === 'ECONNABORTED' || error.message?.includes('timeout') ? 2000 : 1000;
+            const retryDelay = Math.min(baseDelay * Math.pow(2, retryCount), 10000); // Max 10s for timeouts
+            
             logger.warn(`WhatsApp API temporary error - RequestID: ${requestId}, Retry ${retryCount + 1}/${maxRetries} in ${retryDelay}ms`, {
                 errorCode: error.code,
+                errorMessage: error.message,
                 httpStatus: error.response?.status,
-                retryCount: retryCount + 1
+                retryCount: retryCount + 1,
+                maxRetries: maxRetries,
+                isTimeoutError: error.code === 'ECONNABORTED' || error.message?.includes('timeout'),
+                retryDelay: retryDelay
             });
             
             await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -322,6 +331,7 @@ async function callWhatsAppAPI(data, phone_number_id) {
             // Mark error with retry count to prevent infinite recursion
             const retryError = new Error(error.message);
             retryError.retryCount = retryCount + 1;
+            retryError.code = error.code;
             
             return callWhatsAppAPI(data, phone_number_id);
         }
@@ -401,16 +411,32 @@ async function callWhatsAppAPI(data, phone_number_id) {
             logger.error(`WhatsApp API HTTP Error - RequestID: ${requestId}`, errorLogData);
         } else if (error.request) {
             // Request was made but no response received (network/timeout issues)
-            logger.error(`WhatsApp API Network Error - RequestID: ${requestId}`, {
+            const isTimeoutError = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+            
+            logger.error(`WhatsApp API ${isTimeoutError ? 'Timeout' : 'Network'} Error - RequestID: ${requestId}`, {
                 ...errorContext,
                 errorCode: error.code,
                 timeout: error.timeout,
                 requestConfig: {
-                    timeout: 10000,
+                    timeout: 30000,  // Updated timeout value
                     method: 'POST',
                     url: error.config?.url
                 },
-                networkError: true
+                networkError: !isTimeoutError,
+                timeoutError: isTimeoutError,
+                // ⚡ TIMEOUT-SPECIFIC CONTEXT
+                ...(isTimeoutError && {
+                    timeoutContext: {
+                        configuredTimeout: '30000ms',
+                        likelyRelative: 'Network latency between Cloud Run and WhatsApp API',
+                        suggestions: [
+                            'Check Cloud Run → WhatsApp API network latency',
+                            'Consider increasing timeout for complex messages',
+                            'Monitor WhatsApp API response times',
+                            'Check if payload size affects response time'
+                        ]
+                    }
+                })
             });
         } else {
             // Error in setting up the request
