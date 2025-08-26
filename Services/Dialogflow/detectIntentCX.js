@@ -1,6 +1,20 @@
 import { SessionsClient } from '@google-cloud/dialogflow-cx';
 import { convertProtobufToJson } from '../../utils/protoJson.js';
 import { logger } from '../../utils/logging.js';
+
+// ⚡ DEBUGGING: Simple error output for debugging
+function debugError(error, context) {
+  console.error('=== DIALOGFLOW ERROR DEBUG ===');
+  console.error('Context:', context);
+  console.error('Error Type:', typeof error);
+  console.error('Error Name:', error?.name);
+  console.error('Error Message:', error?.message);
+  console.error('Error Code:', error?.code);
+  console.error('Error Stack:', error?.stack);
+  console.error('Error Keys:', Object.keys(error || {}));
+  console.error('Full Error Object:', JSON.stringify(error, null, 2));
+  console.error('==============================');
+}
 /**
  * Example for regional endpoint:
  *   const location = 'us-central1'
@@ -98,17 +112,55 @@ async function detectIntentCX(client, request) {
     
   } catch (error) {
     const processingTime = Date.now() - startTime;
-    logger.error('Dialogflow CX detectIntent failed', {
-      error: error.message,
+    
+    // ⚡ DETAILED ERROR LOGGING: Include all error context
+    const errorDetails = {
+      errorMessage: error.message,
+      errorName: error.name,
+      errorCode: error.code,
       stack: error.stack,
       processingTimeMs: processingTime,
       query: request.queryInput?.text?.text || request.queryInput?.event?.event,
-      isTimeout: error.message.includes('timeout')
-    });
+      queryType: request.queryInput?.text ? 'text' : 'event',
+      isTimeout: error.message?.includes('timeout') || false,
+      sessionPath: request.session,
+      languageCode: request.queryInput?.languageCode,
+      timestamp: new Date().toISOString()
+    };
+    
+    // ⚡ GRPC/API SPECIFIC ERRORS: Capture Google API error details
+    if (error.code !== undefined) {
+      errorDetails.grpcCode = error.code;
+      errorDetails.grpcMessage = error.message;
+      errorDetails.grpcDetails = error.details;
+    }
+    
+    // ⚡ NETWORK/TIMEOUT SPECIFIC: Identify connection issues
+    if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+      errorDetails.networkError = true;
+      errorDetails.errorType = 'network';
+    } else if (error.message?.includes('timeout')) {
+      errorDetails.timeoutError = true;
+      errorDetails.errorType = 'timeout';
+    } else if (error.code >= 400 && error.code < 500) {
+      errorDetails.clientError = true;
+      errorDetails.errorType = 'client';
+    } else if (error.code >= 500) {
+      errorDetails.serverError = true;
+      errorDetails.errorType = 'server';
+    } else {
+      errorDetails.errorType = 'unknown';
+    }
+    
+    logger.error('Dialogflow CX detectIntent failed', errorDetails);
+    
+    // ⚡ DEBUG: Output raw error for debugging
+    debugError(error, 'detectIntentCX');
     
     // ⚡ THROW WITH CONTEXT: Add processing time to error
     error.processingTime = processingTime;
     error.isDialogflowError = true;
+    error.errorType = errorDetails.errorType;
     throw error;
   }
 }
@@ -176,21 +228,45 @@ export async function getCXResponse(query, targetAgent, sessionId, languageCode)
     return result;
     
   } catch (error) {
-    logger.error('Dialogflow CX text query failed', {
-      error: error.message,
+    const totalTime = Date.now() - startTime;
+    
+    // ⚡ COMPREHENSIVE ERROR LOGGING: Include all context
+    const errorContext = {
+      errorMessage: error.message,
+      errorName: error.name,
+      errorCode: error.code,
       stack: error.stack,
-      query: query?.substring(0, 100),
+      query: query?.substring(0, 100) + (query?.length > 100 ? '...' : ''),
+      fullQueryLength: query?.length || 0,
       sessionId: sessionId,
-      targetAgent: targetAgent,
-      totalTimeMs: Date.now() - startTime,
-      isTimeout: error.message?.includes('timeout'),
-      isDialogflowError: error.isDialogflowError
-    });
+      targetAgentLocation: targetAgent?.location,
+      targetAgentProjectId: targetAgent?.projectId,
+      targetAgentId: targetAgent?.agentId,
+      languageCode: languageCode,
+      totalTimeMs: totalTime,
+      isTimeout: error.message?.includes('timeout') || false,
+      isDialogflowError: error.isDialogflowError || false,
+      errorType: error.errorType || 'unknown',
+      invalidConfig: error.invalidConfig || false,
+      invalidQuery: error.invalidQuery || false,
+      timestamp: new Date().toISOString()
+    };
+    
+    // ⚡ GOOGLE API ERROR DETAILS: If available
+    if (error.code !== undefined) {
+      errorContext.grpcCode = error.code;
+      errorContext.grpcDetails = error.details;
+    }
+    
+    logger.error('Dialogflow CX text query failed', errorContext);
+    
+    // ⚡ DEBUG: Output raw error for debugging
+    debugError(error, 'getCXResponse');
     
     // ⚡ ADD CONTEXT: Enhance error with call context
     error.queryType = 'text';
     error.sessionId = sessionId;
-    error.totalTime = Date.now() - startTime;
+    error.totalTime = totalTime;
     throw error;
   }
 }
@@ -256,21 +332,76 @@ export async function getCXEventResponse(event, targetAgent, sessionId, language
     return result;
     
   } catch (error) {
-    logger.error('Dialogflow CX event query failed', {
-      error: error.message,
+    const totalTime = Date.now() - startTime;
+    
+    // ⚡ COMPREHENSIVE ERROR LOGGING: Include all context
+    const errorContext = {
+      errorMessage: error.message,
+      errorName: error.name,
+      errorCode: error.code,
       stack: error.stack,
       event: event,
       sessionId: sessionId,
-      targetAgent: targetAgent,
-      totalTimeMs: Date.now() - startTime,
-      isTimeout: error.message?.includes('timeout'),
-      isDialogflowError: error.isDialogflowError
-    });
+      targetAgentLocation: targetAgent?.location,
+      targetAgentProjectId: targetAgent?.projectId,
+      targetAgentId: targetAgent?.agentId,
+      languageCode: languageCode,
+      totalTimeMs: totalTime,
+      isTimeout: error.message?.includes('timeout') || false,
+      isDialogflowError: error.isDialogflowError || false,
+      errorType: error.errorType || 'unknown',
+      invalidConfig: error.invalidConfig || false,
+      invalidEvent: error.invalidEvent || false,
+      timestamp: new Date().toISOString()
+    };
+    
+    // ⚡ GOOGLE API ERROR DETAILS: If available
+    if (error.code !== undefined) {
+      errorContext.grpcCode = error.code;
+      errorContext.grpcDetails = error.details;
+    }
+    
+    logger.error('Dialogflow CX event query failed', errorContext);
+    
+    // ⚡ DEBUG: Output raw error for debugging
+    debugError(error, 'getCXEventResponse');
     
     // ⚡ ADD CONTEXT: Enhance error with call context
     error.queryType = 'event';
     error.sessionId = sessionId;
-    error.totalTime = Date.now() - startTime;
+    error.totalTime = totalTime;
     throw error;
+  }
+}
+
+// ⚡ CONNECTIVITY TEST: Simple function to test Dialogflow connection
+export async function testDialogflowConnectivity(targetAgent) {
+  logger.info('Testing Dialogflow CX connectivity', { 
+    location: targetAgent?.location,
+    projectId: targetAgent?.projectId,
+    agentId: targetAgent?.agentId
+  });
+  
+  try {
+    const testSessionId = 'test-session-' + Date.now();
+    const result = await getCXResponse('hi', targetAgent, testSessionId, 'en');
+    
+    logger.info('Dialogflow CX connectivity test successful', {
+      hasAnswer: !!result.answer,
+      answerLength: result.answer?.length || 0,
+      hasPayload: !!result.payload,
+      processingTime: result.processingTime
+    });
+    
+    return { success: true, result: result };
+    
+  } catch (error) {
+    logger.error('Dialogflow CX connectivity test failed', {
+      error: error.message,
+      errorType: error.errorType,
+      isDialogflowError: error.isDialogflowError
+    });
+    
+    return { success: false, error: error.message, errorType: error.errorType };
   }
 }
