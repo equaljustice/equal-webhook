@@ -7,13 +7,14 @@ import { checkFileAvailability } from '../CloudStorage/checkFileReadyness.js';
 import { GoogleAuth } from 'google-auth-library';
 
 async function callWhatsAppAPI(data, phone_number_id) {
+  console.log("Called whatsapp API")
   let config = {
     method: 'post',
     maxBodyLength: Infinity,
-    url: `https://graph.facebook.com/v20.0/${phone_number_id}/messages`,
+    url: `https://graph.facebook.com/v23.0/${phone_number_id}/messages`,
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': process.env.WhatsApp_Token
+      'Authorization': `Bearer ${process.env.WhatsApp_Token}`
     },
     data: data
   };
@@ -24,6 +25,15 @@ async function callWhatsAppAPI(data, phone_number_id) {
     })
     .catch((error) => {
       logger.error(error);
+      if (error.response) {
+        logger.error(`Response data: ${JSON.stringify(error.response.data)}`);
+        logger.error(`Response status: ${error.response.status}`);
+        logger.error(`Response headers: ${JSON.stringify(error.response.headers)}`);
+      } else if (error.request) {
+        logger.error(`No response received: ${error.request}`);
+      } else {
+        logger.error(`Request setup error: ${error.message}`);
+      }
     });
 }
 async function callWhatsAppFunction(data, phone_number_id) {
@@ -118,13 +128,14 @@ export async function getWAMediaURL(mediaId, phone_number_id) {
     let config = {
       method: 'get',
       maxBodyLength: Infinity,
-      url: `https://graph.facebook.com/v20.0/${mediaId}?phone_number_id=${phone_number_id}`,
+      url: `https://graph.facebook.com/v23.0/${mediaId}?phone_number_id=${phone_number_id}`,
       headers: {
-        'Authorization': process.env.WhatsApp_Token
+        'Authorization': `Bearer ${process.env.WhatsApp_Token}`
       }
     };
 
     const response = await axios.request(config)
+    logger.info(`mediaURL func response: ${response}`);
     //console.log("media", response.data)
     return response.data;
   } catch (error) {
@@ -141,7 +152,7 @@ export async function downloadWAFile(mediaUrl, filename) {
         maxBodyLength: Infinity,
         url: mediaUrl,
         headers: {
-          'Authorization': process.env.WhatsApp_Token,
+          'Authorization': `Bearer ${process.env.WhatsApp_Token}`,
         },
         responseType: 'stream',
       };

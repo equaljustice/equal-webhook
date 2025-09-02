@@ -2,20 +2,21 @@ import { createClient } from 'redis';
 import { logger } from '../../utils/logging.js';
 
 const client = createClient({
-    password: process.env.Redis_pass,
-    socket: {
-        host: process.env.Redis_host,
-        port: 11212
-    }
+    // password: process.env.Redis_pass,
+    // socket: {
+    //     host: process.env.Redis_host,
+    //     port: 11212
+    // }
+    url: process.env.Redis_url
 });
 try {
     // Connect the client
     await client.connect();
 } catch (error) {
-    logger.log(error);
+    logger.error(error);
 }
 // Function to save a session as a JSON object in Redis
-export async function saveSession(phoneNumber, threadId, action, agentType, targetAgent, payment) {
+export async function saveSession(phoneNumber, threadId, action, agentType, targetAgent, pricing, payment, interactions) {
     try {
         // Create the session object
         const session = {
@@ -23,7 +24,9 @@ export async function saveSession(phoneNumber, threadId, action, agentType, targ
             action: action,
             agentType: agentType,
             targetAgent: targetAgent,
-            payment: payment
+            pricing: pricing,
+            payment: payment,
+            interactions: interactions,
         };
 
         // Store the session object as a JSON string in Redis
@@ -31,6 +34,7 @@ export async function saveSession(phoneNumber, threadId, action, agentType, targ
             EX: 7200  // Expiration time in seconds (2 hours)
         });
         console.log(`Session saved for phone number: ${phoneNumber}`);
+        console.log(session);
     } catch (error) {
         console.error('Error saving session to Redis:', error);
         return null;
