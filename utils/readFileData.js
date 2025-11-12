@@ -1,72 +1,77 @@
-import pdfParse from 'pdf-parse';
-import mammoth from 'mammoth';
-import fs from 'fs';
-import { logger } from './logging.js';
+import mammoth from "mammoth";
+import fs from "fs";
+import { logger } from "./logging.js";
 
 // Function to delete a file from local storage
 export function deleteFile(filePath) {
-    return new Promise((resolve, reject) => {
-        fs.unlink(filePath, (err) => {
-            if (err) {
-                logger.error(`Error deleting the file: ${err}`);
-                reject(err);
-            } else {
-                console.log(`File ${filePath} deleted successfully.`);
-                resolve();
-            }
-        });
+  return new Promise((resolve, reject) => {
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        logger.error(`Error deleting the file: ${err}`);
+        reject(err);
+      } else {
+        console.log(`File ${filePath} deleted successfully.`);
+        resolve();
+      }
     });
+  });
 }
-
 
 function getFileType(url) {
-    if (url.endsWith('.pdf')) {
-        return 'pdf';
-    } else if (url.endsWith('.docx')) {
-        return 'docx';
-    } else {
-        return null;
-    }
+  if (url.endsWith(".pdf")) {
+    return "pdf";
+  } else if (url.endsWith(".docx")) {
+    return "docx";
+  } else {
+    return null;
+  }
 }
-// Function to extract text from a PDF file
+
+// Function to extract text from a PDF file (lazy-load pdf-parse)
 async function extractTextFromPDF(data) {
-    const parsedData = await pdfParse(data);
-    return parsedData.text;
+  let pdfParse;
+  try {
+    pdfParse = await import("pdf-parse"); // lazy-load here
+  } catch (err) {
+    logger.error("Failed to load pdf-parse:", err);
+    throw err;
+  }
+  const parsedData = await pdfParse.default(data); // note: import returns a module object
+  return parsedData.text;
 }
 
 // Function to extract text from a DOCX file
 async function extractTextFromDOCX(data) {
-    const result = await mammoth.extractRawText({ buffer: data });
-    return result.value;
+  const result = await mammoth.extractRawText({ buffer: data });
+  return result.value;
 }
 
 // Main function to handle both PDF and DOCX files
 export async function extractTextFromDocument(filePath, mime_type) {
-    if (!filePath) {
-        logger.warn("Null FilePath");
-        return;
+  if (!filePath) {
+    logger.warn("Null FilePath");
+    return;
+  }
+  try {
+    const dataBuffer = fs.readFileSync(filePath);
+    const fileType = mime_type || getFileType(filePath);
+
+    if (!fileType) {
+      throw new Error("Unsupported file type");
     }
-    try {
-        const dataBuffer = fs.readFileSync(filePath);
-        const fileType = mime_type || getFileType(filePath);
 
-        if (!fileType) {
-            throw new Error('Unsupported file type');
-        }
+    let extractedText;
 
-        let extractedText;
-
-        if (fileType.endsWith('pdf')) {
-            extractedText = await extractTextFromPDF(dataBuffer)
-        } else if (fileType.endsWith('document') || fileType.endsWith('docx')) {
-            extractedText = await extractTextFromDOCX(dataBuffer);
-        }
-        logger.info(extractedText);
-        // Return the extracted text
-        return extractedText;
-
-    } catch (error) {
-        logger.error(error);
-        return null;
+    if (fileType === "pdf") {
+      extractedText = await extractTextFromPDF(dataBuffer);
+    } else if (fileType === "docx") {
+      extractedText = await extractTextFromDOCX(dataBuffer);
     }
+
+    logger.info(extractedText);
+    return extractedText;
+  } catch (error) {
+    logger.error(error);
+    return null;
+  }
 }
