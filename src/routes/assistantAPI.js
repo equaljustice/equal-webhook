@@ -34,6 +34,83 @@ router.post("/create", async (req, res) => {
   }
 });
 
+//Modify a assistant
+router.put("/update/:assistantId", async (req, res) => {
+  const { assistantId } = req.params;
+  const updateFields = {};
+  const allowedFields = ["name", "key", "assistantId", "price", "description"];
+
+  // Prepare an update object only with provided allowed fields
+  for (const field of allowedFields) {
+    if (req.body[field] !== undefined) {
+      updateFields[field] = req.body[field];
+    }
+  }
+
+  if (Object.keys(updateFields).length === 0) {
+    return res
+      .status(400)
+      .json({ message: "No valid fields provided to update" });
+  }
+
+  try {
+    // Check for unique key and assistantId if updating them
+    if (updateFields.key) {
+      const exists = await Assistant.findOne({
+        key: updateFields.key,
+        _id: { $ne: assistantId },
+      });
+      if (exists) {
+        return res
+          .status(409)
+          .json({ message: "Key already in use by another assistant" });
+      }
+    }
+    if (updateFields.assistantId) {
+      const exists = await Assistant.findOne({
+        assistantId: updateFields.assistantId,
+        _id: { $ne: assistantId },
+      });
+      if (exists) {
+        return res
+          .status(409)
+          .json({ message: "assistantId already in use by another assistant" });
+      }
+    }
+
+    // Find and update the assistant
+    const assistant = await Assistant.findByIdAndUpdate(
+      assistantId,
+      { $set: updateFields },
+      { new: true }
+    );
+    if (!assistant) {
+      return res.status(404).json({ message: "Assistant not found!" });
+    }
+
+    return res
+      .status(200)
+      .json({ message: "Assistant updated successfully", assistant });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error updating assistant",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/listall", async (req, res) => {
+  try {
+    const assistants = await Assistant.find({});
+    return res.status(200).json({ assistants });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error fetching assistants",
+      error: error.message,
+    });
+  }
+});
+
 //Create a new session
 router.post("/start-session", jwtAuth, async (req, res) => {
   try {
@@ -60,12 +137,17 @@ router.post("/start-session", jwtAuth, async (req, res) => {
     // return res.status(200).json({ thread });
 
     //Create session in DB
+    const startedOn = new Date();
+    const endedOn = new Date(startedOn.getTime() + 7 * 24 * 60 * 60 * 1000);
     const session = await Session.create({
       userId,
       assistantId,
       threadId: thread.id,
       title: assistant.name,
       assistantKey: sessionKey,
+      price: assistant.price,
+      startedOn,
+      endedOn,
     });
 
     //Send SuccessMessage

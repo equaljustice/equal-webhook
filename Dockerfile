@@ -1,19 +1,19 @@
 # Use a lightweight Node.js base image
 FROM node:20-slim
 
-# Create and set working directory
+# Set working directory inside the container
 WORKDIR /usr/src/app
 
-# Copy package files first (for better layer caching)
+# Copy only package files first (for better layer caching)
 COPY package*.json ./
 
 # Install only production dependencies
 RUN npm ci --omit=dev
 
-# Copy all source code
+# Copy the rest of the app source code
 COPY . .
 
-# Ensure Cloud Run can communicate on port 8080
+# Expose port 8080 (Cloud Run requirement)
 EXPOSE 8080
 
 # Start the app

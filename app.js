@@ -39,4 +39,6 @@ app.use((req, res, next) => {
 app.use(pinoHttp);
 app.use("/api", APIrouter);
 
+import "./src/cronSessionCleanup.js";
+
 export default app;

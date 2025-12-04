@@ -5,6 +5,7 @@ const sessionSchema = new mongoose.Schema({
   assistantId: { type: String, required: true },
   assistantKey: { type: String },
   threadId: { type: String, required: true },
+  price: { type: Number, required: true },
   isPaid: { type: Boolean, default: false },
   title: { type: String, default: "New chat" },
   startedOn: { type: Date, default: Date.now },
