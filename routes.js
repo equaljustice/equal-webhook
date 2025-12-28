@@ -6,6 +6,7 @@ import paymentRoutes from "./src/routes/payment.js";
 import CustomGPTPaymentRoutes from "./src/routes/customGPTPayment.js";
 const APIrouter = express.Router();
 
+
 APIrouter.use("/auth", authRoutes);
 APIrouter.use("/assistant", assistantRoutes);
 APIrouter.use("/payment", paymentRoutes);

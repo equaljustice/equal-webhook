@@ -1,27 +1,75 @@
 import cron from "node-cron";
 import { Session } from "../src/model/sesssion.model.js";
+import mongoose from "mongoose";
 
 // Schedule to run at 2:00 AM IST (20:30 UTC)
-cron.schedule("30 20 * * *", async () => {
+const cleanupJob = cron.schedule("30 20 * * *", async () => {
   try {
+    // Check if database is connected
+    if (mongoose.connection.readyState !== 1) {
+      console.error("Database not connected, skipping session cleanup");
+      return;
+    }
+
     const now = new Date();
-    // Find sessions older than 7 days and not ended
+    // Find sessions where endedOn has passed (sessions are created with endedOn set)
     const expiredSessions = await Session.find({
-      endedOn: { $exists: false },
-      startedOn: { $lte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
+      endedOn: { $lte: now },
     });
 
-    for (const session of expiredSessions) {
-      // Mark endedOn
-      session.endedOn = new Date(
-        session.startedOn.getTime() + 7 * 24 * 60 * 60 * 1000
-      );
-      await session.save();
-      // Remove from DB
-      await Session.deleteOne({ _id: session._id });
+    if (expiredSessions.length === 0) {
+      console.log(`No expired sessions found at ${now.toISOString()}`);
+      return;
     }
-    console.log(`Expired sessions cleaned up at ${now.toISOString()}`);
+
+    // Delete expired sessions
+    const result = await Session.deleteMany({
+      endedOn: { $lte: now },
+    });
+
+    console.log(
+      `✅ Cleaned up ${
+        result.deletedCount
+      } expired session(s) at ${now.toISOString()}`
+    );
   } catch (err) {
-    console.error("Error in session cleanup:", err);
+    console.error("❌ Error in session cleanup:", err);
   }
 });
+
+// Log when cron job is scheduled
+console.log(
+  "✅ Session cleanup cron job scheduled: Daily at 2:00 AM IST (20:30 UTC)"
+);
+
+// Export cleanup function for manual testing
+export const runCleanup = async () => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      console.error("Database not connected, cannot run cleanup");
+      return;
+    }
+
+    const now = new Date();
+    const expiredSessions = await Session.find({
+      endedOn: { $lte: now },
+    });
+
+    if (expiredSessions.length === 0) {
+      console.log(`No expired sessions found at ${now.toISOString()}`);
+      return;
+    }
+
+    const result = await Session.deleteMany({
+      endedOn: { $lte: now },
+    });
+
+    console.log(
+      `✅ Cleaned up ${
+        result.deletedCount
+      } expired session(s) at ${now.toISOString()}`
+    );
+  } catch (err) {
+    console.error("❌ Error in session cleanup:", err);
+  }
+};

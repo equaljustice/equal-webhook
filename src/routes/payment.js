@@ -3,6 +3,7 @@ import { Payment } from "../model/payment.model.js";
 import axios from "axios";
 import { jwtAuth } from "../middleware/jwtAuth.js";
 import { Session } from "../model/sesssion.model.js";
+import { CustomGPTpayment } from "../model/ customGPTPayment.model.js";
 
 const router = express.Router();
 
@@ -86,6 +87,7 @@ router.post("/create-order/:sessionId", jwtAuth, async (req, res) => {
   }
 });
 
+
 router.post("/airthpay-webhook", async (req, res) => {
   try {
     const data = req.body;
@@ -104,7 +106,8 @@ router.post("/airthpay-webhook", async (req, res) => {
       statusValue = "failed";
     }
 
-    const paymentRecord = await Payment.findOneAndUpdate(
+    // Try to update Payment first
+    let paymentRecord = await Payment.findOneAndUpdate(
       { orderId: data.orderId },
       {
         $set: {
@@ -118,12 +121,38 @@ router.post("/airthpay-webhook", async (req, res) => {
       { new: true }
     );
 
-    const sessionId = paymentRecord.sessionId;
-    if (paymentRecord.status?.value === "paid") {
-      await Session.findByIdAndUpdate(sessionId, { $set: { isPaid: true } });
+    if (paymentRecord && paymentRecord.sessionId) {
+      // If for session payments
+      const sessionId = paymentRecord.sessionId;
+      if (paymentRecord.status?.value === "paid") {
+        await Session.findByIdAndUpdate(sessionId, { $set: { isPaid: true } });
+      }
+      res.status(200).send("OK");
+      return;
     }
 
-    res.status(200).send("OK");
+    // If not found in Payment, try in CustomGPTpayment
+    let customPayRecord = await CustomGPTpayment.findOneAndUpdate(
+      { orderId: data.orderId },
+      {
+        $set: {
+          status: {
+            value: statusValue,
+            paidAt: paidAt,
+          },
+          webhookTransaction: data,
+        },
+      },
+      { new: true }
+    );
+
+    if (customPayRecord) {
+      res.status(200).send("OK");
+      return;
+    }
+
+    // If neither found
+    res.status(404).send("OrderId not found for Payment or CustomGPTPayment");
   } catch (err) {
     console.error("Webhook Error:", err);
     res.status(200).send("OK");
