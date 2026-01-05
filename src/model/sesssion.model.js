@@ -10,6 +10,8 @@ const sessionSchema = new mongoose.Schema({
   title: { type: String, default: "New chat" },
   startedOn: { type: Date, default: Date.now },
   endedOn: { type: Date },
+  provider: { type: String, enum: ['openai', 'gemini'], default: 'openai' },
+  geminiConfig: { type: mongoose.Schema.Types.Mixed },
   messages: [
     {
       role: String,
