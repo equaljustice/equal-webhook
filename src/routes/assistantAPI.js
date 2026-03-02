@@ -8,6 +8,12 @@ import path from "path";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import os from "os";
+import { SPECIAL_ACCESS_USER_IDS } from "../../constants.js";
+import { readPromptFile } from "../utils/promptManager.js";
+import {
+  generateDocument,
+  getDocumentFilename,
+} from "../utils/documentGenerator.js";
 
 const router = express.Router();
 
@@ -39,6 +45,340 @@ const upload = multer({
 });
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Helper function to check if user has special access (no payment required)
+const hasSpecialAccess = (userId) => {
+  return SPECIAL_ACCESS_USER_IDS.includes(userId);
+};
+
+/**
+ * Build document data from the actual final response message.
+ * Uses the real chat content (cleanMessage) as the document body,
+ * and optionally merges metadata from the LLM's document JSON (title, document_type).
+ * This prevents the "random content" bug where the LLM hallucinates document sections.
+ */
+const buildDocumentDataFromMessage = (cleanMessage, session, llmDocData) => {
+  const assistantKey = session?.assistantKey || "document";
+  const sessionTitle = session?.title || "Document";
+
+  return {
+    document_type: llmDocData?.document_type || assistantKey,
+    title: llmDocData?.title || sessionTitle,
+    content: {
+      sections: [
+        {
+          type: "html",
+          text: cleanMessage, // The actual final response the user saw
+        },
+      ],
+    },
+    metadata: {
+      language: llmDocData?.metadata?.language || "en",
+      generated_date: new Date().toISOString(),
+      use_case: llmDocData?.metadata?.use_case || assistantKey,
+    },
+  };
+};
+
+/**
+ * Walk backward through session.messages to find the last substantive
+ * assistant message (the actual legal document), skipping short
+ * termination / acknowledgement messages.
+ * Returns the content string, or null if nothing qualifies.
+ */
+const findLastSubstantiveMessage = (session) => {
+  const MIN_SUBSTANTIVE_LENGTH = 200;
+  const messages = session.messages || [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (
+      m.role === "assistant" &&
+      m.content &&
+      m.content.length >= MIN_SUBSTANTIVE_LENGTH
+    ) {
+      return m.content;
+    }
+  }
+  return null;
+};
+
+// Helper function to extract structured document data from assistant message
+// Returns both the document data and the indices for removal
+const extractDocumentData = (message) => {
+  if (!message || typeof message !== "string") {
+    return { data: null, startIdx: -1, endIdx: -1 };
+  }
+
+  // Find the start of the document JSON by looking for "document_type"
+  let startIdx = -1;
+  const searchPatterns = [
+    '{"document_type"',
+    '{\n"document_type"',
+    '{\r\n"document_type"',
+    '{\r"document_type"',
+    '{ "document_type"',
+  ];
+
+  for (const pattern of searchPatterns) {
+    startIdx = message.indexOf(pattern);
+    if (startIdx !== -1) {
+      break;
+    }
+  }
+
+  if (startIdx === -1) {
+    return { data: null, startIdx: -1, endIdx: -1 };
+  }
+
+  // Find the matching closing brace by counting braces
+  let braceCount = 0;
+  let inString = false;
+  let escapeNext = false;
+  let endIdx = -1;
+
+  for (let i = startIdx; i < message.length; i++) {
+    const char = message[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"' && !escapeNext) {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '{') {
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          endIdx = i;
+          break;
+        }
+      }
+    }
+  }
+
+  if (endIdx === -1) {
+    return { data: null, startIdx: -1, endIdx: -1 };
+  }
+
+  // Extract and parse the JSON
+  try {
+    const jsonStr = message.substring(startIdx, endIdx + 1);
+    const documentData = JSON.parse(jsonStr);
+    
+    // Validate that it has document_type field
+    if (documentData && documentData.hasOwnProperty("document_type")) {
+      return { data: documentData, startIdx, endIdx: endIdx + 1 };
+    }
+  } catch (parseError) {
+    console.warn("Failed to parse document data JSON:", parseError.message);
+    return { data: null, startIdx: -1, endIdx: -1 };
+  }
+
+  return { data: null, startIdx: -1, endIdx: -1 };
+};
+
+// Helper function to extract structured upload requirement and session termination from assistant message
+const extractUploadRequirement = (message) => {
+  if (!message || typeof message !== "string") {
+    return {
+      requiresUpload: false,
+      uploadType: null,
+      reason: null,
+      sessionTerminated: false,
+      terminationMessage: null,
+      paymentRequired: false,
+      cleanMessage: message || "",
+      documentData: null,
+      finalResponse: null,
+    };
+  }
+
+  // Try to extract JSON object from the end of the message
+  // Look for JSON pattern at the end (may be on last line or embedded)
+  // Match JSON object that contains upload_required, session_terminated, or payment_required field
+  const jsonPatterns = [
+    /\{[\s\n]*"(?:upload_required|session_terminated|payment_required)"[\s\S]*?\}(?:\s*)$/m,
+    /\{[\s\n]*"(?:upload_required|session_terminated|payment_required)"[\s\S]*?\}/,
+  ];
+
+  let jsonMatch = null;
+  for (const pattern of jsonPatterns) {
+    const matches = message.match(pattern);
+    if (matches) {
+      jsonMatch = matches[0];
+      break;
+    }
+  }
+
+  let documentData = null;
+  let cleanMessage = message;
+
+  if (jsonMatch) {
+    try {
+      const metadata = JSON.parse(jsonMatch);
+
+      // Validate that it has the expected structure
+      if (
+        metadata.hasOwnProperty("upload_required") ||
+        metadata.hasOwnProperty("session_terminated") ||
+        metadata.hasOwnProperty("payment_required")
+      ) {
+        // If session is terminated, try to extract document data JSON first
+        // (before removing termination JSON, so indices are correct)
+        if (
+          metadata.session_terminated === true ||
+          metadata.session_terminated === "true"
+        ) {
+          // Try to extract document data from the original message
+          const docResult = extractDocumentData(message);
+          documentData = docResult.data;
+          
+          // Remove document JSON from message before removing termination JSON
+          if (documentData && docResult.startIdx !== -1 && docResult.endIdx !== -1) {
+            // Remove the document JSON substring directly from original message
+            const beforeDoc = message.substring(0, docResult.startIdx);
+            const afterDoc = message.substring(docResult.endIdx);
+            message = (beforeDoc + afterDoc).trim();
+          }
+        }
+
+        // Extract clean message (remove termination JSON from end, handling newlines)
+        cleanMessage = message.replace(jsonMatch, "").trim();
+        
+        // Final cleanup: remove any remaining document JSON patterns (safety net)
+        if (documentData) {
+          cleanMessage = cleanMessage.replace(/\n\s*\{[\s\n]*"document_type"[\s\S]*?\}\s*/g, "").trim();
+          cleanMessage = cleanMessage.replace(/\{[\s\n]*"document_type"[\s\S]*?\}\s*/g, "").trim();
+          cleanMessage = cleanMessage.replace(/\s*\{[\s\n]*"document_type"[\s\S]*?\}\s*$/g, "").trim();
+        }
+
+        return {
+          requiresUpload:
+            metadata.upload_required === true ||
+            metadata.upload_required === "true",
+          uploadType: metadata.upload_type || null,
+          reason: metadata.upload_reason || null,
+          sessionTerminated:
+            metadata.session_terminated === true ||
+            metadata.session_terminated === "true",
+          terminationMessage: metadata.termination_message || null,
+          paymentRequired:
+            metadata.payment_required === true ||
+            metadata.payment_required === "true",
+          cleanMessage: cleanMessage,
+          documentData: documentData,
+          finalResponse:
+            typeof metadata.final_response === "string" &&
+            metadata.final_response.trim().length > 0
+              ? metadata.final_response.trim()
+              : null,
+        };
+      }
+    } catch (parseError) {
+      // If JSON parsing fails, fall back to old regex method for backward compatibility
+      console.warn(
+        "Failed to parse metadata JSON, falling back to regex:",
+        parseError
+      );
+    }
+  }
+
+  // Fallback: Use old regex-based detection for backward compatibility
+  // This will be removed once all assistants are updated with structured output
+  const lowerMessage = message.toLowerCase();
+  const uploadKeywords = [
+    "upload",
+    "re-upload",
+    "reupload",
+    "please upload",
+    "need to upload",
+    "upload the document",
+    "upload your document",
+    "upload a document",
+    "upload the file",
+    "upload your file",
+    "upload a file",
+    "upload again",
+    "upload your will again",
+    "upload again in",
+    "please upload again",
+    "upload your will",
+    "upload your document again",
+    "upload the document again",
+    "upload the file again",
+    "upload your file again",
+    "upload it again",
+    "upload once more",
+    "upload one more time",
+    "kindly upload",
+    "upload now",
+  ];
+
+  const requiresUpload = uploadKeywords.some((keyword) =>
+    lowerMessage.includes(keyword)
+  );
+  const isReUpload =
+    requiresUpload &&
+    (lowerMessage.includes("re-upload") ||
+      lowerMessage.includes("reupload") ||
+      lowerMessage.includes("upload again") ||
+      lowerMessage.includes("upload your will again"));
+
+  // Fallback termination detection (regex-based for backward compatibility)
+  const terminationKeywords = [
+    "session is over",
+    "session over",
+    "exit or start a new session",
+    "can exit or start",
+    "terminate",
+    "end the session",
+  ];
+  const sessionTerminated = terminationKeywords.some((keyword) =>
+    lowerMessage.includes(keyword)
+  );
+
+  // Even in fallback mode, try to extract document data if session is terminated
+  let fallbackDocumentData = null;
+  if (sessionTerminated) {
+    const docResult = extractDocumentData(message);
+    fallbackDocumentData = docResult.data;
+    
+    // Remove document JSON from clean message in fallback mode too
+    if (fallbackDocumentData && docResult.startIdx !== -1 && docResult.endIdx !== -1) {
+      cleanMessage = message.substring(0, docResult.startIdx) + 
+                    message.substring(docResult.endIdx);
+      cleanMessage = cleanMessage.trim();
+      // Also remove any leading/trailing newlines
+      cleanMessage = cleanMessage.replace(/\n\s*\{[\s\n]*"document_type"[\s\S]*?\}\s*/g, "").trim();
+      cleanMessage = cleanMessage.replace(/\{[\s\n]*"document_type"[\s\S]*?\}\s*/g, "").trim();
+    }
+  }
+
+  return {
+    requiresUpload,
+    uploadType: isReUpload ? "re_upload" : requiresUpload ? "initial" : null,
+    reason: null,
+    sessionTerminated: sessionTerminated,
+    terminationMessage: sessionTerminated
+      ? "Your session is over now. You can exit or start a new session."
+      : null,
+    paymentRequired: false,
+    cleanMessage: message,
+    documentData: fallbackDocumentData,
+    finalResponse: null,
+  };
+};
 
 //Create Assistant instance into db
 router.post("/create", async (req, res) => {
@@ -191,6 +531,17 @@ router.post("/start-session", jwtAuth, async (req, res) => {
     //Create session in DB
     const startedOn = new Date();
     const endedOn = new Date(startedOn.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const isSpecialAccess = hasSpecialAccess(userId);
+    // deferPayment: true  → Q&A is free, payment triggered by AI before final output
+    // deferPayment: false → original flow, payment required upfront before chatting
+    const deferPayment = assistant.config?.deferPayment === true;
+    const isPaid = isSpecialAccess || deferPayment ? true : false;
+
+    // Check if assistant supports multiple file uploads
+    const supportsMultipleUploads =
+      assistant.config?.supportsMultipleUploads === true;
+
     const session = await Session.create({
       userId,
       assistantId,
@@ -202,6 +553,8 @@ router.post("/start-session", jwtAuth, async (req, res) => {
       endedOn,
       provider,
       geminiConfig,
+      isPaid,
+      supportsMultipleUploads,
     });
 
     //Send SuccessMessage
@@ -259,46 +612,61 @@ router.delete("/delete-session/:sessionId", jwtAuth, async (req, res) => {
   }
 });
 
-// Upload document for Gemini file analysis
+// Upload document(s) for Gemini file analysis - supports both single and multiple files
 router.post(
   "/upload-document",
   jwtAuth,
-  upload.single("document"),
+  upload.array("documents", 10), // Support up to 10 files, field name: "documents"
   async (req, res) => {
     try {
-      const file = req.file;
-      if (!file) {
-        return res.status(400).json({ error: "No file uploaded" });
+      const files = req.files || (req.file ? [req.file] : []); // Support both single and multiple
+      const { sessionId } = req.body;
+      const userId = req.user.id;
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No file(s) uploaded" });
+      }
+
+      // If sessionId is provided, validate and link to session
+      let session = null;
+      if (sessionId) {
+        session = await Session.findOne({ _id: sessionId, userId });
+        if (!session) {
+          // Clean up temp files
+          const fs = await import("fs/promises");
+          for (const file of files) {
+            await fs.unlink(file.path).catch(() => {});
+          }
+          return res.status(404).json({ error: "Session not found" });
+        }
       }
 
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-      // Read file buffer
       const fs = await import("fs/promises");
-      const fileBuffer = await fs.readFile(file.path);
 
-      // Determine mimeType with fallback
-      let mimeType = file.mimetype;
-      if (!mimeType || mimeType === "application/octet-stream") {
-        // Fallback based on file extension
-        const ext = path.extname(file.originalname || "").toLowerCase();
-        const mimeTypes = {
-          ".pdf": "application/pdf",
-          ".doc": "application/msword",
-          ".docx":
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          ".jpg": "image/jpeg",
-          ".jpeg": "image/jpeg",
-          ".png": "image/png",
-        };
-        mimeType = mimeTypes[ext] || "application/pdf";
-      }
+      // Helper function to upload a single file to Gemini
+      const uploadFileToGemini = async (file) => {
+        // Read file buffer
+        const fileBuffer = await fs.readFile(file.path);
 
-      // Upload file to Gemini Files API
-      let fileId;
-      try {
-        // Use Gemini's file upload API
-        // The API requires mimeType in the config object
+        // Determine mimeType with fallback
+        let mimeType = file.mimetype;
+        if (!mimeType || mimeType === "application/octet-stream") {
+          // Fallback based on file extension
+          const ext = path.extname(file.originalname || "").toLowerCase();
+          const mimeTypes = {
+            ".pdf": "application/pdf",
+            ".doc": "application/msword",
+            ".docx":
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+          };
+          mimeType = mimeTypes[ext] || "application/pdf";
+        }
+
+        // Upload file to Gemini Files API
         let uploadResponse;
         try {
           // Format 1: Using file path with config containing mimeType
@@ -321,7 +689,7 @@ router.post(
         }
 
         // Extract file URI from response (handle different response structures)
-        fileId =
+        const fileId =
           uploadResponse?.file?.uri ||
           uploadResponse?.file?.name ||
           uploadResponse?.uri ||
@@ -333,22 +701,328 @@ router.post(
             "Failed to extract file ID from Gemini upload response"
           );
         }
-      } catch (uploadErr) {
-        // Clean up temp file on error
-        await fs.unlink(file.path).catch(() => {});
+
+        return fileId;
+      };
+
+      // Upload all files to Gemini
+      const uploadedFiles = [];
+      const fileErrors = [];
+
+      for (const file of files) {
+        try {
+          const fileId = await uploadFileToGemini(file);
+          uploadedFiles.push({
+            fileId: fileId,
+            fileName: file.originalname,
+          });
+          // Clean up temp file after successful upload
+          await fs.unlink(file.path).catch(() => {});
+        } catch (uploadErr) {
+          // Clean up temp file on error
+          await fs.unlink(file.path).catch(() => {});
+          fileErrors.push({
+            fileName: file.originalname,
+            error: uploadErr.message,
+          });
+        }
+      }
+
+      // If all files failed, return error
+      if (uploadedFiles.length === 0) {
         return res.status(500).json({
-          error: "Failed to upload file to Gemini",
-          message: uploadErr.message,
+          error: "Failed to upload all files",
+          errors: fileErrors,
         });
       }
 
-      // Clean up temp file after successful upload
-      await fs.unlink(file.path).catch(() => {});
+      // If some files failed, include errors in response but continue
+      const fileIds = uploadedFiles.map((f) => f.fileId);
+
+      // If sessionId was provided, link fileIds to session and update upload status
+      let assistantReply = null;
+      if (session) {
+        // Handle multiple uploads: append all new fileIds to array
+        if (!session.uploadedFileIds) {
+          session.uploadedFileIds = [];
+        }
+        // Add all newly uploaded files to the array
+        for (const fileId of fileIds) {
+          session.uploadedFileIds.push(fileId);
+        }
+        // Also keep uploadedFileId for backward compatibility (use latest)
+        session.uploadedFileId = fileIds[fileIds.length - 1];
+
+        session.isDocUploaded = true;
+        session.isDocUploadRequired = false;
+        // Remove uploadAttempts tracking - no longer needed
+
+        // Automatically continue conversation with uploaded document
+        try {
+          // Create a message indicating document was uploaded
+          const fileCount = session.supportsMultipleUploads
+            ? session.uploadedFileIds?.length || 1
+            : 1;
+          const uploadMessage =
+            fileCount > 1
+              ? `${fileCount} documents uploaded successfully. Please analyze them.`
+              : "Document uploaded successfully. Please analyze it.";
+
+          if (session.provider === "gemini") {
+            // Gemini logic - automatically process the uploaded document
+            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+            // Build history for context
+            const history = (session.messages || []).map((msg) => ({
+              role: msg.role === "user" ? "user" : "model",
+              parts: [{ text: msg.content }],
+            }));
+
+            // Build message with uploaded file(s)
+            const messageParts = [{ text: uploadMessage }];
+
+            // Add all uploaded files to the message
+            const filesToInclude = session.supportsMultipleUploads
+              ? session.uploadedFileIds || fileIds
+              : fileIds;
+
+            for (const fileUri of filesToInclude) {
+              if (fileUri) {
+                messageParts.push({
+                  fileData: {
+                    fileUri: fileUri,
+                  },
+                });
+              }
+            }
+
+            history.push({ role: "user", parts: messageParts });
+            let config = session.geminiConfig || {};
+            const model = config.model || "gemini-3-flash-preview";
+
+            // Pull systemInstruction from assistant asset if available
+            let systemInstructionText = undefined;
+            try {
+              const assistant = await Assistant.findOne({
+                assistantId: session.assistantId,
+              });
+              if (
+                assistant &&
+                assistant.config &&
+                assistant.config.systemInstructionAsset
+              ) {
+                try {
+                  // Read from GCS (with local filesystem fallback)
+                  systemInstructionText = await readPromptFile(
+                    assistant.config.systemInstructionAsset
+                  );
+                } catch (err) {
+                  // Continue without system instruction if file not found
+                  console.warn(
+                    `Failed to load system instruction: ${err.message}`
+                  );
+                }
+
+                // Add file analysis instructions
+                if (systemInstructionText) {
+                  const fileCount = filesToInclude.length;
+                  const fileText =
+                    fileCount > 1 ? "documents have" : "document has";
+                  systemInstructionText +=
+                    `\n\nIMPORTANT: ${fileCount} uploaded ${fileText} been provided for analysis. ` +
+                    "The uploaded document(s) are read-only. Do not invent missing clauses. " +
+                    "If information is missing from the document(s), respond with 'Not found in document.' " +
+                    "Follow the system rules strictly and analyze only what is present in the uploaded document(s).";
+
+                  config = {
+                    ...config,
+                    systemInstruction: [{ text: systemInstructionText }],
+                  };
+                }
+              }
+            } catch (resolveErr) {
+              // Continue without system instruction on error
+            }
+
+            // Generate assistant response
+            let assistantMessage = "";
+            try {
+              const response = await ai.models.generateContentStream({
+                model,
+                config,
+                contents: history,
+              });
+              for await (const chunk of response) {
+                if (chunk.text) {
+                  assistantMessage += chunk.text;
+                }
+              }
+              // Extract upload requirement from structured output
+              const uploadInfo = extractUploadRequirement(assistantMessage);
+              const cleanMessage = uploadInfo.cleanMessage || assistantMessage;
+              assistantReply = cleanMessage;
+
+              // Save messages to session (without JSON marker)
+              session.messages.push({ role: "user", content: uploadMessage });
+              session.messages.push({
+                role: "assistant",
+                content: cleanMessage,
+              });
+
+              const resolvedFinalResponse =
+                typeof uploadInfo.finalResponse === "string" &&
+                uploadInfo.finalResponse.trim().length > 0
+                  ? uploadInfo.finalResponse.trim()
+                  : null;
+              if (resolvedFinalResponse) {
+                session.final_response = resolvedFinalResponse;
+              }
+
+              // Store document data if session is terminated
+              if (uploadInfo.sessionTerminated) {
+                const docContent =
+                  resolvedFinalResponse ||
+                  session.final_response ||
+                  findLastSubstantiveMessage(session);
+                if (docContent) {
+                  session.finalDocumentData = buildDocumentDataFromMessage(
+                    docContent,
+                    session,
+                    uploadInfo.documentData
+                  );
+                }
+              }
+
+              // Check if assistant is asking for re-upload in the auto-resume response
+              const requiresReUpload =
+                uploadInfo.requiresUpload &&
+                uploadInfo.uploadType === "re_upload";
+              if (requiresReUpload) {
+                // Assistant is asking for re-upload, set the flag
+                session.isDocUploadRequired = true;
+                session.isDocUploaded = false;
+                // For multiple uploads, don't clear all files - just mark as needing re-upload
+                // For single upload, clear the fileId
+                if (!session.supportsMultipleUploads) {
+                  session.uploadedFileId = null;
+                  session.uploadedFileIds = [];
+                }
+              }
+            } catch (geminiErr) {
+              // If Gemini fails, continue without assistant reply
+              console.error(
+                "Failed to generate assistant response after upload:",
+                geminiErr
+              );
+            }
+          } else if (session.provider === "openai") {
+            // OpenAI logic - automatically process the uploaded document
+            // Add message to thread
+            await client.beta.threads.messages.create(session.threadId, {
+              role: "user",
+              content: uploadMessage,
+            });
+
+            // Run the assistant
+            const run = await client.beta.threads.runs.create(
+              session.threadId,
+              {
+                assistant_id: session.assistantId,
+              }
+            );
+
+            // Poll until completed
+            let runStatus;
+            do {
+              await new Promise((r) => setTimeout(r, 1000));
+              runStatus = await client.beta.threads.runs.retrieve(
+                session.threadId,
+                run.id
+              );
+            } while (runStatus.status !== "completed");
+
+            // Fetch messages
+            const messages = await client.beta.threads.messages.list(
+              session.threadId
+            );
+            const assistantMessage =
+              messages.data[0].content[0].text.value || "No response";
+
+            // Extract upload requirement from structured output
+            const uploadInfo = extractUploadRequirement(assistantMessage);
+            const cleanMessage = uploadInfo.cleanMessage || assistantMessage;
+            assistantReply = cleanMessage;
+
+            // Save message history (without JSON marker)
+            session.messages.push({ role: "user", content: uploadMessage });
+            session.messages.push({
+              role: "assistant",
+              content: cleanMessage,
+            });
+
+            const resolvedFinalResponse =
+              typeof uploadInfo.finalResponse === "string" &&
+              uploadInfo.finalResponse.trim().length > 0
+                ? uploadInfo.finalResponse.trim()
+                : null;
+            if (resolvedFinalResponse) {
+              session.final_response = resolvedFinalResponse;
+            }
+
+            // Store document data if session is terminated
+            if (uploadInfo.sessionTerminated) {
+              const docContent =
+                resolvedFinalResponse ||
+                session.final_response ||
+                findLastSubstantiveMessage(session);
+              if (docContent) {
+                session.finalDocumentData = buildDocumentDataFromMessage(
+                  docContent,
+                  session,
+                  uploadInfo.documentData
+                );
+              }
+            }
+
+            // Check if assistant is asking for re-upload in the auto-resume response
+            const requiresReUpload =
+              uploadInfo.requiresUpload &&
+              uploadInfo.uploadType === "re_upload";
+            if (requiresReUpload) {
+              // Assistant is asking for re-upload, set the flag
+              session.isDocUploadRequired = true;
+              session.isDocUploaded = false;
+              session.uploadedFileId = null;
+            }
+          }
+        } catch (autoContinueErr) {
+          // If auto-continue fails, log but don't fail the upload
+          console.error(
+            "Failed to auto-continue conversation after upload:",
+            autoContinueErr
+          );
+        }
+
+        await session.save();
+      }
 
       return res.status(200).json({
-        fileId: fileId,
-        fileName: file.originalname,
-        message: "File uploaded successfully",
+        fileIds: fileIds, // Array of all uploaded file IDs
+        files: uploadedFiles, // Array of {fileId, fileName} objects
+        message:
+          uploadedFiles.length > 1
+            ? `${uploadedFiles.length} files uploaded successfully`
+            : "File uploaded successfully",
+        assistantReply: assistantReply, // Include assistant's response if available
+        conversationResumed: !!assistantReply,
+        supportsMultipleUploads: session?.supportsMultipleUploads || false,
+        totalUploadedFiles: session?.uploadedFileIds?.length || fileIds.length,
+        uploadedFileIds: session?.uploadedFileIds || fileIds,
+        // Backward compatibility - include single fileId and fileName
+        fileId: fileIds[0], // First file ID for backward compatibility
+        fileName: uploadedFiles[0]?.fileName,
+        // Include errors if any files failed
+        ...(fileErrors.length > 0 && { errors: fileErrors }),
       });
     } catch (error) {
       // Clean up temp file on error
@@ -371,11 +1045,56 @@ router.post("/send-message", jwtAuth, async (req, res) => {
     const session = await Session.findById(sessionId);
     if (!session) return res.status(404).json({ error: "Session not found" });
 
-    // Check payment
-    if (!session.isPaid)
+    // Check payment (skip for special access users)
+    const userId = req.user.id;
+    const isSpecialAccess = hasSpecialAccess(userId);
+    if (!session.isPaid && !isSpecialAccess) {
       return res
         .status(403)
         .json({ error: "Payment required before chatting" });
+    }
+
+    // Auto-mark as paid for special access users if not already marked
+    if (isSpecialAccess && !session.isPaid) {
+      session.isPaid = true;
+      await session.save();
+    }
+
+    // Check if document upload is required but not completed
+    if (session.isDocUploadRequired && !session.isDocUploaded) {
+      return res.status(403).json({
+        error: "Document upload required",
+        requiresUpload: true,
+      });
+    }
+
+    // Get all fileIds from session (support multiple uploads)
+    // If fileId is provided directly, also update the session
+    let filesToUse = [];
+    if (
+      session.supportsMultipleUploads &&
+      session.uploadedFileIds?.length > 0
+    ) {
+      filesToUse = session.uploadedFileIds;
+    } else if (session.uploadedFileId) {
+      filesToUse = [session.uploadedFileId];
+    } else if (fileId) {
+      filesToUse = [fileId];
+    }
+
+    if (fileId && !session.uploadedFileId) {
+      // If fileId is provided and session doesn't have one, save it
+      if (session.supportsMultipleUploads) {
+        if (!session.uploadedFileIds) {
+          session.uploadedFileIds = [];
+        }
+        session.uploadedFileIds.push(fileId);
+      }
+      session.uploadedFileId = fileId;
+      session.isDocUploaded = true;
+      session.isDocUploadRequired = false; // Clear upload requirement when file is provided
+      session.uploadAttempts = (session.uploadAttempts || 0) + 1;
+    }
 
     if (session.provider === "gemini") {
       // Gemini logic
@@ -389,14 +1108,16 @@ router.post("/send-message", jwtAuth, async (req, res) => {
       // Build current message parts
       const currentMessageParts = [{ text: userMessage }];
 
-      // If fileId is provided, add file reference to the message
+      // Add all uploaded files to the message (support multiple uploads)
       // Gemini API expects file references in parts array
-      if (fileId) {
-        currentMessageParts.push({
-          fileData: {
-            fileUri: fileId,
-          },
-        });
+      for (const fileUri of filesToUse) {
+        if (fileUri) {
+          currentMessageParts.push({
+            fileData: {
+              fileUri: fileUri,
+            },
+          });
+        }
       }
 
       history.push({ role: "user", parts: currentMessageParts });
@@ -414,27 +1135,27 @@ router.post("/send-message", jwtAuth, async (req, res) => {
           assistant.config &&
           assistant.config.systemInstructionAsset
         ) {
-          const fs = await import("fs/promises");
           try {
-            const promptPath = path.resolve(
-              process.cwd(),
+            // Read from GCS (with local filesystem fallback)
+            systemInstructionText = await readPromptFile(
               assistant.config.systemInstructionAsset
             );
-            systemInstructionText = await fs.readFile(promptPath, "utf-8");
           } catch (err) {
-            // fallback or error if not found
+            // Return error if file not found (this is in send-message, so we should fail)
             return res.status(500).json({
               error: "systemInstruction file not found",
               message: err.message,
             });
           }
-          // Add file analysis instructions if fileId is provided
-          if (fileId) {
+          // Add file analysis instructions if files are provided
+          if (filesToUse.length > 0) {
+            const fileCount = filesToUse.length;
+            const fileText = fileCount > 1 ? "documents have" : "document has";
             systemInstructionText +=
-              "\n\nIMPORTANT: An uploaded document has been provided for analysis. " +
-              "The uploaded document is read-only. Do not invent missing clauses. " +
-              "If information is missing from the document, respond with 'Not found in document.' " +
-              "Follow the system rules strictly and analyze only what is present in the uploaded document.";
+              `\n\nIMPORTANT: ${fileCount} uploaded ${fileText} been provided for analysis. ` +
+              "The uploaded document(s) are read-only. Do not invent missing clauses. " +
+              "If information is missing from the document(s), respond with 'Not found in document.' " +
+              "Follow the system rules strictly and analyze only what is present in the uploaded document(s).";
           }
 
           config = {
@@ -468,10 +1189,118 @@ router.post("/send-message", jwtAuth, async (req, res) => {
           .status(500)
           .json({ error: geminiErr.message, message: "Gemini failed" });
       }
+      // Extract upload requirement from structured output
+      const uploadInfo = extractUploadRequirement(assistantMessage);
+      let cleanMessage = uploadInfo.cleanMessage || assistantMessage;
+
+      // HARD PAYMENT BARRIER: When AI signals payment is required, replace the
+      // entire response with a safe payment prompt. This prevents any assessment
+      // content from leaking even if the AI ignores instructions.
+      if (uploadInfo.paymentRequired && !isSpecialAccess) {
+        session.isPaid = false;
+        cleanMessage = "Thank you for completing all the questions. To receive your personalized assessment, please complete the payment.";
+        console.log("Payment barrier activated for session:", sessionId);
+
+        session.messages.push({ role: "user", content: userMessage });
+        session.messages.push({ role: "assistant", content: cleanMessage });
+        await session.save();
+
+        return res.json({
+          reply: cleanMessage,
+          sessionTerminated: false,
+          terminationMessage: null,
+          paymentRequired: true,
+          paymentAmount: session.price,
+        });
+      }
+
       session.messages.push({ role: "user", content: userMessage });
-      session.messages.push({ role: "assistant", content: assistantMessage });
+      session.messages.push({ role: "assistant", content: cleanMessage });
+
+      const resolvedFinalResponse =
+        typeof uploadInfo.finalResponse === "string" &&
+        uploadInfo.finalResponse.trim().length > 0
+          ? uploadInfo.finalResponse.trim()
+          : null;
+      if (resolvedFinalResponse) {
+        session.final_response = resolvedFinalResponse;
+      }
+
+      // Store document data if session is terminated — use the last substantive
+      // assistant message (the real document), not the short termination message
+      if (uploadInfo.sessionTerminated) {
+        const docContent =
+          resolvedFinalResponse ||
+          session.final_response ||
+          findLastSubstantiveMessage(session);
+        if (docContent) {
+          session.finalDocumentData = buildDocumentDataFromMessage(
+            docContent,
+            session,
+            uploadInfo.documentData
+          );
+          console.log("Stored document data for session:", sessionId);
+        }
+      }
+
+      // Use structured upload requirement (works for all languages)
+      const requiresUpload = uploadInfo.requiresUpload;
+      const uploadType = uploadInfo.uploadType;
+      const isReUpload =
+        uploadType === "re_upload" ||
+        (requiresUpload && session.isDocUploaded && session.uploadAttempts > 0);
+
+      if (requiresUpload) {
+        // Only set upload required if we haven't exceeded max attempts
+        if (session.uploadAttempts < 2) {
+          session.isDocUploadRequired = true;
+          // If re-upload, reset the uploaded status
+          if (isReUpload) {
+            session.isDocUploaded = false;
+            // For multiple uploads, don't clear all files - just mark as needing re-upload
+            // For single upload, clear the fileId
+            if (!session.supportsMultipleUploads) {
+              session.uploadedFileId = null;
+              session.uploadedFileIds = [];
+            }
+          }
+        } else {
+          // Max attempts reached - clear upload requirement to allow chat to continue
+          session.isDocUploadRequired = false;
+        }
+      } else {
+        // Only clear upload requirement if document is uploaded AND assistant didn't ask for upload
+        // Don't clear if assistant is asking for re-upload (even if document exists)
+        if (session.isDocUploaded && filesToUse.length > 0 && !requiresUpload) {
+          session.isDocUploadRequired = false;
+        }
+        // Also clear if max attempts reached (allow chat to continue)
+        if (session.uploadAttempts >= 2) {
+          session.isDocUploadRequired = false;
+        }
+      }
+
       await session.save();
-      return res.json({ reply: assistantMessage });
+
+      // Return response with upload requirement flag if needed (use cleanMessage without JSON marker)
+      if (session.isDocUploadRequired && !session.isDocUploaded) {
+        return res.json({
+          reply: cleanMessage,
+          requiresUpload: true,
+          isReUpload: uploadType === "re_upload",
+          uploadReason: uploadInfo.reason || null,
+          sessionTerminated: uploadInfo.sessionTerminated || false,
+          terminationMessage: uploadInfo.terminationMessage || null,
+          paymentRequired: false,
+        });
+      }
+
+      return res.json({
+        reply: cleanMessage,
+        sessionTerminated: uploadInfo.sessionTerminated || false,
+        terminationMessage: uploadInfo.terminationMessage || null,
+        paymentRequired: false,
+      });
     }
     // ========== OpenAI (default) logic ==========
     // Step 3: Add message to thread
@@ -496,11 +1325,109 @@ router.post("/send-message", jwtAuth, async (req, res) => {
     const messages = await client.beta.threads.messages.list(session.threadId);
     const assistantMessage =
       messages.data[0].content[0].text.value || "No response";
-    // Save message history
+
+    // Extract upload requirement from structured output
+    const uploadInfo = extractUploadRequirement(assistantMessage);
+    let cleanMessage = uploadInfo.cleanMessage || assistantMessage;
+
+    // HARD PAYMENT BARRIER: When AI signals payment is required, replace the
+    // entire response with a safe payment prompt. This prevents any assessment
+    // content from leaking even if the AI ignores instructions.
+    if (uploadInfo.paymentRequired && !isSpecialAccess) {
+      session.isPaid = false;
+      cleanMessage = "Thank you for completing all the questions. To receive your personalized assessment, please complete the payment.";
+      console.log("Payment barrier activated for session:", sessionId);
+
+      session.messages.push({ role: "user", content: userMessage });
+      session.messages.push({ role: "assistant", content: cleanMessage });
+      await session.save();
+
+      return res.json({
+        reply: cleanMessage,
+        sessionTerminated: false,
+        terminationMessage: null,
+        paymentRequired: true,
+        paymentAmount: session.price,
+      });
+    }
+
+    // Save message history (without JSON marker)
     session.messages.push({ role: "user", content: userMessage });
-    session.messages.push({ role: "assistant", content: assistantMessage });
+    session.messages.push({ role: "assistant", content: cleanMessage });
+
+    const resolvedFinalResponse =
+      typeof uploadInfo.finalResponse === "string" &&
+      uploadInfo.finalResponse.trim().length > 0
+        ? uploadInfo.finalResponse.trim()
+        : null;
+    if (resolvedFinalResponse) {
+      session.final_response = resolvedFinalResponse;
+    }
+
+    // Store document data if session is terminated — use the last substantive
+    // assistant message (the real document), not the short termination message
+    if (uploadInfo.sessionTerminated) {
+      const docContent =
+        resolvedFinalResponse ||
+        session.final_response ||
+        findLastSubstantiveMessage(session);
+      if (docContent) {
+        session.finalDocumentData = buildDocumentDataFromMessage(
+          docContent,
+          session,
+          uploadInfo.documentData
+        );
+      }
+    }
+
+    // Use structured upload requirement (works for all languages)
+    const requiresUpload = uploadInfo.requiresUpload;
+    const uploadType = uploadInfo.uploadType;
+    const isReUpload =
+      uploadType === "re_upload" ||
+      (requiresUpload && session.isDocUploaded && session.uploadAttempts > 0);
+
+    if (requiresUpload) {
+      session.isDocUploadRequired = true;
+      // If re-upload, reset the uploaded status
+      if (isReUpload) {
+        session.isDocUploaded = false;
+        // For multiple uploads, don't clear all files - just mark as needing re-upload
+        // For single upload, clear the fileId
+        if (!session.supportsMultipleUploads) {
+          session.uploadedFileId = null;
+          session.uploadedFileIds = [];
+        }
+      }
+    } else {
+      // Only clear upload requirement if document is uploaded AND assistant didn't ask for upload
+      // Don't clear if assistant is asking for re-upload (even if document exists)
+      if (session.isDocUploaded && filesToUse.length > 0 && !requiresUpload) {
+        session.isDocUploadRequired = false;
+      }
+    }
+
     await session.save();
-    res.json({ reply: assistantMessage });
+
+    // Return response with upload requirement flag if needed (use cleanMessage without JSON marker)
+    if (session.isDocUploadRequired && !session.isDocUploaded) {
+      return res.json({
+        reply: cleanMessage,
+        requiresUpload: true,
+        isReUpload: uploadType === "re_upload",
+        uploadReason: uploadInfo.reason || null,
+        sessionTerminated: uploadInfo.sessionTerminated || false,
+        terminationMessage: uploadInfo.terminationMessage || null,
+        paymentRequired: false,
+      });
+    }
+
+    res.json({
+      reply: cleanMessage,
+      sessionTerminated: uploadInfo.sessionTerminated || false,
+      terminationMessage: uploadInfo.terminationMessage || null,
+      paymentRequired: false,
+    });
   } catch (err) {
     res.status(500).json({
       error: err.message,
@@ -518,6 +1445,103 @@ router.post("/mark-payment", jwtAuth, async (req, res) => {
   session.isPaid = true;
   await session.save();
   res.json({ message: "Payment confirmed. You can now chat!" });
+});
+
+// Download document endpoint
+router.get("/download-document/:sessionId", jwtAuth, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { format = "pdf" } = req.query;
+    const userId = req.user.id;
+
+    // Validate format
+    if (format !== "pdf" && format !== "word" && format !== "docx") {
+      return res.status(400).json({
+        error: "Invalid format",
+        message: "Format must be 'pdf' or 'word'",
+      });
+    }
+
+    // Find session and validate ownership
+    const session = await Session.findOne({ _id: sessionId, userId });
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    // Check if session has final document data
+    let documentData = session.finalDocumentData;
+    
+    // Fallback: Build document data from the last substantive assistant message
+    // This handles sessions created before the feature or where storage failed
+    if (!documentData) {
+      const savedFinalResponse =
+        typeof session.final_response === "string" &&
+        session.final_response.trim().length > 0
+          ? session.final_response.trim()
+          : null;
+      const substantiveContent =
+        savedFinalResponse ||
+        (session.messages && session.messages.length > 0
+          ? findLastSubstantiveMessage(session)
+          : null);
+      if (substantiveContent) {
+        documentData = buildDocumentDataFromMessage(
+          substantiveContent,
+          session,
+          null
+        );
+        // Save it for future use
+        session.finalDocumentData = documentData;
+        await session.save();
+      }
+    }
+    
+    if (!documentData) {
+      return res.status(404).json({
+        error: "Document not available",
+        message:
+          "This session does not have a final document available for download. The session may not be completed yet.",
+      });
+    }
+
+      try {
+        // Generate document
+        const documentBuffer = await generateDocument(
+          documentData,
+          format
+        );
+
+        // Get filename
+        const filename = getDocumentFilename(documentData, format);
+
+      // Set response headers
+      const contentType =
+        format === "pdf"
+          ? "application/pdf"
+          : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`
+      );
+      res.setHeader("Content-Length", documentBuffer.length);
+
+      // Send document
+      res.send(documentBuffer);
+    } catch (generationError) {
+      console.error("Document generation error:", generationError);
+      return res.status(500).json({
+        error: "Document generation failed",
+        message: generationError.message,
+      });
+    }
+  } catch (error) {
+    console.error("Download document error:", error);
+    return res.status(500).json({
+      error: "Failed to download document",
+      message: error.message,
+    });
+  }
 });
 
 export default router;

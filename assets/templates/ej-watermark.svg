@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="#22743a">
+  <!-- Scales of Justice - EqualJustice Watermark -->
+  <g opacity="1">
+    <!-- Center pillar -->
+    <rect x="194" y="100" width="12" height="200" rx="3"/>
+    <!-- Base -->
+    <rect x="140" y="290" width="120" height="14" rx="7"/>
+    <rect x="160" y="300" width="80" height="12" rx="6"/>
+    <!-- Beam -->
+    <rect x="80" y="94" width="240" height="12" rx="6"/>
+    <!-- Top ornament -->
+    <circle cx="200" cy="88" r="18"/>
+    <circle cx="200" cy="88" r="10" fill="white"/>
+    <text x="200" y="93" text-anchor="middle" font-size="14" font-weight="bold" font-family="serif" fill="#22743a">EJ</text>
+    <!-- Left chain -->
+    <line x1="100" y1="106" x2="100" y2="160" stroke="#22743a" stroke-width="4" stroke-linecap="round"/>
+    <!-- Left pan -->
+    <path d="M 50 160 Q 55 155 100 155 Q 145 155 150 160 Q 145 200 100 210 Q 55 200 50 160 Z"/>
+    <!-- Right chain -->
+    <line x1="300" y1="106" x2="300" y2="160" stroke="#22743a" stroke-width="4" stroke-linecap="round"/>
+    <!-- Right pan -->
+    <path d="M 250 160 Q 255 155 300 155 Q 345 155 350 160 Q 345 200 300 210 Q 255 200 250 160 Z"/>
+    <!-- Text -->
+    <text x="200" y="350" text-anchor="middle" font-size="28" font-weight="bold" font-family="'Georgia', serif" letter-spacing="3">EQUALJUSTICE</text>
+  </g>
+</svg>

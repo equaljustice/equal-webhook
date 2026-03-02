@@ -16,6 +16,7 @@ import express from "express";
 import { pinoHttp, logger } from "./utils/logging.js";
 import APIrouter from "./routes.js";
 import { connectDB } from "./src/db/config.js";
+import { seedPromptsFromLocal } from "./src/utils/promptManager.js";
 import cors from "cors";
 const app = express();
 
@@ -74,29 +75,36 @@ app.get("/health", (req, res) => {
 
 // JSON body parser - only for requests with JSON content type
 // Configure to handle empty bodies gracefully
-app.use(express.json({ 
-  type: ["application/json"],
-  limit: '10mb'
-}));
+app.use(
+  express.json({
+    type: ["application/json"],
+    limit: "10mb",
+  }),
+);
 
 // Error handling middleware for JSON parsing errors (must be after body parser)
 app.use((err, req, res, next) => {
-  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
     // JSON parsing error - likely empty or invalid JSON body
     // For GET/HEAD/DELETE requests, this is fine - just continue without body
-    if (['GET', 'HEAD', 'DELETE', 'OPTIONS'].includes(req.method)) {
+    if (["GET", "HEAD", "DELETE", "OPTIONS"].includes(req.method)) {
       req.body = {};
       return next();
     }
-    return res.status(400).json({ 
-      error: 'Invalid JSON in request body',
-      message: err.message 
+    return res.status(400).json({
+      error: "Invalid JSON in request body",
+      message: err.message,
     });
   }
   next(err);
 });
 
-connectDB();
+// Connect to MongoDB, then seed prompts from local files if DB is empty
+connectDB().then(() => {
+  seedPromptsFromLocal().catch((err) =>
+    console.error("Failed to seed prompts:", err.message),
+  );
+});
 
 // Use request-based logger for log correlation
 app.use(
@@ -105,7 +113,7 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: "*",
     credentials: true,
-  })
+  }),
 );
 
 app.use((req, res, next) => {
@@ -125,10 +133,13 @@ app.use("/api", APIrouter);
 
 // Final error handler for any unhandled errors
 app.use((err, req, res, next) => {
-  logger.error({ err, req: { method: req.method, url: req.url } }, 'Unhandled error');
+  logger.error(
+    { err, req: { method: req.method, url: req.url } },
+    "Unhandled error",
+  );
   res.status(err.status || 500).json({
-    error: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    error: err.message || "Internal server error",
+    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });
 });
 
