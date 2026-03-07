@@ -1,24 +1,11 @@
-# Ignore node modules and debug logs
 node_modules
 npm-debug.log
-yarn-error.log
-
-# Ignore Git and Docker metadata
+Dockerfile
+.dockerignore
 .git
 .gitignore
-.dockerignore
-.gcloudignore
-
-# Ignore local environment files
 .env
-.env.*
 
-# Ignore documentation and unnecessary files
-README.md
-LICENSE
+# Documentation
+docs/
 *.md
-
-# Ignore build or test artifacts
-coverage
-dist
-tmp

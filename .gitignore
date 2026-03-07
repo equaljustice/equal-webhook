@@ -29,3 +29,6 @@ thread_**
 emboutput.csv
 localtestingchetan.docx
 test**
+
+# Documentation (internal docs, not tracked in git)
+docs/
