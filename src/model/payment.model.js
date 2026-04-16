@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const paymentSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   sessionId: { type: String, required: true },
+  paymentCycle: { type: Number, default: 0 },
   status: {
     value: {
       type: String,

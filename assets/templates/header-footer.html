@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{TITLE}}</title>
   <style>
+    /* @page margin is replaced at runtime in generatePDF() to match header/footer bands */
     @page {
-      margin: 60px 50px 50px 50px;
+      margin: 0;
       size: A4;
     }
     
@@ -156,15 +157,28 @@
     
     /* End-of-document info */
     .document-end-info {
-      margin-top: 50px;
-      padding-top: 15px;
+      margin-top: 28px;
+      padding-top: 10px;
       font-size: 9pt;
       color: #999;
       text-align: left;
     }
+
+    /*
+     * PDF: gap between fixed header/footer (margin box) and flowing text.
+     * pdf-content-safe is set for all PDFs from this template.
+     */
+    body.pdf-content-safe .content {
+      padding-top: 4px;
+      padding-bottom: 6px;
+    }
+    body.will-print.pdf-content-safe .content {
+      padding-top: 4px;
+      padding-bottom: 4px;
+    }
   </style>
 </head>
-<body>
+<body class="{{BODY_CLASS}}">
   <div class="content">
     {{CONTENT}}
     <div class="document-end-info">

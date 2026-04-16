@@ -12,6 +12,7 @@
     "dev": "nodemon -r dotenv/config ./index.js",
     "build-image": "gcloud builds submit --pack image=asia-south1-docker.pkg.dev/atmprebuiltagent/cloud-run-source-deploy:manual",
     "deploy": "gcloud run deploy microservice-template --image asia-south1-docker.pkg.dev/atmprebuiltagent/cloud-run-source-deploy:manual --region asia-south1",
+    "gen:test-docs": "node scripts/generate-will-multipage-samples.mjs",
     "test": "mocha test/app.test.js --check-leaks",
     "system-test": "mocha test/system.test.js --timeout=180000",
     "seed-admin": "node scripts/seed-admin.js",

@@ -16,6 +16,25 @@ export const SPECIAL_ACCESS_USER_IDS = [
   // Add more user IDs here as needed
 ];
 
+/**
+ * Layout profiles for PDF/DOCX generation. Add new ids when you add a new layout
+ * block in documentGenerator (e.g. legal_notice, prenup).
+ */
+export const DOCUMENT_TEMPLATE_PROFILE = {
+  DEFAULT: "default",
+  WILL: "will",
+};
+
+/**
+ * Maps Session.assistantKey (product use-case) to a DOCUMENT_TEMPLATE_PROFILE value.
+ * One assistant key → one template. Unlisted keys use metadata/heuristic fallback.
+ */
+export const ASSISTANT_KEY_TO_DOCUMENT_TEMPLATE = {
+  will: DOCUMENT_TEMPLATE_PROFILE.WILL,
+  will_instructions: DOCUMENT_TEMPLATE_PROFILE.WILL,
+  create_my_will: DOCUMENT_TEMPLATE_PROFILE.WILL,
+};
+
 // Document generation configuration
 export const DOCUMENT_CONFIG = {
   branding: {

@@ -18,6 +18,15 @@ const axiosInstance = axios.create({
   },
 });
 
+const getCyclePayableAmount = (session, cycleNumber) => {
+  if ((cycleNumber || 0) <= 1) {
+    return session.price;
+  }
+  return typeof session.additionalPrice === "number"
+    ? session.additionalPrice
+    : session.price;
+};
+
 router.post("/create-order/:sessionId", jwtAuth, async (req, res) => {
   const userId = req.user.id;
   const email = req.user.email;
@@ -31,7 +40,9 @@ router.post("/create-order/:sessionId", jwtAuth, async (req, res) => {
     return res.status(400).json({ message: "Session already paid" });
   }
 
-  const amt = session.price * 100; //In paisa
+  const paymentCycle = session.paymentCycle || 0;
+  const payableAmount = getCyclePayableAmount(session, paymentCycle);
+  const amt = payableAmount * 100; //In paisa
   // const amt = 100;
 
   if (!amt || !email)
@@ -55,6 +66,7 @@ router.post("/create-order/:sessionId", jwtAuth, async (req, res) => {
     const dbPayload = {
       userId,
       sessionId: session._id,
+      paymentCycle,
       status: {
         value: "unpaid",
         paidAt: null,

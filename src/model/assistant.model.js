@@ -5,8 +5,13 @@ const assistantSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true },
   assistantId: { type: String, required: true, unique: true },
   price: { type: Number, required: true },
+  actualPrice: { type: Number },
+  additionalPrice: { type: Number },
+  actualAdditionalPrice: { type: Number },
   description: { type: String },
   provider: { type: String, enum: ['openai', 'gemini'], required: true },
+  /** When true, clients may show PDF/Word download after a completed document session */
+  docDownloadAvailable: { type: Boolean, default: false },
   config: { type: mongoose.Schema.Types.Mixed },
 });
 
