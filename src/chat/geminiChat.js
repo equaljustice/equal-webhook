@@ -4,8 +4,10 @@ import {
   resolveGeminiModel,
 } from "../utils/geminiConfig.js";
 import { withTimeout } from "./messageControlParse.js";
+import { buildTurnContextMessage, isFinalGenerationTurn } from "./sessionStateProtocol.js";
 
 const GEMINI_STREAM_TIMEOUT_MS = 120000;
+const TRIMMED_HISTORY_TURNS = parseInt(process.env.GEMINI_TRIM_HISTORY_TURNS || "2", 10);
 
 /**
  * Stream Gemini generateContent; invoke onChunk for each text delta.
@@ -16,6 +18,7 @@ export async function streamGeminiChat({
   model,
   sourceConfig = {},
   systemInstructionText,
+  cachedContentName,
   contents,
   onChunk,
   timeoutMs = GEMINI_STREAM_TIMEOUT_MS,
@@ -24,7 +27,8 @@ export async function streamGeminiChat({
   const resolvedModel = resolveGeminiModel(sourceConfig);
   const config = buildGeminiGenerationConfig({
     sourceConfig,
-    systemInstructionText,
+    systemInstructionText: cachedContentName ? undefined : systemInstructionText,
+    cachedContentName,
   });
 
   let fullText = "";
@@ -55,13 +59,31 @@ export async function streamGeminiChat({
 /**
  * Build Gemini contents array from session history + current user turn.
  */
-export function buildGeminiHistory(session, userMessage, filesToUse = []) {
-  const history = (session.messages || []).map((msg) => ({
+export function buildGeminiHistory(
+  session,
+  userMessage,
+  filesToUse = [],
+  options = {}
+) {
+  const { dynamicOverlay = "", useTrimmedHistory = true } = options;
+  const fullHistory = useTrimmedHistory
+    ? sliceRecentHistory(session.messages || [], TRIMMED_HISTORY_TURNS)
+    : session.messages || [];
+
+  const history = fullHistory.map((msg) => ({
     role: msg.role === "user" ? "user" : "model",
     parts: [{ text: msg.content }],
   }));
 
-  const currentParts = [{ text: userMessage }];
+  const historyMode = useTrimmedHistory ? "trimmed" : "full";
+  const wrappedUser = buildTurnContextMessage({
+    session,
+    userMessage,
+    dynamicOverlay,
+    historyMode,
+  });
+
+  const currentParts = [{ text: wrappedUser }];
   for (const fileUri of filesToUse) {
     if (fileUri) {
       currentParts.push({ fileData: { fileUri } });
@@ -69,6 +91,29 @@ export function buildGeminiHistory(session, userMessage, filesToUse = []) {
   }
   history.push({ role: "user", parts: currentParts });
   return history;
+}
+
+function sliceRecentHistory(messages, turnCount) {
+  if (!turnCount || turnCount <= 0) return [];
+  const maxMessages = turnCount * 2;
+  if (messages.length <= maxMessages) return messages;
+  return messages.slice(-maxMessages);
+}
+
+/**
+ * Build contents for legacy AI-led chat with optional trimmed history.
+ */
+export function buildLegacyGeminiContents({
+  session,
+  userMessage,
+  filesToUse = [],
+  dynamicOverlay = "",
+}) {
+  const useFullHistory = isFinalGenerationTurn(session, userMessage);
+  return buildGeminiHistory(session, userMessage, filesToUse, {
+    dynamicOverlay,
+    useTrimmedHistory: !useFullHistory,
+  });
 }
 
 /**

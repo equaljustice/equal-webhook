@@ -1,6 +1,7 @@
 import { paymentBarrierMessage, detectChatLanguageFromText } from "./messageControlParse.js";
 import { FLOW_STATES } from "../flow/flowConstants.js";
 import { buildControlJson } from "../flow/flowContent.js";
+import { QA_PHASES } from "./sessionStateProtocol.js";
 
 export function getCyclePayableAmount(session, cycleNumber) {
   if ((cycleNumber || 0) <= 1) {
@@ -72,6 +73,59 @@ export function enforceFlowGuards(session, uploadInfo) {
     console.warn("[FlowGuard] Overrode illegal model flags", {
       sessionId: session._id || session.guestSessionId,
       flowState: session.flowState,
+      violations: corrected.violations,
+    });
+  }
+
+  return corrected;
+}
+
+/**
+ * Server-side guardrails for AI-led (legacy) assistants — payment/termination/document timing.
+ */
+export function enforceLegacySessionGuards(session, uploadInfo, { isSpecialAccess = false } = {}) {
+  const corrected = { ...uploadInfo, violations: [] };
+  const phase = session.qaPhase || QA_PHASES.QA_IN_PROGRESS;
+
+  if (corrected.paymentRequired && (session.isPaid || isSpecialAccess)) {
+    corrected.paymentRequired = false;
+    corrected.violations.push("payment_already_paid");
+  }
+
+  if (
+    corrected.documentReady &&
+    !isSpecialAccess &&
+    !session.isPaid &&
+    phase !== QA_PHASES.READY_FOR_FINAL &&
+    phase !== QA_PHASES.FINAL_GENERATED
+  ) {
+    corrected.documentReady = false;
+    corrected.violations.push("document_before_payment");
+  }
+
+  if (corrected.sessionTerminated) {
+    if (
+      phase === QA_PHASES.QA_IN_PROGRESS ||
+      phase === QA_PHASES.WAITING_PAYMENT
+    ) {
+      corrected.sessionTerminated = false;
+      corrected.terminationMessage = null;
+      corrected.violations.push("termination_during_qa");
+    } else if (
+      !corrected.documentReady &&
+      phase !== QA_PHASES.FINAL_GENERATED &&
+      phase !== QA_PHASES.TERMINATED
+    ) {
+      corrected.sessionTerminated = false;
+      corrected.terminationMessage = null;
+      corrected.violations.push("termination_before_document");
+    }
+  }
+
+  if (corrected.violations.length) {
+    console.warn("[LegacyGuard] Overrode illegal model flags", {
+      sessionId: session._id || session.guestSessionId,
+      qaPhase: phase,
       violations: corrected.violations,
     });
   }

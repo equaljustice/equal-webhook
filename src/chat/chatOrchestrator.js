@@ -20,14 +20,29 @@ import {
 import {
   applyPaymentBarrier,
   enforceFlowGuards,
+  enforceLegacySessionGuards,
   getCyclePayableAmount,
 } from "./sessionGuards.js";
 import {
   buildFinalGenerationUserMessage,
+  buildLegacyGeminiContents,
   buildGeminiHistory,
   streamGeminiChat,
 } from "./geminiChat.js";
 import { buildGuestGeminiSystemInstruction } from "./guestSignupOffer.js";
+import { appendGuestSystemInstruction } from "./guestPromptContext.js";
+import {
+  getOrCreateInstructionCache,
+  isInstructionCacheEnabled,
+} from "./geminiInstructionCache.js";
+import {
+  SESSION_STATE_PROTOCOL,
+  mergeSessionStateFromModel,
+  advanceQaPhase,
+  quickOptionsToFlowOptions,
+  isPaymentCompletionMessage,
+  QA_PHASES,
+} from "./sessionStateProtocol.js";
 
 /**
  * Initialize flow on new session when orchestrator is enabled.
@@ -84,6 +99,65 @@ export async function advanceFlowAfterUpload(session, assistant) {
     });
   }
   return null;
+}
+
+/**
+ * Split static instructions (cacheable) from per-session runtime overlay.
+ */
+async function resolveInstructionLayers({
+  assistant,
+  session,
+  filesToUse,
+  isGuest,
+  templateAsset,
+  flowMode = false,
+}) {
+  const asset =
+    templateAsset ||
+    assistant?.config?.systemInstructionAsset ||
+    assistant?.config?.finalGenerationAsset;
+
+  if (!asset) {
+    return {
+      cacheableText: null,
+      dynamicOverlay: SESSION_STATE_PROTOCOL,
+      fullInlineText: null,
+      asset: null,
+    };
+  }
+
+  let cacheableText = await readPromptFile(asset);
+
+  if (flowMode) {
+    cacheableText +=
+      "\n\n=== FLOW MODE: FINAL GENERATION ONLY ===\n" +
+      "You are generating the final legal document. The structured answers JSON in the user message is authoritative. " +
+      "Do not ask new questions. Output the complete document per your template rules. " +
+      "End with control JSON on the last line only.";
+  }
+
+  const dynamicParts = [SESSION_STATE_PROTOCOL];
+
+  if (isGuest) {
+    const guestOverlay = appendGuestSystemInstruction("", session).trim();
+    if (guestOverlay) dynamicParts.unshift(guestOverlay);
+  }
+
+  if (filesToUse?.length > 0) {
+    const fileCount = filesToUse.length;
+    const fileText = fileCount > 1 ? "documents have" : "document has";
+    dynamicParts.push(
+      `IMPORTANT: ${fileCount} uploaded ${fileText} been provided for analysis. ` +
+        "The uploaded document(s) are read-only. Do not invent missing clauses. " +
+        "If information is missing from the document(s), respond with 'Not found in document.' " +
+        "Follow the system rules strictly and analyze only what is present in the uploaded document(s)."
+    );
+  }
+
+  const dynamicOverlay = dynamicParts.join("\n\n");
+  const fullInlineText = `${cacheableText}\n\n${dynamicOverlay}`;
+
+  return { cacheableText, dynamicOverlay, fullInlineText, asset };
 }
 
 async function resolveSystemInstruction({
@@ -293,7 +367,9 @@ async function handleFlowTurn({
     });
 
     const genUserMessage = buildFinalGenerationUserMessage(session, userMessage);
-    const history = buildGeminiHistory(session, genUserMessage, filesToUse);
+    const history = buildGeminiHistory(session, genUserMessage, filesToUse, {
+      useTrimmedHistory: false,
+    });
     const sourceConfig = session.geminiConfig || {};
 
     const assistantMessage = await streamGeminiChat({
@@ -365,9 +441,9 @@ async function handleLegacyGeminiTurn({
   isSpecialAccess,
   onStreamChunk,
 }) {
-  let systemInstructionText;
+  let layers;
   try {
-    systemInstructionText = await resolveSystemInstruction({
+    layers = await resolveInstructionLayers({
       assistant,
       session,
       filesToUse,
@@ -377,15 +453,49 @@ async function handleLegacyGeminiTurn({
     return { error: err.message, status: 500, message: "systemInstruction file not found" };
   }
 
-  const history = buildGeminiHistory(session, userMessage, filesToUse);
+  if (!layers.fullInlineText) {
+    return { error: "No system instruction asset configured", status: 500 };
+  }
+
+  if (!session.qaPhase) {
+    session.qaPhase = QA_PHASES.QA_IN_PROGRESS;
+  }
+
+  if (
+    session.qaPhase === QA_PHASES.WAITING_PAYMENT &&
+    (session.isPaid || isSpecialAccess || isPaymentCompletionMessage(userMessage))
+  ) {
+    session.qaPhase = QA_PHASES.READY_FOR_FINAL;
+  }
+
   const sourceConfig = session.geminiConfig || {};
+  let cachedContentName = session.geminiInstructionCacheName || null;
+
+  if (!cachedContentName && isInstructionCacheEnabled()) {
+    cachedContentName = await getOrCreateInstructionCache({
+      instructionText: layers.cacheableText,
+      sourceConfig,
+      displayName: assistant.key || "assistant",
+    });
+    if (cachedContentName) {
+      session.geminiInstructionCacheName = cachedContentName;
+    }
+  }
+
+  const contents = buildLegacyGeminiContents({
+    session,
+    userMessage,
+    filesToUse,
+    dynamicOverlay: layers.dynamicOverlay,
+  });
 
   let assistantMessage;
   try {
     assistantMessage = await streamGeminiChat({
       sourceConfig,
-      systemInstructionText,
-      contents: history,
+      systemInstructionText: cachedContentName ? undefined : layers.fullInlineText,
+      cachedContentName: cachedContentName || undefined,
+      contents,
       onChunk: onStreamChunk,
     });
   } catch (geminiErr) {
@@ -394,12 +504,28 @@ async function handleLegacyGeminiTurn({
 
   let uploadInfo = extractUploadRequirement(assistantMessage);
   uploadInfo = enforceFlowGuards(session, uploadInfo);
+  uploadInfo = enforceLegacySessionGuards(session, uploadInfo, { isSpecialAccess });
+
+  if (uploadInfo.sessionState) {
+    mergeSessionStateFromModel(session, uploadInfo.sessionState);
+  }
+  if (uploadInfo.selectedLanguage) {
+    session.selectedLanguage = uploadInfo.selectedLanguage;
+  }
+
+  advanceQaPhase(session, uploadInfo);
+
   let cleanMessage = uploadInfo.cleanMessage || assistantMessage;
+  const flowOptions = quickOptionsToFlowOptions(
+    uploadInfo.sessionState?.quick_options || session.lastQuickOptions
+  );
 
   if (uploadInfo.paymentRequired && !isSpecialAccess) {
     const barrier = applyPaymentBarrier(session, {
-      language: detectChatLanguageFromText(cleanMessage),
+      language:
+        session.selectedLanguage || detectChatLanguageFromText(cleanMessage),
     });
+    session.qaPhase = QA_PHASES.WAITING_PAYMENT;
     cleanMessage = barrier.cleanMessage;
     return {
       reply: cleanMessage,
@@ -408,7 +534,9 @@ async function handleLegacyGeminiTurn({
       paymentCycle: barrier.paymentCycle,
       sessionTerminated: false,
       flowMode: false,
+      flowOptions,
       streaming: !!onStreamChunk,
+      instructionCached: !!cachedContentName,
     };
   }
 
@@ -427,7 +555,10 @@ async function handleLegacyGeminiTurn({
     requiresUpload: uploadInfo.requiresUpload,
     uploadType: uploadInfo.uploadType,
     uploadReason: uploadInfo.reason,
+    documentReady: uploadInfo.documentReady,
     flowMode: false,
+    flowOptions,
     streaming: !!onStreamChunk,
+    instructionCached: !!cachedContentName,
   };
 }

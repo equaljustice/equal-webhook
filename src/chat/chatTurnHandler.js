@@ -169,6 +169,7 @@ export async function executeChatTurn({
     streaming: result.streaming || false,
     flowOptions: result.flowOptions || [],
     inputType: result.inputType || null,
+    instructionCached: result.instructionCached || false,
   };
 
   const finalPayload =

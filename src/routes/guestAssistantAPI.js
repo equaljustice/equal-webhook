@@ -163,6 +163,11 @@ function buildGuestSessionDoc({
     askedNodeOrder: [],
     paymentGateShown: false,
     flowAudit: [],
+    qaPhase: "qa_in_progress",
+    currentStep: "language_select",
+    noticeParagraphKeys: [],
+    geminiInstructionCacheName: null,
+    lastQuickOptions: null,
   };
 }
 

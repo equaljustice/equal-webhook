@@ -45,6 +45,12 @@ const sessionSchema = new mongoose.Schema({
   paymentGateShown: { type: Boolean, default: false },
   flowAudit: { type: [mongoose.Schema.Types.Mixed], default: [] },
   selectedLanguage: { type: String },
+  // AI-led session state (legacy + cached-instruction mode)
+  qaPhase: { type: String },
+  currentStep: { type: String },
+  noticeParagraphKeys: { type: [String], default: [] },
+  geminiInstructionCacheName: { type: String },
+  lastQuickOptions: { type: mongoose.Schema.Types.Mixed },
 });
 
 export const Session = mongoose.model("Session", sessionSchema);

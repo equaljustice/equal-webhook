@@ -346,6 +346,7 @@ const emptyUploadInfo = (cleanMessage = "") => ({
   finalResponse: null,
   guestSignupOffer: false,
   selectedLanguage: null,
+  sessionState: null,
 });
 
 export const extractUploadRequirement = (message) => {
@@ -423,6 +424,10 @@ export const extractUploadRequirement = (message) => {
           selectedLanguage:
             typeof metadata.selected_language === "string"
               ? metadata.selected_language.trim()
+              : null,
+          sessionState:
+            metadata.session_state && typeof metadata.session_state === "object"
+              ? metadata.session_state
               : null,
         };
       }

@@ -45,6 +45,7 @@ export function resolveGeminiModel(sourceConfig = {}) {
 export function buildGeminiGenerationConfig({
   sourceConfig = {},
   systemInstructionText,
+  cachedContentName,
 } = {}) {
   const config = {
     temperature: resolveGenerationParam(sourceConfig, "temperature"),
@@ -54,6 +55,10 @@ export function buildGeminiGenerationConfig({
 
   if (systemInstructionText) {
     config.systemInstruction = [{ text: systemInstructionText }];
+  }
+
+  if (cachedContentName) {
+    config.cachedContent = cachedContentName;
   }
 
   return config;
