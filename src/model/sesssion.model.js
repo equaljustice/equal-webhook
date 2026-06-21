@@ -34,6 +34,17 @@ const sessionSchema = new mongoose.Schema({
   finalDocumentData: { type: mongoose.Schema.Types.Mixed, default: null },
   // Explicit final response used for document downloads
   final_response: { type: String, default: null },
+  // Flow orchestrator (deterministic Q&A)
+  useFlowOrchestrator: { type: Boolean, default: false },
+  flowKey: { type: String },
+  flowVersion: { type: Number },
+  flowState: { type: String },
+  currentNodeId: { type: String },
+  answers: { type: mongoose.Schema.Types.Mixed, default: {} },
+  askedNodeOrder: { type: [String], default: [] },
+  paymentGateShown: { type: Boolean, default: false },
+  flowAudit: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  selectedLanguage: { type: String },
 });
 
 export const Session = mongoose.model("Session", sessionSchema);

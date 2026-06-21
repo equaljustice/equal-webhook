@@ -1,6 +1,5 @@
 import express from "express";
 import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
 import { v4 as uuidv4 } from "uuid";
 import multer from "multer";
 import os from "os";
@@ -13,11 +12,6 @@ import {
   getDocumentFilename,
 } from "../utils/documentGenerator.js";
 import {
-  buildGeminiGenerationConfig,
-  resolveGeminiModel,
-} from "../utils/geminiConfig.js";
-import {
-  withTimeout,
   persistSessionDocumentSnapshot,
   extractUploadRequirement,
   detectChatLanguageFromText,
@@ -25,6 +19,7 @@ import {
   buildDocumentDataFromMessage,
   findLastSubstantiveMessage,
 } from "../chat/messageControlParse.js";
+import { getCyclePayableAmount } from "../chat/sessionGuards.js";
 import {
   getGuestSession,
   putGuestSession,
@@ -38,11 +33,16 @@ import {
 import { signGuestToken, verifyGuestToken } from "../services/guestToken.js";
 import { guestUploadDocumentHandler } from "../handlers/guestUploadDocumentHandler.js";
 import {
-  buildGuestGeminiSystemInstruction,
   buildGuestOpenAiAdditionalInstructions,
   enrichGuestApiResponse,
   processGuestAssistantReply,
 } from "../chat/guestSignupOffer.js";
+import {
+  bootstrapFlowSession,
+  executeChatTurn,
+  executeChatTurnStream,
+  preflightChatTurn,
+} from "../chat/chatTurnHandler.js";
 import {
   trackGuestChatStarted,
   trackGuestMessageSent,
@@ -51,7 +51,6 @@ import {
 const router = express.Router();
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const OPENAI_RUN_POLL_MAX_ATTEMPTS = 120;
-const GEMINI_STREAM_TIMEOUT_MS = 120000;
 
 const guestUpload = multer({
   dest: os.tmpdir(),
@@ -77,15 +76,6 @@ const guestUpload = multer({
     }
   },
 });
-
-const getCyclePayableAmount = (session, cycleNumber) => {
-  if ((cycleNumber || 0) <= 1) {
-    return session.price;
-  }
-  return typeof session.additionalPrice === "number"
-    ? session.additionalPrice
-    : session.price;
-};
 
 function readGuestToken(req) {
   return req.get("guest-token") || req.get("Guest-Token");
@@ -164,6 +154,15 @@ function buildGuestSessionDoc({
     selectedLanguage: null,
     signupOfferShown: false,
     signupOfferResponse: null,
+    useFlowOrchestrator: false,
+    flowKey: null,
+    flowVersion: null,
+    flowState: null,
+    currentNodeId: null,
+    answers: {},
+    askedNodeOrder: [],
+    paymentGateShown: false,
+    flowAudit: [],
   };
 }
 
@@ -443,6 +442,8 @@ router.post("/guest/start-session", async (req, res) => {
       isPaid,
     });
 
+    await bootstrapFlowSession(sessionDoc, assistant);
+
     await putGuestSession(guestSessionId, sessionDoc);
 
     trackGuestChatStarted({
@@ -521,6 +522,56 @@ router.post("/guest/signup-offer-response", async (req, res) => {
   }
 });
 
+router.post("/guest/send-message-stream", async (req, res) => {
+  try {
+    const decoded = requireGuestContext(req, res);
+    if (!decoded) return;
+
+    const { guestSessionId, userMessage, fileId } = req.body || {};
+    if (!guestSessionId || !userMessage) {
+      return res.status(400).json({ error: "guestSessionId and userMessage are required" });
+    }
+    if (decoded.guestSessionId !== guestSessionId) {
+      return res.status(403).json({ error: "guestSessionId does not match guest-token" });
+    }
+
+    const session = await getGuestSession(guestSessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Guest session not found or expired" });
+    }
+
+    const preflight = preflightChatTurn(session, { requirePaid: true });
+    if (!preflight.ok) {
+      return res.status(preflight.status).json(preflight.body);
+    }
+
+    const assistantRow = await Assistant.findOne({ assistantId: session.assistantId });
+    if (!assistantRow) {
+      return res.status(404).json({ error: "Assistant not found" });
+    }
+
+    if (session.provider !== "gemini") {
+      return res.status(400).json({ error: "Streaming is only supported for Gemini sessions" });
+    }
+
+    await executeChatTurnStream(req, res, {
+      session,
+      assistant: assistantRow,
+      userMessage,
+      fileId,
+      isGuest: true,
+    });
+
+    await putGuestSession(guestSessionId, session);
+    recordGuestMessageAnalytics(session, guestSessionId, req);
+  } catch (err) {
+    console.error("guest/send-message-stream", err);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+});
+
 router.post("/guest/send-message", async (req, res) => {
   try {
     const decoded = requireGuestContext(req, res);
@@ -546,241 +597,38 @@ router.post("/guest/send-message", async (req, res) => {
     }
 
     const isSpecialAccess = false;
-    if (!session.isPaid && !isSpecialAccess) {
-      return res.status(403).json({ error: "Payment required before chatting" });
+    const preflight = preflightChatTurn(session, {
+      isSpecialAccess,
+      requirePaid: true,
+    });
+    if (!preflight.ok) {
+      return res.status(preflight.status).json(preflight.body);
     }
 
-    if (session.isDocUploadRequired && !session.isDocUploaded) {
-      return res.status(403).json({
-        error: "Document upload required",
-        requiresUpload: true,
-      });
+    const assistantRow = await Assistant.findOne({
+      assistantId: session.assistantId,
+    });
+    if (!assistantRow) {
+      return res.status(404).json({ error: "Assistant not found" });
     }
-
-    let filesToUse = [];
-    if (
-      session.supportsMultipleUploads &&
-      session.uploadedFileIds?.length > 0
-    ) {
-      filesToUse = session.uploadedFileIds;
-    } else if (session.uploadedFileId) {
-      filesToUse = [session.uploadedFileId];
-    } else if (fileId) {
-      filesToUse = [fileId];
-    }
-
-    if (fileId && !session.uploadedFileId) {
-      if (session.supportsMultipleUploads) {
-        if (!session.uploadedFileIds) {
-          session.uploadedFileIds = [];
-        }
-        session.uploadedFileIds.push(fileId);
-      }
-      session.uploadedFileId = fileId;
-      session.isDocUploaded = true;
-      session.isDocUploadRequired = false;
-      session.uploadAttempts = (session.uploadAttempts || 0) + 1;
-    }
-
-    if (!session.messages) session.messages = [];
 
     if (session.provider === "gemini") {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const history = (session.messages || []).map((msg) => ({
-        role: msg.role === "user" ? "user" : "model",
-        parts: [{ text: msg.content }],
-      }));
-
-      const currentMessageParts = [{ text: userMessage }];
-      for (const fileUri of filesToUse) {
-        if (fileUri) {
-          currentMessageParts.push({
-            fileData: { fileUri: fileUri },
-          });
-        }
-      }
-
-      history.push({ role: "user", parts: currentMessageParts });
-      const sourceConfig = session.geminiConfig || {};
-      const model = resolveGeminiModel(sourceConfig);
-
-      let systemInstructionText;
-      try {
-        const assistantRow = await Assistant.findOne({
-          assistantId: session.assistantId,
-        });
-        if (
-          assistantRow &&
-          assistantRow.config &&
-          assistantRow.config.systemInstructionAsset
-        ) {
-          try {
-            systemInstructionText = await buildGuestGeminiSystemInstruction(
-              assistantRow,
-              session,
-              filesToUse
-            );
-          } catch (err) {
-            return res.status(500).json({
-              error: "systemInstruction file not found",
-              message: err.message,
-            });
-          }
-        }
-      } catch (resolveErr) {
-        return res.status(500).json({
-          error: "Failed to resolve systemInstruction asset",
-          message: resolveErr.message,
-        });
-      }
-
-      const config = buildGeminiGenerationConfig({
-        sourceConfig,
-        systemInstructionText,
+      const turn = await executeChatTurn({
+        session,
+        assistant: assistantRow,
+        userMessage,
+        fileId,
+        isGuest: true,
+        isSpecialAccess,
       });
 
-      let assistantMessage = "";
-      try {
-        await withTimeout(
-          (async () => {
-            const response = await ai.models.generateContentStream({
-              model,
-              config,
-              contents: history,
-            });
-            for await (const chunk of response) {
-              if (chunk.text) {
-                assistantMessage += chunk.text;
-              }
-            }
-          })(),
-          GEMINI_STREAM_TIMEOUT_MS,
-          "Gemini stream"
-        );
-      } catch (geminiErr) {
-        return res
-          .status(500)
-          .json({ error: geminiErr.message, message: "Gemini failed" });
+      if (turn?.error) {
+        return res.status(turn.status || 500).json(turn.body || { error: "Chat failed" });
       }
 
-      const uploadInfo = extractUploadRequirement(assistantMessage);
-      let cleanMessage = uploadInfo.cleanMessage || assistantMessage;
-
-      if (uploadInfo.paymentRequired && !isSpecialAccess) {
-        if (session.isPaid) {
-          session.paymentCycle = (session.paymentCycle || 0) + 1;
-        }
-        const paymentCycle = session.paymentCycle || 0;
-        const paymentAmount = getCyclePayableAmount(session, paymentCycle);
-        session.isPaid = false;
-        cleanMessage = paymentBarrierMessage(
-          detectChatLanguageFromText(cleanMessage)
-        );
-        console.log("Payment barrier activated for guest session:", guestSessionId);
-
-        session.messages.push({ role: "user", content: userMessage });
-        session.messages.push({ role: "assistant", content: cleanMessage });
-        processGuestAssistantReply(session, uploadInfo, userMessage);
-        await putGuestSession(guestSessionId, session);
-        recordGuestMessageAnalytics(session, guestSessionId, req);
-
-        return res.json(
-          enrichGuestApiResponse(
-            {
-              reply: cleanMessage,
-              sessionTerminated: false,
-              terminationMessage: null,
-              paymentRequired: true,
-              paymentAmount,
-              paymentCycle,
-            },
-            session,
-            uploadInfo
-          )
-        );
-      }
-
-      session.messages.push({ role: "user", content: userMessage });
-      session.messages.push({ role: "assistant", content: cleanMessage });
-
-      const resolvedFinalResponse =
-        typeof uploadInfo.finalResponse === "string" &&
-        uploadInfo.finalResponse.trim().length > 0
-          ? uploadInfo.finalResponse.trim()
-          : null;
-      if (resolvedFinalResponse) {
-        session.final_response = resolvedFinalResponse;
-      }
-
-      persistSessionDocumentSnapshot(
-        session,
-        guestSessionId,
-        uploadInfo,
-        cleanMessage
-      );
-
-      const requiresUpload = uploadInfo.requiresUpload;
-      const uploadType = uploadInfo.uploadType;
-      const isReUpload =
-        uploadType === "re_upload" ||
-        (requiresUpload && session.isDocUploaded && session.uploadAttempts > 0);
-
-      if (requiresUpload) {
-        if (session.uploadAttempts < 2) {
-          session.isDocUploadRequired = true;
-          if (isReUpload) {
-            session.isDocUploaded = false;
-            if (!session.supportsMultipleUploads) {
-              session.uploadedFileId = null;
-              session.uploadedFileIds = [];
-            }
-          }
-        } else {
-          session.isDocUploadRequired = false;
-        }
-      } else {
-        if (session.isDocUploaded && filesToUse.length > 0 && !requiresUpload) {
-          session.isDocUploadRequired = false;
-        }
-        if (session.uploadAttempts >= 2) {
-          session.isDocUploadRequired = false;
-        }
-      }
-
-      processGuestAssistantReply(session, uploadInfo, userMessage);
       await putGuestSession(guestSessionId, session);
       recordGuestMessageAnalytics(session, guestSessionId, req);
-
-      if (session.isDocUploadRequired && !session.isDocUploaded) {
-        return res.json(
-          enrichGuestApiResponse(
-            {
-              reply: cleanMessage,
-              requiresUpload: true,
-              isReUpload: uploadType === "re_upload",
-              uploadReason: uploadInfo.reason || null,
-              sessionTerminated: uploadInfo.sessionTerminated || false,
-              terminationMessage: uploadInfo.terminationMessage || null,
-              paymentRequired: false,
-            },
-            session,
-            uploadInfo
-          )
-        );
-      }
-
-      return res.json(
-        enrichGuestApiResponse(
-          {
-            reply: cleanMessage,
-            sessionTerminated: uploadInfo.sessionTerminated || false,
-            terminationMessage: uploadInfo.terminationMessage || null,
-            paymentRequired: false,
-          },
-          session,
-          uploadInfo
-        )
-      );
+      return res.json(turn);
     }
 
     await client.beta.threads.messages.create(session.threadId, {

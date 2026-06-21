@@ -1,0 +1,97 @@
+{
+  "_comment": "Content companion for _reference.emp_termination_part_a_q4_q7.flow.json — verbatim legal text from emp_termination_intructions.txt",
+  "nature_of_employment": {
+    "title": { "en": "Nature of employment" },
+    "text": { "en": "Your nature of employment?" }
+  },
+  "probation_termination_reason": {
+    "title": { "en": "Probation termination reason" },
+    "text": { "en": "What is the reason for termination?" }
+  },
+  "probation_mass_layoff_info": {
+    "text": {
+      "en": "If your exit happened in a mass layoff/retrenchment, you may still have rights on process and dues (e.g., proper selection criteria/LIFO where applicable, statutory compensation and notice pay, anti-retaliation). I'll collect facts to assess what additional compensation you can seek."
+    }
+  },
+  "probation_role_changed": {
+    "title": { "en": "Role changes during probation" },
+    "text": {
+      "en": "Has your role and responsibilities changed by the company during your probation period?"
+    }
+  },
+  "contract_regularly_renewed": {
+    "title": { "en": "Contract renewal" },
+    "text": { "en": "Has your contract been regularly renewed?" }
+  },
+  "tenure_of_employment": {
+    "title": { "en": "Employment tenure" },
+    "text": {
+      "en": "How long have you been employed with your company on the date of termination?"
+    }
+  },
+  "nature_of_job": {
+    "title": { "en": "Nature of job" },
+    "text": { "en": "What is your nature of job:" }
+  },
+  "manager_authority_hire": {
+    "title": { "en": "Managerial authority" },
+    "text": {
+      "en": "Did you have all of these authorities over your team viz. to hire, approve leave, discipline, do appraisals, and recommend promotions?"
+    }
+  },
+  "manager_authority_budget": {
+    "title": { "en": "Budget authority" },
+    "text": {
+      "en": "Could you approve budgets/payments or sign documents binding the company?"
+    }
+  },
+  "manager_authority_represent": {
+    "title": { "en": "External representation" },
+    "text": {
+      "en": "Did you represent the company to outsiders with power to commit it?"
+    }
+  },
+  "manager_time_managerial": {
+    "title": { "en": "Time on managerial tasks" },
+    "text": {
+      "en": "Did you spend more than 75% of your work time on the above managerial tasks?"
+    }
+  },
+  "manager_not_workman_info": {
+    "text": {
+      "en": "Based on your answers, you will not be treated as a \"Workman\" under the Industrial Disputes Act and may lack certain special employment protections / benefits on retrenchments."
+    }
+  },
+  "statutory_position": {
+    "title": { "en": "Statutory positions" },
+    "text": {
+      "en": "Are you holding any statutory position in your company like board of directors, compliance officer, nodal officer, grievance officer, principal officer, manager, occupier, etc.?"
+    }
+  },
+  "bank_signatory_question": {
+    "title": { "en": "Bank signatory" },
+    "text": {
+      "en": "If you are a signatory to the bank accounts of your company, have you signed any cheques or given any auto debit instructions for the company which are not yet encashed or signed any post dated cheques?"
+    }
+  },
+  "noticeParagraphs": {
+    "probation_role_changed_para": {
+      "en": "My roles and responsibilities were changed frequently without justification and my free consent, and these changes have prevented me from performing effectively, and therefore the non-extention or termination was not justified and illegal."
+    },
+    "contract_renewal_para": {
+      "en": "Continuous or frequent renewal of my contract, would make my legal relationship with the employer that of employer-employee and not contractual, and therefore, I should be treated at par with any other permanent employee of the employer for any employment or other legal rights, remedies and benefits."
+    },
+    "tenure_under_240_para": {
+      "en": "I was not allowed to complete my employment tenure to be eligible to have one year of continuous service that entitles me to earn certain benefits, compensation and pay-outs under various labour laws including without limitation Industrial Disputes Act and Shops and Establishment Act. Without going into the merits of the process of termination, and without prejudice to my other rights and remedies, the employer ought to have paid me my statutory entitlement as if I have worked for one year of continuous service, which I am deprived of due to this termination of employment by the employer."
+    },
+    "manager_workman_para": {
+      "en": "Although my role is that of a manager, a substantial part of my job is to undertake manual, technical and skilled jobs and a non-substantial portion is to manage a team or the business of the organization. I should therefore not be considered as a manager but should be considered as a technical and skilled workman for the purpose of my rights, remedies, and benefits under applicable employment laws, and should not be deprived of the same."
+    },
+    "statutory_position_notice_para": {
+      "en": "As I am holding certain statutory positions, you are required to immediately notify the relevant statutory authorities of my cessation of employment, and provide me with proof of such notification. The employer should continue to be obligated to indemnify, protect and defend me for any claims that I am already subject to or may be subject to due to my holding such statutory positions for the employer. I hereby reiterate that my duties under these statutory positions were taken under the overall directions, supervision and advice of the senior management and my managers, and not by me alone."
+    },
+    "statutory_position_police_para": {
+      "en": "I would like to put on record that I have ceased to hold all statutory positions under applicable laws that I was holding for my employer during my employment. I have informed my employer to inform all the relevant statutory authorities of my cessation of my such statutory positions. I would further like to put on record through your good offices that the duties performed by me under these statutory positions were performed under the overall directions, supervision and advice of the senior management and my managers, and not by me alone."
+    }
+  }
+}

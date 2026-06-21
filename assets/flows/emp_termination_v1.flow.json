@@ -1,0 +1,108 @@
+{
+  "flowKey": "emp_termination",
+  "version": 1,
+  "deferPayment": true,
+  "paymentMode": "once",
+  "startNodeId": "language_select",
+  "finalTemplateAsset": "assets/prompts/emp_termination_intructions.txt",
+  "nodes": {
+    "language_select": {
+      "type": "question",
+      "contentKey": "language_select",
+      "input": { "type": "language_select" },
+      "storeAs": "language",
+      "next": "greeting"
+    },
+    "greeting": {
+      "type": "message",
+      "contentKey": "greeting",
+      "next": "confirm_understood"
+    },
+    "confirm_understood": {
+      "type": "question",
+      "contentKey": "confirm_understood",
+      "input": {
+        "type": "confirmation"
+      },
+      "storeAs": "understood",
+      "edges": {
+        "yes": "mode_select",
+        "no": "terminate_no_refund"
+      }
+    },
+    "terminate_no_refund": {
+      "type": "terminate",
+      "contentKey": "terminate_no_refund"
+    },
+    "mode_select": {
+      "type": "question",
+      "contentKey": "mode_select",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "notice", "label": "Notice to employer" },
+          { "key": "police", "label": "Police complaint" }
+        ]
+      },
+      "storeAs": "output_mode",
+      "next": "employment_status"
+    },
+    "employment_status": {
+      "type": "question",
+      "contentKey": "employment_status",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "terminated", "label": "Employment terminated / retrenched" },
+          { "key": "forced_resignation", "label": "Forced to resign" },
+          { "key": "active_dispute", "label": "Still employed but dispute ongoing" }
+        ]
+      },
+      "storeAs": "employment_status",
+      "next": "employer_name"
+    },
+    "employer_name": {
+      "type": "question",
+      "contentKey": "employer_name",
+      "input": { "type": "text" },
+      "storeAs": "employer_name",
+      "next": "employee_name"
+    },
+    "employee_name": {
+      "type": "question",
+      "contentKey": "employee_name",
+      "input": { "type": "text" },
+      "storeAs": "employee_name",
+      "next": "termination_date"
+    },
+    "termination_date": {
+      "type": "question",
+      "contentKey": "termination_date",
+      "input": { "type": "text" },
+      "storeAs": "termination_date",
+      "next": "relief_sought"
+    },
+    "relief_sought": {
+      "type": "question",
+      "contentKey": "relief_sought",
+      "input": { "type": "text" },
+      "storeAs": "relief_sought",
+      "next": "payment_gate"
+    },
+    "payment_gate": {
+      "type": "payment_gate",
+      "contentKey": "payment_prompt",
+      "next": "final_generate"
+    },
+    "final_generate": {
+      "type": "final_generate",
+      "contentKey": "final_generate",
+      "templatePromptAsset": "assets/prompts/emp_termination_intructions.txt",
+      "next": "closing"
+    },
+    "closing": {
+      "type": "terminate",
+      "contentKey": "closing"
+    }
+  }
+}

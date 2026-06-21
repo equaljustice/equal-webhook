@@ -1,0 +1,4 @@
+{
+  "enabled": [],
+  "notes": "Add assistant keys here only when matching {key}_v1.flow.json + content.json is complete (verbatim legal Q&A). Until then assistants use the full instruction prompt via legacy Gemini mode."
+}

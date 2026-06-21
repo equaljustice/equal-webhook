@@ -1,0 +1,82 @@
+{
+  "language_select": {
+    "title": { "en": "Language Selection" },
+    "text": {
+      "en": "Please select your preferred language for this session:"
+    }
+  },
+  "greeting": {
+    "text": {
+      "en": "Thanks for reaching out. I'm sorry you're dealing with a termination of your employment. Don't worry, I'll help you draft a notice to your employer for a possible reinstatement and/or higher compensation.<br><br>Please answer a few questions so I can make the notice specific for your facts. The entire session would require approximately 15-20 mins of your attention.<br><br><em>This is not a legal service or legal advice, always consult a legal advisor for any legal help.</em><br><br>Reply <strong>yes</strong> when you have read and understood the above."
+    }
+  },
+  "confirm_understood": {
+    "title": { "en": "Confirmation" },
+    "text": {
+      "en": "Have you understood that this is a strict question-answer session and not general legal advice?"
+    },
+    "options": {
+      "yes": "Yes, I understand",
+      "no": "No"
+    }
+  },
+  "terminate_no_refund": {
+    "text": {
+      "en": "As per the description on equaljustice.ai, you are not entitled to a refund when declining to proceed. Your session is over now. You can exit or start a new session."
+    }
+  },
+  "mode_select": {
+    "title": { "en": "Output type" },
+    "text": {
+      "en": "What would you like to create?"
+    }
+  },
+  "employment_status": {
+    "title": { "en": "Employment status" },
+    "text": {
+      "en": "What best describes your situation?"
+    }
+  },
+  "employer_name": {
+    "title": { "en": "Employer" },
+    "text": {
+      "en": "What is the full legal name of your employer / company?"
+    }
+  },
+  "employee_name": {
+    "title": { "en": "Your name" },
+    "text": {
+      "en": "What is your full name as per your employment records?"
+    }
+  },
+  "termination_date": {
+    "title": { "en": "Termination date" },
+    "text": {
+      "en": "On what date were you terminated, retrenched, or forced to resign? (DD-MM-YYYY or approximate)"
+    }
+  },
+  "relief_sought": {
+    "title": { "en": "Relief sought" },
+    "text": {
+      "en": "Briefly describe what relief you want (e.g. reinstatement, compensation, gratuity, PF dues)."
+    },
+    "explanation": {
+      "en": "Be specific — this will appear in your notice."
+    }
+  },
+  "payment_prompt": {
+    "text": {
+      "en": "Thank you for completing all the questions. To receive your personalized notice or complaint, please complete the payment."
+    }
+  },
+  "final_generate": {
+    "text": {
+      "en": "Generating your document..."
+    }
+  },
+  "closing": {
+    "text": {
+      "en": "Your session is over now. You can exit or start a new session. You can reach out to equal@equaljustice.ai for further support including connecting with a lawyer."
+    }
+  }
+}

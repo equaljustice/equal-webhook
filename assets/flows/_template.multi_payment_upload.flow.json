@@ -1,0 +1,69 @@
+{
+  "_comment": "Reference template — copy patterns into assistant-specific flow files. Not loaded at runtime.",
+  "flowKey": "example_check_with_upload",
+  "version": 1,
+  "deferPayment": true,
+  "paymentMode": "repeatable",
+  "startNodeId": "language_select",
+  "nodes": {
+    "language_select": {
+      "type": "question",
+      "contentKey": "language_select",
+      "input": { "type": "language_select" },
+      "next": "upload_gate"
+    },
+    "upload_gate": {
+      "type": "upload_gate",
+      "contentKey": "upload_prompt",
+      "uploadType": "document",
+      "next": "summary_questions"
+    },
+    "summary_questions": {
+      "type": "question",
+      "contentKey": "city_question",
+      "input": { "type": "text" },
+      "next": "payment_gate_1"
+    },
+    "payment_gate_1": {
+      "type": "payment_gate",
+      "contentKey": "payment_before_assessment",
+      "next": "final_generate_assessment"
+    },
+    "final_generate_assessment": {
+      "type": "final_generate",
+      "contentKey": "assessment_gen",
+      "templatePromptAsset": "assets/prompts/check_my_rent_agreement.txt",
+      "next": "optional_addon_prompt"
+    },
+    "optional_addon_prompt": {
+      "type": "question",
+      "contentKey": "want_synopsis",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "yes", "label": "Yes" },
+          { "key": "no", "label": "No" }
+        ]
+      },
+      "edges": {
+        "yes": "payment_gate_2",
+        "no": "closing"
+      }
+    },
+    "payment_gate_2": {
+      "type": "payment_gate",
+      "contentKey": "payment_for_addon",
+      "next": "final_generate_addon"
+    },
+    "final_generate_addon": {
+      "type": "final_generate",
+      "contentKey": "addon_gen",
+      "templatePromptAsset": "assets/prompts/check_my_rent_agreement.txt",
+      "next": "closing"
+    },
+    "closing": {
+      "type": "terminate",
+      "contentKey": "closing"
+    }
+  }
+}

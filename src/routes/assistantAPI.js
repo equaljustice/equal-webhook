@@ -1,6 +1,5 @@
 import express from "express";
 import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
 import { jwtAuth } from "../middleware/jwtAuth.js";
 import { Assistant } from "../model/assistant.model.js";
 import { Session } from "../model/sesssion.model.js";
@@ -10,10 +9,6 @@ import { v4 as uuidv4 } from "uuid";
 import os from "os";
 import { SPECIAL_ACCESS_USER_IDS } from "../../constants.js";
 import { readPromptFile } from "../utils/promptManager.js";
-import {
-  buildGeminiGenerationConfig,
-  resolveGeminiModel,
-} from "../utils/geminiConfig.js";
 import {
   generateDocument,
   getDocumentFilename,
@@ -27,10 +22,16 @@ import {
   detectChatLanguageFromText,
   paymentBarrierMessage,
 } from "../chat/messageControlParse.js";
+import {
+  bootstrapFlowSession,
+  executeChatTurn,
+  executeChatTurnStream,
+  preflightChatTurn,
+} from "../chat/chatTurnHandler.js";
+import { getCyclePayableAmount } from "../chat/sessionGuards.js";
 
 const router = express.Router();
-const OPENAI_RUN_POLL_MAX_ATTEMPTS = 120; // ~2 minutes at 1s poll
-const GEMINI_STREAM_TIMEOUT_MS = 120000; // 2 minutes
+const OPENAI_RUN_POLL_MAX_ATTEMPTS = 120;
 
 // Configure multer for temporary file storage
 const upload = multer({
@@ -79,15 +80,6 @@ async function docDownloadFlagByAssistantKeys(assistantKeys) {
   }
   return map;
 }
-
-const getCyclePayableAmount = (session, cycleNumber) => {
-  if ((cycleNumber || 0) <= 1) {
-    return session.price;
-  }
-  return typeof session.additionalPrice === "number"
-    ? session.additionalPrice
-    : session.price;
-};
 
 //Create Assistant instance into db
 router.post("/create", async (req, res) => {
@@ -308,6 +300,9 @@ router.post("/start-session", jwtAuth, async (req, res) => {
       isPaid,
       supportsMultipleUploads,
     });
+
+    await bootstrapFlowSession(session, assistant);
+    await session.save();
 
     //Send SuccessMessage
     return res.status(201).json({
@@ -795,6 +790,43 @@ router.post(
 );
 
 //Send Message
+router.post("/send-message-stream", jwtAuth, async (req, res) => {
+  try {
+    const { sessionId, userMessage, fileId } = req.body;
+    const session = await Session.findById(sessionId);
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    const userId = req.user.id;
+    const isSpecialAccess = hasSpecialAccess(userId);
+    const preflight = preflightChatTurn(session, { isSpecialAccess, requirePaid: true });
+    if (!preflight.ok) {
+      return res.status(preflight.status).json(preflight.body);
+    }
+
+    const assistant = await Assistant.findOne({ assistantId: session.assistantId });
+    if (!assistant) {
+      return res.status(404).json({ error: "Assistant not found" });
+    }
+    if (session.provider !== "gemini") {
+      return res.status(400).json({ error: "Streaming is only supported for Gemini sessions" });
+    }
+
+    await executeChatTurnStream(req, res, {
+      session,
+      assistant,
+      userMessage,
+      fileId,
+      isSpecialAccess,
+    });
+    await session.save();
+  } catch (error) {
+    console.error(error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to stream message" });
+    }
+  }
+});
+
 router.post("/send-message", jwtAuth, async (req, res) => {
   try {
     const { sessionId, userMessage, fileId } = req.body;
@@ -803,262 +835,40 @@ router.post("/send-message", jwtAuth, async (req, res) => {
     // Check payment (skip for special access users)
     const userId = req.user.id;
     const isSpecialAccess = hasSpecialAccess(userId);
-    if (!session.isPaid && !isSpecialAccess) {
-      return res
-        .status(403)
-        .json({ error: "Payment required before chatting" });
+    const preflight = preflightChatTurn(session, {
+      isSpecialAccess,
+      requirePaid: true,
+    });
+    if (!preflight.ok) {
+      return res.status(preflight.status).json(preflight.body);
     }
 
-    // Auto-mark as paid for special access users if not already marked
     if (isSpecialAccess && !session.isPaid) {
       session.isPaid = true;
       await session.save();
     }
 
-    // Check if document upload is required but not completed
-    if (session.isDocUploadRequired && !session.isDocUploaded) {
-      return res.status(403).json({
-        error: "Document upload required",
-        requiresUpload: true,
-      });
-    }
-
-    // Get all fileIds from session (support multiple uploads)
-    // If fileId is provided directly, also update the session
-    let filesToUse = [];
-    if (
-      session.supportsMultipleUploads &&
-      session.uploadedFileIds?.length > 0
-    ) {
-      filesToUse = session.uploadedFileIds;
-    } else if (session.uploadedFileId) {
-      filesToUse = [session.uploadedFileId];
-    } else if (fileId) {
-      filesToUse = [fileId];
-    }
-
-    if (fileId && !session.uploadedFileId) {
-      // If fileId is provided and session doesn't have one, save it
-      if (session.supportsMultipleUploads) {
-        if (!session.uploadedFileIds) {
-          session.uploadedFileIds = [];
-        }
-        session.uploadedFileIds.push(fileId);
-      }
-      session.uploadedFileId = fileId;
-      session.isDocUploaded = true;
-      session.isDocUploadRequired = false; // Clear upload requirement when file is provided
-      session.uploadAttempts = (session.uploadAttempts || 0) + 1;
+    const assistant = await Assistant.findOne({ assistantId: session.assistantId });
+    if (!assistant) {
+      return res.status(404).json({ error: "Assistant not found" });
     }
 
     if (session.provider === "gemini") {
-      // Gemini logic
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      // Build history for context, if needed
-      const history = (session.messages || []).map((msg) => ({
-        role: msg.role === "user" ? "user" : "model",
-        parts: [{ text: msg.content }],
-      }));
-
-      // Build current message parts
-      const currentMessageParts = [{ text: userMessage }];
-
-      // Add all uploaded files to the message (support multiple uploads)
-      // Gemini API expects file references in parts array
-      for (const fileUri of filesToUse) {
-        if (fileUri) {
-          currentMessageParts.push({
-            fileData: {
-              fileUri: fileUri,
-            },
-          });
-        }
-      }
-
-      history.push({ role: "user", parts: currentMessageParts });
-      const sourceConfig = session.geminiConfig || {};
-      const model = resolveGeminiModel(sourceConfig);
-      // Pull systemInstruction from assistant asset if available
-      let systemInstructionText = undefined;
-      try {
-        // Find the assistant for the session
-        const assistant = await Assistant.findOne({
-          assistantId: session.assistantId,
-        });
-        if (
-          assistant &&
-          assistant.config &&
-          assistant.config.systemInstructionAsset
-        ) {
-          try {
-            // Read from GCS (with local filesystem fallback)
-            systemInstructionText = await readPromptFile(
-              assistant.config.systemInstructionAsset
-            );
-          } catch (err) {
-            // Return error if file not found (this is in send-message, so we should fail)
-            return res.status(500).json({
-              error: "systemInstruction file not found",
-              message: err.message,
-            });
-          }
-          // Add file analysis instructions if files are provided
-          if (filesToUse.length > 0) {
-            const fileCount = filesToUse.length;
-            const fileText = fileCount > 1 ? "documents have" : "document has";
-            systemInstructionText +=
-              `\n\nIMPORTANT: ${fileCount} uploaded ${fileText} been provided for analysis. ` +
-              "The uploaded document(s) are read-only. Do not invent missing clauses. " +
-              "If information is missing from the document(s), respond with 'Not found in document.' " +
-              "Follow the system rules strictly and analyze only what is present in the uploaded document(s).";
-          }
-        }
-      } catch (resolveErr) {
-        return res.status(500).json({
-          error: "Failed to resolve systemInstruction asset",
-          message: resolveErr.message,
-        });
-      }
-      const config = buildGeminiGenerationConfig({
-        sourceConfig,
-        systemInstructionText,
-      });
-      let assistantMessage = "";
-      let chunks = [];
-      try {
-        await withTimeout(
-          (async () => {
-            const response = await ai.models.generateContentStream({
-              model,
-              config,
-              contents: history,
-            });
-            for await (const chunk of response) {
-              if (chunk.text) {
-                assistantMessage += chunk.text;
-                chunks.push(chunk.text);
-                // Optionally, stream chunk.text to client with res.write (for real streaming)
-              }
-            }
-          })(),
-          GEMINI_STREAM_TIMEOUT_MS,
-          "Gemini stream"
-        );
-      } catch (geminiErr) {
-        return res
-          .status(500)
-          .json({ error: geminiErr.message, message: "Gemini failed" });
-      }
-      // Extract upload requirement from structured output
-      const uploadInfo = extractUploadRequirement(assistantMessage);
-      let cleanMessage = uploadInfo.cleanMessage || assistantMessage;
-
-      // HARD PAYMENT BARRIER: When AI signals payment is required, replace the
-      // entire response with a safe payment prompt. This prevents any assessment
-      // content from leaking even if the AI ignores instructions.
-      if (uploadInfo.paymentRequired && !isSpecialAccess) {
-        if (session.isPaid) {
-          session.paymentCycle = (session.paymentCycle || 0) + 1;
-        }
-        const paymentCycle = session.paymentCycle || 0;
-        const paymentAmount = getCyclePayableAmount(session, paymentCycle);
-        session.isPaid = false;
-        cleanMessage = paymentBarrierMessage(
-          detectChatLanguageFromText(cleanMessage)
-        );
-        console.log("Payment barrier activated for session:", sessionId);
-
-        session.messages.push({ role: "user", content: userMessage });
-        session.messages.push({ role: "assistant", content: cleanMessage });
-        await session.save();
-
-        return res.json({
-          reply: cleanMessage,
-          sessionTerminated: false,
-          terminationMessage: null,
-          paymentRequired: true,
-          paymentAmount,
-          paymentCycle,
-        });
-      }
-
-      session.messages.push({ role: "user", content: userMessage });
-      session.messages.push({ role: "assistant", content: cleanMessage });
-
-      const resolvedFinalResponse =
-        typeof uploadInfo.finalResponse === "string" &&
-        uploadInfo.finalResponse.trim().length > 0
-          ? uploadInfo.finalResponse.trim()
-          : null;
-      if (resolvedFinalResponse) {
-        session.final_response = resolvedFinalResponse;
-      }
-
-      persistSessionDocumentSnapshot(
+      const turn = await executeChatTurn({
         session,
-        sessionId,
-        uploadInfo,
-        cleanMessage
-      );
+        assistant,
+        userMessage,
+        fileId,
+        isGuest: false,
+        isSpecialAccess,
+      });
 
-      // Use structured upload requirement (works for all languages)
-      const requiresUpload = uploadInfo.requiresUpload;
-      const uploadType = uploadInfo.uploadType;
-      const isReUpload =
-        uploadType === "re_upload" ||
-        (requiresUpload && session.isDocUploaded && session.uploadAttempts > 0);
-
-      if (requiresUpload) {
-        // Only set upload required if we haven't exceeded max attempts
-        if (session.uploadAttempts < 2) {
-          session.isDocUploadRequired = true;
-          // If re-upload, reset the uploaded status
-          if (isReUpload) {
-            session.isDocUploaded = false;
-            // For multiple uploads, don't clear all files - just mark as needing re-upload
-            // For single upload, clear the fileId
-            if (!session.supportsMultipleUploads) {
-              session.uploadedFileId = null;
-              session.uploadedFileIds = [];
-            }
-          }
-        } else {
-          // Max attempts reached - clear upload requirement to allow chat to continue
-          session.isDocUploadRequired = false;
-        }
-      } else {
-        // Only clear upload requirement if document is uploaded AND assistant didn't ask for upload
-        // Don't clear if assistant is asking for re-upload (even if document exists)
-        if (session.isDocUploaded && filesToUse.length > 0 && !requiresUpload) {
-          session.isDocUploadRequired = false;
-        }
-        // Also clear if max attempts reached (allow chat to continue)
-        if (session.uploadAttempts >= 2) {
-          session.isDocUploadRequired = false;
-        }
+      if (turn?.error) {
+        return res.status(turn.status || 500).json(turn.body || { error: "Chat failed" });
       }
 
       await session.save();
-
-      // Return response with upload requirement flag if needed (use cleanMessage without JSON marker)
-      if (session.isDocUploadRequired && !session.isDocUploaded) {
-        return res.json({
-          reply: cleanMessage,
-          requiresUpload: true,
-          isReUpload: uploadType === "re_upload",
-          uploadReason: uploadInfo.reason || null,
-          sessionTerminated: uploadInfo.sessionTerminated || false,
-          terminationMessage: uploadInfo.terminationMessage || null,
-          paymentRequired: false,
-        });
-      }
-
-      return res.json({
-        reply: cleanMessage,
-        sessionTerminated: uploadInfo.sessionTerminated || false,
-        terminationMessage: uploadInfo.terminationMessage || null,
-        paymentRequired: false,
-      });
+      return res.json(turn);
     }
     // ========== OpenAI (default) logic ==========
     // Step 3: Add message to thread

@@ -1,0 +1,274 @@
+{
+  "_comment": "REFERENCE ONLY — shows how emp_termination_intructions.txt Section D Q4–Q7 maps to deterministic flow JSON. Not loaded at runtime. Merge into emp_termination_v1.flow.json when Part A is fully authored.",
+  "fragment": "part_a_q4_q7",
+  "startNodeId": "nature_of_employment",
+  "nodes": {
+    "nature_of_employment": {
+      "_legalRef": "Part A Ques 4",
+      "type": "question",
+      "contentKey": "nature_of_employment",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "permanent", "label": "Permanent" },
+          { "key": "contractual", "label": "Contractual" },
+          { "key": "probation", "label": "On Probation" }
+        ]
+      },
+      "storeAs": "nature_of_employment",
+      "edges": {
+        "probation": "probation_termination_reason",
+        "contractual": "contract_regularly_renewed"
+      },
+      "next": "tenure_of_employment"
+    },
+
+    "probation_termination_reason": {
+      "_legalRef": "Sub-Ques 4.1 — only if On Probation",
+      "type": "question",
+      "contentKey": "probation_termination_reason",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "mass_layoff", "label": "Part of mass layoff" },
+          { "key": "not_extended", "label": "Probation either not extended nor converted to permanent" }
+        ]
+      },
+      "storeAs": "probation_termination_reason",
+      "edges": {
+        "mass_layoff": "probation_mass_layoff_info",
+        "not_extended": "probation_role_changed"
+      }
+    },
+
+    "probation_mass_layoff_info": {
+      "_legalRef": "Sub-Ques 4.1.1 — inform user (no question)",
+      "type": "message",
+      "contentKey": "probation_mass_layoff_info",
+      "next": "tenure_of_employment"
+    },
+
+    "probation_role_changed": {
+      "_legalRef": "Sub-Ques 4.1.2 — only if not extended",
+      "type": "question",
+      "contentKey": "probation_role_changed",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "yes", "label": "Yes" },
+          { "key": "no", "label": "No" }
+        ]
+      },
+      "storeAs": "probation_role_changed",
+      "onAnswer": {
+        "yes": { "noticeParagraphKey": "probation_role_changed_para" }
+      },
+      "next": "tenure_of_employment"
+    },
+
+    "contract_regularly_renewed": {
+      "_legalRef": "Sub-Ques 4.2 — only if Contractual",
+      "type": "question",
+      "contentKey": "contract_regularly_renewed",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "yes", "label": "Yes" },
+          { "key": "no", "label": "No" }
+        ]
+      },
+      "storeAs": "contract_regularly_renewed",
+      "onAnswer": {
+        "yes": { "noticeParagraphKey": "contract_renewal_para" }
+      },
+      "next": "tenure_of_employment"
+    },
+
+    "tenure_of_employment": {
+      "_legalRef": "Ques 5 — all paths merge here",
+      "type": "question",
+      "contentKey": "tenure_of_employment",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "less_than_240_days", "label": "Less than 240 days" },
+          { "key": "between_240_days_and_4_years", "label": "More than 240 days but less than 4 years" },
+          { "key": "more_than_4_years_240_days", "label": "More than 4 years and 240 days" }
+        ]
+      },
+      "storeAs": "tenure_of_employment",
+      "onAnswer": {
+        "less_than_240_days": { "noticeParagraphKey": "tenure_under_240_para" }
+      },
+      "next": "nature_of_job"
+    },
+
+    "nature_of_job": {
+      "_legalRef": "Ques 6",
+      "type": "question",
+      "contentKey": "nature_of_job",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "administrative", "label": "Administrative" },
+          { "key": "individual_contributor", "label": "Individual contributor in any other department without any administrative powers" },
+          { "key": "manager", "label": "Manager or Supervisor" },
+          { "key": "manual_unskilled", "label": "Manual or Unskilled labour" }
+        ]
+      },
+      "storeAs": "nature_of_job",
+      "edges": {
+        "manager": "manager_authority_hire"
+      },
+      "next": "route_after_nature_of_job"
+    },
+
+    "route_after_nature_of_job": {
+      "_legalRef": "Skip Ques 7 if manual/unskilled; else ask Ques 7",
+      "type": "router",
+      "routes": [
+        {
+          "when": { "answerKey": "nature_of_job", "equals": "manual_unskilled" },
+          "next": "bank_signatory_question"
+        }
+      ],
+      "defaultNext": "statutory_position"
+    },
+
+    "manager_authority_hire": {
+      "_legalRef": "Sub-Ques 6.1(a) — one sub-question per message",
+      "type": "question",
+      "contentKey": "manager_authority_hire",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "yes", "label": "Yes" },
+          { "key": "no", "label": "No" }
+        ]
+      },
+      "storeAs": "manager_authority_hire",
+      "next": "manager_authority_budget"
+    },
+    "manager_authority_budget": {
+      "_legalRef": "Sub-Ques 6.1(b)",
+      "type": "question",
+      "contentKey": "manager_authority_budget",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "yes", "label": "Yes" },
+          { "key": "no", "label": "No" }
+        ]
+      },
+      "storeAs": "manager_authority_budget",
+      "next": "manager_authority_represent"
+    },
+    "manager_authority_represent": {
+      "_legalRef": "Sub-Ques 6.1(c)",
+      "type": "question",
+      "contentKey": "manager_authority_represent",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "yes", "label": "Yes" },
+          { "key": "no", "label": "No" }
+        ]
+      },
+      "storeAs": "manager_authority_represent",
+      "next": "manager_time_managerial"
+    },
+    "manager_time_managerial": {
+      "_legalRef": "Sub-Ques 6.1(d)",
+      "type": "question",
+      "contentKey": "manager_time_managerial",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "yes", "label": "Yes" },
+          { "key": "no", "label": "No" }
+        ]
+      },
+      "storeAs": "manager_time_managerial",
+      "next": "manager_workman_eval"
+    },
+
+    "manager_workman_eval": {
+      "_legalRef": "Sub-Ques 6.1 outcome — all No vs any Yes",
+      "type": "router",
+      "routes": [
+        {
+          "when": {
+            "allAnswers": {
+              "keys": [
+                "manager_authority_hire",
+                "manager_authority_budget",
+                "manager_authority_represent",
+                "manager_time_managerial"
+              ],
+              "equals": "no"
+            }
+          },
+          "collectNoticeParagraphKey": "manager_workman_para",
+          "next": "statutory_position"
+        },
+        {
+          "when": {
+            "anyAnswer": {
+              "keys": [
+                "manager_authority_hire",
+                "manager_authority_budget",
+                "manager_authority_represent",
+                "manager_time_managerial"
+              ],
+              "equals": "yes"
+            }
+          },
+          "next": "manager_not_workman_info"
+        }
+      ],
+      "defaultNext": "statutory_position"
+    },
+
+    "manager_not_workman_info": {
+      "_legalRef": "Inform user — not treated as Workman under IDA",
+      "type": "message",
+      "contentKey": "manager_not_workman_info",
+      "next": "statutory_position"
+    },
+
+    "statutory_position": {
+      "_legalRef": "Ques 7 — skipped for manual/unskilled via router",
+      "type": "question",
+      "contentKey": "statutory_position",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "yes", "label": "Yes" },
+          { "key": "no", "label": "No" }
+        ]
+      },
+      "storeAs": "statutory_position",
+      "onAnswer": {
+        "yes": {
+          "noticeParagraphKeys": ["statutory_position_notice_para", "statutory_position_police_para"]
+        }
+      },
+      "next": "bank_signatory_question"
+    },
+
+    "bank_signatory_question": {
+      "_legalRef": "Ques 8 — placeholder; continues Part A in full flow",
+      "type": "question",
+      "contentKey": "bank_signatory_question",
+      "input": {
+        "type": "single_select",
+        "options": [
+          { "key": "yes", "label": "Yes" },
+          { "key": "no", "label": "No" }
+        ]
+      },
+      "storeAs": "bank_signatory",
+      "next": null
+    }
+  }
+}
