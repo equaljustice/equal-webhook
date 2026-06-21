@@ -1,0 +1,49 @@
+# Self-hosted production: API + Redis on one server (VPS, VM, bare metal).
+#
+# NOT for Google Cloud Run alone — Cloud Run cannot use Redis running on your laptop.
+# Use this if you deploy the API container next to Redis on the same host.
+#
+# Setup:
+#   cp .env.example .env   # fill MONGO_URI, JWT_SECRET, API keys, etc.
+#   # In .env set:
+#   #   NODE_ENV=production
+#   #   REDIS_URL=redis://redis:6379
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# API: http://localhost:8080  (put reverse proxy + TLS in front for HTTPS)
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - eqj_redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    # Do not publish 6379 publicly in production; API reaches redis via internal network.
+    # ports:
+    #   - "127.0.0.1:6379:6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  eqj_redis_data:

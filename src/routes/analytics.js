@@ -11,6 +11,8 @@ const allowedEvents = new Set([
   "signup_started",
   "signup_completed",
   "login_completed",
+  "guest_chat_started",
+  "guest_message_sent",
 ]);
 
 const IST_TIMEZONE = "Asia/Kolkata";
@@ -103,6 +105,10 @@ router.get("/summary", adminAuth, async (req, res) => {
       visitorsWithoutSignupAgg,
       topPages,
       dailyTrafficAgg,
+      uniqueGuestChatStarters,
+      uniqueGuestMessengers,
+      totalGuestMessages,
+      dailyGuestChatAgg,
     ] = await Promise.all([
       User.countDocuments({}),
       AnalyticsEvent.distinct("anonymousId", {
@@ -202,6 +208,62 @@ router.get("/summary", adminAuth, async (req, res) => {
         },
         { $sort: { date: 1 } },
       ]),
+      AnalyticsEvent.distinct("anonymousId", {
+        ...rangeMatch,
+        eventName: "guest_chat_started",
+        source: "server",
+      }).then((ids) => ids.length),
+      AnalyticsEvent.distinct("anonymousId", {
+        ...rangeMatch,
+        eventName: "guest_message_sent",
+        source: "server",
+      }).then((ids) => ids.length),
+      AnalyticsEvent.countDocuments({
+        ...rangeMatch,
+        eventName: "guest_message_sent",
+        source: "server",
+      }),
+      AnalyticsEvent.aggregate([
+        {
+          $match: {
+            ...rangeMatch,
+            source: "server",
+            eventName: { $in: ["guest_chat_started", "guest_message_sent"] },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: "%Y-%m-%d",
+                date: "$occurredAt",
+                timezone: IST_TIMEZONE,
+              },
+            },
+            chatsStarted: {
+              $sum: {
+                $cond: [{ $eq: ["$eventName", "guest_chat_started"] }, 1, 0],
+              },
+            },
+            messagesSent: {
+              $sum: {
+                $cond: [{ $eq: ["$eventName", "guest_message_sent"] }, 1, 0],
+              },
+            },
+            uniqueGuests: { $addToSet: "$anonymousId" },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            date: "$_id",
+            chatsStarted: 1,
+            messagesSent: 1,
+            uniqueGuests: { $size: "$uniqueGuests" },
+          },
+        },
+        { $sort: { date: 1 } },
+      ]),
     ]);
 
     const visitorsWithoutSignup = visitorsWithoutSignupAgg[0]?.count || 0;
@@ -223,13 +285,96 @@ router.get("/summary", adminAuth, async (req, res) => {
         signupCompleted,
         visitorsWithoutSignup,
         conversionRate,
+        uniqueGuestChatStarters,
+        uniqueGuestMessengers,
+        totalGuestMessages,
+        guestMessageRate:
+          uniqueVisitors > 0
+            ? Number(((uniqueGuestMessengers / uniqueVisitors) * 100).toFixed(2))
+            : 0,
       },
       topPages,
       dailyTraffic: dailyTrafficAgg,
+      dailyGuestChat: dailyGuestChatAgg,
     });
   } catch (error) {
     return res.status(500).json({
       message: "Failed to load analytics summary",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/guest-visitors", adminAuth, async (req, res) => {
+  try {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 180);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+    const now = new Date();
+    const startDate = getIstStartDate(days);
+    const rangeMatch = { occurredAt: { $gte: startDate, $lte: now } };
+
+    const visitorsAgg = await AnalyticsEvent.aggregate([
+      {
+        $match: {
+          ...rangeMatch,
+          source: "server",
+          eventName: { $in: ["guest_chat_started", "guest_message_sent"] },
+        },
+      },
+      {
+        $group: {
+          _id: "$anonymousId",
+          startedChat: {
+            $max: {
+              $cond: [{ $eq: ["$eventName", "guest_chat_started"] }, 1, 0],
+            },
+          },
+          messageCount: {
+            $sum: {
+              $cond: [{ $eq: ["$eventName", "guest_message_sent"] }, 1, 0],
+            },
+          },
+          lastActivityAt: { $max: "$occurredAt" },
+          assistantKeys: {
+            $addToSet: {
+              $cond: [
+                { $ne: ["$metadata.assistantKey", ""] },
+                "$metadata.assistantKey",
+                null,
+              ],
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          anonymousId: "$_id",
+          startedChat: { $eq: ["$startedChat", 1] },
+          messageCount: 1,
+          lastActivityAt: 1,
+          assistantKeys: {
+            $filter: {
+              input: "$assistantKeys",
+              as: "key",
+              cond: { $ne: ["$$key", null] },
+            },
+          },
+        },
+      },
+      { $sort: { lastActivityAt: -1 } },
+      { $limit: limit },
+    ]);
+
+    return res.status(200).json({
+      timezone: IST_TIMEZONE,
+      periodDays: days,
+      count: visitorsAgg.length,
+      visitors: visitorsAgg,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to load guest visitor analytics",
       error: error.message,
     });
   }

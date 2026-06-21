@@ -11,9 +11,22 @@ import os from "os";
 import { SPECIAL_ACCESS_USER_IDS } from "../../constants.js";
 import { readPromptFile } from "../utils/promptManager.js";
 import {
+  buildGeminiGenerationConfig,
+  resolveGeminiModel,
+} from "../utils/geminiConfig.js";
+import {
   generateDocument,
   getDocumentFilename,
 } from "../utils/documentGenerator.js";
+import {
+  withTimeout,
+  buildDocumentDataFromMessage,
+  findLastSubstantiveMessage,
+  persistSessionDocumentSnapshot,
+  extractUploadRequirement,
+  detectChatLanguageFromText,
+  paymentBarrierMessage,
+} from "../chat/messageControlParse.js";
 
 const router = express.Router();
 const OPENAI_RUN_POLL_MAX_ATTEMPTS = 120; // ~2 minutes at 1s poll
@@ -74,564 +87,6 @@ const getCyclePayableAmount = (session, cycleNumber) => {
   return typeof session.additionalPrice === "number"
     ? session.additionalPrice
     : session.price;
-};
-
-const withTimeout = (promise, ms, label = "Operation") => {
-  let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${ms}ms`));
-    }, ms);
-  });
-  return Promise.race([promise, timeoutPromise]).finally(() => {
-    if (timeoutId) clearTimeout(timeoutId);
-  });
-};
-
-/**
- * Build document data from the actual final response message.
- * Uses the real chat content (cleanMessage) as the document body,
- * and optionally merges metadata from the LLM's document JSON (title, document_type).
- * This prevents the "random content" bug where the LLM hallucinates document sections.
- */
-const buildDocumentDataFromMessage = (cleanMessage, session, llmDocData) => {
-  const assistantKey = session?.assistantKey || "document";
-  const sessionTitle = session?.title || "Document";
-
-  return {
-    document_type: llmDocData?.document_type || assistantKey,
-    title: llmDocData?.title || sessionTitle,
-    content: {
-      sections: [
-        {
-          type: "html",
-          text: cleanMessage, // The actual final response the user saw
-        },
-      ],
-    },
-    metadata: {
-      language: llmDocData?.metadata?.language || "en",
-      generated_date: new Date().toISOString(),
-      use_case: llmDocData?.metadata?.use_case || assistantKey,
-      testator_name: llmDocData?.metadata?.testator_name,
-      will_title_line: llmDocData?.metadata?.will_title_line,
-      template_profile: llmDocData?.metadata?.template_profile,
-    },
-  };
-};
-
-/** Minimum length for treating an assistant reply as a downloadable document body. */
-const DOCUMENT_SNAPSHOT_MIN_LENGTH = 200;
-
-/**
- * Walk backward through session.messages to find the last substantive
- * assistant message (the actual legal document), skipping short
- * termination / acknowledgement messages.
- * Returns the content string, or null if nothing qualifies.
- */
-const findLastSubstantiveMessage = (session) => {
-  const messages = session.messages || [];
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (
-      m.role === "assistant" &&
-      m.content &&
-      m.content.length >= DOCUMENT_SNAPSHOT_MIN_LENGTH
-    ) {
-      return m.content;
-    }
-  }
-  return null;
-};
-
-/**
- * Persist finalDocumentData when the model signals session end and/or a completed
- * generated document (document_ready), so downloads work before termination
- * (e.g. multi-notice salary flow).
- */
-const persistSessionDocumentSnapshot = (session, sessionId, uploadInfo, cleanMessage) => {
-  const terminated = uploadInfo.sessionTerminated;
-  const docReady = uploadInfo.documentReady;
-  if (!terminated && !docReady) return;
-
-  // Closing-only turn after document_ready: keep the last captured artifact (e.g. Will before
-  // signing guidance, or latest notice in multi-notice flow). Legacy flows without
-  // document_ready still set finalDocumentData only here.
-  if (terminated && !docReady && session.finalDocumentData) {
-    return;
-  }
-
-  const resolvedFinalResponse =
-    typeof uploadInfo.finalResponse === "string" &&
-    uploadInfo.finalResponse.trim().length > 0
-      ? uploadInfo.finalResponse.trim()
-      : null;
-
-  let docContent = null;
-  if (docReady) {
-    docContent =
-      resolvedFinalResponse ||
-      (cleanMessage && cleanMessage.trim().length >= DOCUMENT_SNAPSHOT_MIN_LENGTH
-        ? cleanMessage.trim()
-        : null) ||
-      findLastSubstantiveMessage(session);
-  } else if (terminated) {
-    docContent =
-      resolvedFinalResponse ||
-      session.final_response ||
-      findLastSubstantiveMessage(session);
-  }
-
-  if (docContent) {
-    session.finalDocumentData = buildDocumentDataFromMessage(
-      docContent,
-      session,
-      uploadInfo.documentData
-    );
-    console.log("Stored document data for session:", sessionId);
-  }
-};
-
-// Helper function to extract structured document data from assistant message
-// Returns both the document data and the indices for removal
-const extractDocumentData = (message) => {
-  if (!message || typeof message !== "string") {
-    return { data: null, startIdx: -1, endIdx: -1 };
-  }
-
-  // Find the start of the document JSON by looking for "document_type"
-  let startIdx = -1;
-  const searchPatterns = [
-    '{"document_type"',
-    '{\n"document_type"',
-    '{\r\n"document_type"',
-    '{\r"document_type"',
-    '{ "document_type"',
-  ];
-
-  for (const pattern of searchPatterns) {
-    startIdx = message.indexOf(pattern);
-    if (startIdx !== -1) {
-      break;
-    }
-  }
-
-  if (startIdx === -1) {
-    return { data: null, startIdx: -1, endIdx: -1 };
-  }
-
-  // Find the matching closing brace by counting braces
-  let braceCount = 0;
-  let inString = false;
-  let escapeNext = false;
-  let endIdx = -1;
-
-  for (let i = startIdx; i < message.length; i++) {
-    const char = message[i];
-
-    if (escapeNext) {
-      escapeNext = false;
-      continue;
-    }
-
-    if (char === '\\') {
-      escapeNext = true;
-      continue;
-    }
-
-    if (char === '"' && !escapeNext) {
-      inString = !inString;
-      continue;
-    }
-
-    if (!inString) {
-      if (char === '{') {
-        braceCount++;
-      } else if (char === '}') {
-        braceCount--;
-        if (braceCount === 0) {
-          endIdx = i;
-          break;
-        }
-      }
-    }
-  }
-
-  if (endIdx === -1) {
-    return { data: null, startIdx: -1, endIdx: -1 };
-  }
-
-  // Extract and parse the JSON
-  try {
-    const jsonStr = message.substring(startIdx, endIdx + 1);
-    const documentData = JSON.parse(jsonStr);
-    
-    // Validate that it has document_type field
-    if (documentData && documentData.hasOwnProperty("document_type")) {
-      return { data: documentData, startIdx, endIdx: endIdx + 1 };
-    }
-  } catch (parseError) {
-    console.warn("Failed to parse document data JSON:", parseError.message);
-    return { data: null, startIdx: -1, endIdx: -1 };
-  }
-
-  return { data: null, startIdx: -1, endIdx: -1 };
-};
-
-/**
- * Best-effort language detection based on unicode script ranges.
- * This is only used for backend-generated fallback messages (payment/termination),
- * because the main Q&A flow content is generated by the model in the chosen language.
- * @param {string} text
- * @returns {"en"|"hi"|"bn"|"gu"|"pa"|"ta"|"te"|"kn"|"or"|"ur"}
- */
-function detectChatLanguageFromText(text = "") {
-  const s = String(text);
-
-  // Urdu (Arabic script)
-  if (/[\u0600-\u06FF\u0750-\u077F]/.test(s)) return "ur";
-
-  // Devanagari (Hindi/Marathi/Bhojpuri)
-  if (/[\u0900-\u097F]/.test(s)) return "hi";
-
-  // Gujarati
-  if (/[\u0A80-\u0AFF]/.test(s)) return "gu";
-
-  // Gurmukhi (Punjabi)
-  if (/[\u0A00-\u0A7F]/.test(s)) return "pa";
-
-  // Tamil
-  if (/[\u0B80-\u0BFF]/.test(s)) return "ta";
-
-  // Telugu
-  if (/[\u0C00-\u0C7F]/.test(s)) return "te";
-
-  // Kannada
-  if (/[\u0C80-\u0CFF]/.test(s)) return "kn";
-
-  // Odia
-  if (/[\u0B00-\u0B7F]/.test(s)) return "or";
-
-  // Bengali/Assamese
-  if (/[\u0980-\u09FF]/.test(s)) return "bn";
-
-  return "en";
-}
-
-function paymentBarrierMessage(language) {
-  switch (language) {
-    case "hi":
-      return "सभी प्रश्नों के उत्तर देने के लिए धन्यवाद। अपनी व्यक्तिगत मूल्यांकन रिपोर्ट प्राप्त करने के लिए कृपया भुगतान पूरा करें।";
-    case "bn":
-      return "সব প্রশ্নের উত্তর দেওয়ার জন্য ধন্যবাদ। আপনার ব্যক্তিগত মূল্যায়ন রিপোর্ট পেতে অনুগ্রহ করে অর্থপ্রদান সম্পূর্ণ করুন।";
-    case "gu":
-      return "બધા પ્રશ્નોના જવાબ આપવા બદલ આભાર. તમારો વ્યક્તિગત અંદાજ/મૂલ્યાંકન મેળવવા માટે કૃપા કરીને ચુકવણી પૂર્ણ કરો.";
-    case "pa":
-      return "ਸਾਰੇ ਸਵਾਲਾਂ ਦੇ ਜਵਾਬ ਦੇਣ ਲਈ ਧੰਨਵਾਦ। ਆਪਣਾ ਨਿੱਜੀ ਮੁਲਾਂਕਣ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ ਕਿਰਪਾ ਕਰਕੇ ਭੁਗਤਾਨ ਪੂਰਾ ਕਰੋ।";
-    case "ta":
-      return "அனைத்து கேள்விகளுக்கும் பதிலளித்ததற்கு நன்றி. உங்கள் தனிப்பட்ட மதிப்பீட்டை பெற, தயவுசெய்து கட்டணத்தை நிறைவு செய்யுங்கள்।";
-    case "te":
-      return "అన్ని ప్రశ్నలకు సమాధానమిచ్చినందుకు ధన్యవాదాలు. మీ వ్యక్తిగత అంచనాను పొందేందుకు దయచేసి చెల్లింపును పూర్తి చేయండి।";
-    case "kn":
-      return "ಎಲ್ಲಾ ಪ್ರಶ್ನೆಗಳಿಗೆ ಉತ್ತರಿಸಿದುದಕ್ಕೆ ಧನ್ಯವಾದಗಳು. ನಿಮ್ಮ ವೈಯಕ್ತಿಕ ಮೌಲ್ಯಮಾಪನವನ್ನು ಪಡೆಯಲು ದಯವಿಟ್ಟು ಪಾವತಿಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ।";
-    case "or":
-      return "ସମସ୍ତ ପ୍ରଶ୍ନର ଉତ୍ତର ଦେଇଥିବା ପାଇଁ ଧନ୍ୟବାଦ। ଆପଣଙ୍କର ବ୍ୟକ୍ତିଗତ ମୂଲ୍ୟାଙ୍କନ ପାଇବାକୁ ଦୟାକରି ଦେୟ ପୂରଣ କରନ୍ତୁ।";
-    case "ur":
-      return "تمام سوالات کے جوابات دینے کا شکریہ۔ اپنا ذاتی جائزہ حاصل کرنے کے لیے براہ کرم ادائیگی مکمل کریں۔";
-    case "en":
-    default:
-      return "Thank you for completing all the questions. To receive your personalized assessment, please complete the payment.";
-  }
-}
-
-function terminationBarrierMessage(language) {
-  switch (language) {
-    case "hi":
-      return "आपका सेशन समाप्त हो गया है। आप बाहर निकल सकते हैं या नया सेशन शुरू कर सकते हैं।";
-    case "bn":
-      return "আপনার সেশন শেষ হয়ে গেছে। আপনি বের হতে পারেন বা নতুন সেশন শুরু করতে পারেন।";
-    case "gu":
-      return "તમારું સત્ર સમાપ્ત થઈ ગયું છે. તમે બહાર નીકળી શકો છો અથવા નવું સત્ર શરૂ કરી શકો છો.";
-    case "pa":
-      return "ਤੁਹਾਡਾ ਸੈਸ਼ਨ ਖਤਮ ਹੋ ਗਿਆ ਹੈ। ਤੁਸੀਂ ਬਾਹਰ ਨਿਕਲ ਸਕਦੇ ਹੋ ਜਾਂ ਨਵਾਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰ ਸਕਦੇ ਹੋ।";
-    case "ta":
-      return "உங்கள் அமர்வு முடிவடைந்தது. நீங்கள் வெளியேறலாம் அல்லது புதிய அமர்வை தொடங்கலாம்।";
-    case "te":
-      return "మీ సెషన్ ముగిసింది. మీరు బయటకి వెళ్లవచ్చు లేదా కొత్త సెషన్ ప్రారంభించవచ్చు।";
-    case "kn":
-      return "ನಿಮ್ಮ ಸೆಷನ್ ಮುಗಿದಿದೆ. ನೀವು ಹೊರಬರಬಹುದು ಅಥವಾ ಹೊಸ ಸೆಷನ್ ಆರಂಭಿಸಬಹುದು।";
-    case "or":
-      return "ଆପଣଙ୍କ ସେସନ୍ ସମାପ୍ତ ହୋଇଛି। ଆପଣ ବାହାରି ପାରିବେ କିମ୍ବା ନୂତନ ସେସନ୍ ଆରମ୍ଭ କରିପାରିବେ।";
-    case "ur":
-      return "آپ کا سیشن ختم ہو گیا ہے۔ آپ باہر نکل سکتے ہیں یا نیا سیشن شروع کر سکتے ہیں۔";
-    case "en":
-    default:
-      return "Your session is over now. You can exit or start a new session.";
-  }
-}
-
-/**
- * Extract the final control JSON block from any position within the message.
- * The control JSON must contain at least one of:
- * upload_required, session_terminated, payment_required, document_ready
- * @param {string} message
- * @returns {null | { jsonStr: string, metadata: any }}
- */
-function extractControlJsonFromMessage(message) {
-  if (!message || typeof message !== "string") return null;
-
-  const controlKeys = [
-    "upload_required",
-    "session_terminated",
-    "payment_required",
-    "document_ready",
-  ];
-
-  // Find the latest occurrence of any control key so we target the final JSON.
-  let lastKeyIdx = -1;
-  for (const key of controlKeys) {
-    const idx = message.lastIndexOf(`"${key}"`);
-    if (idx > lastKeyIdx) lastKeyIdx = idx;
-  }
-  if (lastKeyIdx === -1) return null;
-
-  // The control JSON should start at the nearest '{' before the key.
-  const startIdx = message.lastIndexOf("{", lastKeyIdx);
-  if (startIdx === -1) return null;
-
-  // Brace-match to find the end of the JSON object.
-  let braceCount = 0;
-  let inString = false;
-  let escapeNext = false;
-  let endIdx = -1;
-
-  for (let i = startIdx; i < message.length; i++) {
-    const char = message[i];
-
-    if (escapeNext) {
-      escapeNext = false;
-      continue;
-    }
-
-    if (char === "\\") {
-      escapeNext = true;
-      continue;
-    }
-
-    if (char === '"' && !escapeNext) {
-      inString = !inString;
-      continue;
-    }
-
-    if (!inString) {
-      if (char === "{") {
-        braceCount++;
-      } else if (char === "}") {
-        braceCount--;
-        if (braceCount === 0) {
-          endIdx = i;
-          break;
-        }
-      }
-    }
-  }
-
-  if (endIdx === -1) return null;
-
-  const jsonStr = message.substring(startIdx, endIdx + 1);
-  try {
-    const metadata = JSON.parse(jsonStr);
-    const hasAnyControlKey = controlKeys.some((k) =>
-      Object.prototype.hasOwnProperty.call(metadata, k)
-    );
-    if (!hasAnyControlKey) return null;
-    return { jsonStr, metadata };
-  } catch {
-    return null;
-  }
-}
-
-// Helper function to extract structured upload requirement and session termination from assistant message
-const extractUploadRequirement = (message) => {
-  if (!message || typeof message !== "string") {
-    return {
-      requiresUpload: false,
-      uploadType: null,
-      reason: null,
-      sessionTerminated: false,
-      terminationMessage: null,
-      paymentRequired: false,
-      documentReady: false,
-      cleanMessage: message || "",
-      documentData: null,
-      finalResponse: null,
-    };
-  }
-
-  // Extract structured control JSON from anywhere inside the assistant reply.
-  // This is important for non-English languages where the model might append
-  // trailing whitespace/punctuation after the JSON.
-  const controlJson = extractControlJsonFromMessage(message);
-
-  let documentData = null;
-  let cleanMessage = message;
-
-  if (controlJson) {
-    try {
-      const metadata = controlJson.metadata;
-      const jsonMatch = controlJson.jsonStr;
-      // Validate that it has the expected structure
-      if (
-        metadata.hasOwnProperty("upload_required") ||
-        metadata.hasOwnProperty("session_terminated") ||
-        metadata.hasOwnProperty("payment_required") ||
-        metadata.hasOwnProperty("document_ready")
-      ) {
-        const documentReadyFlag =
-          metadata.document_ready === true || metadata.document_ready === "true";
-        const sessionTerminatedFlag =
-          metadata.session_terminated === true ||
-          metadata.session_terminated === "true";
-        // Extract optional embedded {"document_type":...} when ending and/or
-        // when a final artifact is emitted mid-session
-        if (sessionTerminatedFlag || documentReadyFlag) {
-          const docResult = extractDocumentData(message);
-          documentData = docResult.data;
-
-          if (documentData && docResult.startIdx !== -1 && docResult.endIdx !== -1) {
-            const beforeDoc = message.substring(0, docResult.startIdx);
-            const afterDoc = message.substring(docResult.endIdx);
-            message = (beforeDoc + afterDoc).trim();
-          }
-        }
-
-        // Extract clean message (remove termination JSON/control JSON block)
-        cleanMessage = message.replace(jsonMatch, "").trim();
-        
-        // Final cleanup: remove any remaining document JSON patterns (safety net)
-        if (documentData) {
-          cleanMessage = cleanMessage.replace(/\n\s*\{[\s\n]*"document_type"[\s\S]*?\}\s*/g, "").trim();
-          cleanMessage = cleanMessage.replace(/\{[\s\n]*"document_type"[\s\S]*?\}\s*/g, "").trim();
-          cleanMessage = cleanMessage.replace(/\s*\{[\s\n]*"document_type"[\s\S]*?\}\s*$/g, "").trim();
-        }
-
-        return {
-          requiresUpload:
-            metadata.upload_required === true ||
-            metadata.upload_required === "true",
-          uploadType: metadata.upload_type || null,
-          reason: metadata.upload_reason || null,
-          sessionTerminated:
-            metadata.session_terminated === true ||
-            metadata.session_terminated === "true",
-          terminationMessage: metadata.termination_message || null,
-          paymentRequired:
-            metadata.payment_required === true ||
-            metadata.payment_required === "true",
-          documentReady: documentReadyFlag,
-          cleanMessage: cleanMessage,
-          documentData: documentData,
-          finalResponse:
-            typeof metadata.final_response === "string" &&
-            metadata.final_response.trim().length > 0
-              ? metadata.final_response.trim()
-              : null,
-        };
-      }
-    } catch (parseError) {
-      // If JSON parsing fails, fall back to old regex method for backward compatibility
-      console.warn(
-        "Failed to parse metadata JSON, falling back to regex:",
-        parseError
-      );
-    }
-  }
-
-  // Fallback: Use old regex-based detection for backward compatibility
-  // This will be removed once all assistants are updated with structured output
-  const lowerMessage = message.toLowerCase();
-  const uploadKeywords = [
-    "upload",
-    "re-upload",
-    "reupload",
-    "please upload",
-    "need to upload",
-    "upload the document",
-    "upload your document",
-    "upload a document",
-    "upload the file",
-    "upload your file",
-    "upload a file",
-    "upload again",
-    "upload your will again",
-    "upload again in",
-    "please upload again",
-    "upload your will",
-    "upload your document again",
-    "upload the document again",
-    "upload the file again",
-    "upload your file again",
-    "upload it again",
-    "upload once more",
-    "upload one more time",
-    "kindly upload",
-    "upload now",
-  ];
-
-  const requiresUpload = uploadKeywords.some((keyword) =>
-    lowerMessage.includes(keyword)
-  );
-  const isReUpload =
-    requiresUpload &&
-    (lowerMessage.includes("re-upload") ||
-      lowerMessage.includes("reupload") ||
-      lowerMessage.includes("upload again") ||
-      lowerMessage.includes("upload your will again"));
-
-  // Fallback termination detection (regex-based for backward compatibility)
-  const terminationKeywords = [
-    "session is over",
-    "session over",
-    "exit or start a new session",
-    "can exit or start",
-    "terminate",
-    "end the session",
-  ];
-  const sessionTerminated = terminationKeywords.some((keyword) =>
-    lowerMessage.includes(keyword)
-  );
-
-  // Even in fallback mode, try to extract document data if session is terminated
-  let fallbackDocumentData = null;
-  if (sessionTerminated) {
-    const docResult = extractDocumentData(message);
-    fallbackDocumentData = docResult.data;
-    
-    // Remove document JSON from clean message in fallback mode too
-    if (fallbackDocumentData && docResult.startIdx !== -1 && docResult.endIdx !== -1) {
-      cleanMessage = message.substring(0, docResult.startIdx) + 
-                    message.substring(docResult.endIdx);
-      cleanMessage = cleanMessage.trim();
-      // Also remove any leading/trailing newlines
-      cleanMessage = cleanMessage.replace(/\n\s*\{[\s\n]*"document_type"[\s\S]*?\}\s*/g, "").trim();
-      cleanMessage = cleanMessage.replace(/\{[\s\n]*"document_type"[\s\S]*?\}\s*/g, "").trim();
-    }
-  }
-
-  return {
-    requiresUpload,
-    uploadType: isReUpload ? "re_upload" : requiresUpload ? "initial" : null,
-    reason: null,
-    sessionTerminated: sessionTerminated,
-    terminationMessage: sessionTerminated
-      ? terminationBarrierMessage(detectChatLanguageFromText(message))
-      : null,
-    paymentRequired: false,
-    documentReady: false,
-    cleanMessage: message,
-    documentData: fallbackDocumentData,
-    finalResponse: null,
-  };
 };
 
 //Create Assistant instance into db
@@ -1100,8 +555,8 @@ router.post(
             }
 
             history.push({ role: "user", parts: messageParts });
-            let config = session.geminiConfig || {};
-            const model = config.model || "gemini-3-flash-preview";
+            const sourceConfig = session.geminiConfig || {};
+            const model = resolveGeminiModel(sourceConfig);
 
             // Pull systemInstruction from assistant asset if available
             let systemInstructionText = undefined;
@@ -1136,16 +591,16 @@ router.post(
                     "The uploaded document(s) are read-only. Do not invent missing clauses. " +
                     "If information is missing from the document(s), respond with 'Not found in document.' " +
                     "Follow the system rules strictly and analyze only what is present in the uploaded document(s).";
-
-                  config = {
-                    ...config,
-                    systemInstruction: [{ text: systemInstructionText }],
-                  };
                 }
               }
             } catch (resolveErr) {
               // Continue without system instruction on error
             }
+
+            const config = buildGeminiGenerationConfig({
+              sourceConfig,
+              systemInstructionText,
+            });
 
             // Generate assistant response
             let assistantMessage = "";
@@ -1421,8 +876,8 @@ router.post("/send-message", jwtAuth, async (req, res) => {
       }
 
       history.push({ role: "user", parts: currentMessageParts });
-      let config = session.geminiConfig || {};
-      const model = config.model || "gemini-3-flash-preview";
+      const sourceConfig = session.geminiConfig || {};
+      const model = resolveGeminiModel(sourceConfig);
       // Pull systemInstruction from assistant asset if available
       let systemInstructionText = undefined;
       try {
@@ -1457,11 +912,6 @@ router.post("/send-message", jwtAuth, async (req, res) => {
               "If information is missing from the document(s), respond with 'Not found in document.' " +
               "Follow the system rules strictly and analyze only what is present in the uploaded document(s).";
           }
-
-          config = {
-            ...config,
-            systemInstruction: [{ text: systemInstructionText }],
-          };
         }
       } catch (resolveErr) {
         return res.status(500).json({
@@ -1469,6 +919,10 @@ router.post("/send-message", jwtAuth, async (req, res) => {
           message: resolveErr.message,
         });
       }
+      const config = buildGeminiGenerationConfig({
+        sourceConfig,
+        systemInstructionText,
+      });
       let assistantMessage = "";
       let chunks = [];
       try {

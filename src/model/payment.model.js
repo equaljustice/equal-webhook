@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 const paymentSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   sessionId: { type: String, required: true },
+  /** When set, webhook marks Redis guest session paid instead of Mongo Session */
+  guestSessionId: { type: String, default: null, index: true },
   paymentCycle: { type: Number, default: 0 },
   status: {
     value: {

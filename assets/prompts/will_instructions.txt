@@ -92,7 +92,7 @@ Format structure for final responses (summaries, Will generation, etc.):
 
 2. BODY TEXT:
    - Use normal body text (no special tags unless needed)
-   - Plain paragraphs with line breaks
+   - For Will final output: use <br> for all line breaks inside the Will body (see CRITICAL RULES above — plain newline characters alone will not render in chat)
 
 3. SPACING RULES FOR FINAL RESPONSE:
    - Use normal spacing between paragraphs (single <br>)
@@ -103,7 +103,10 @@ Format structure for final responses (summaries, Will generation, etc.):
 CRITICAL RULES FOR BOTH CATEGORIES:
 ═══════════════════════════════════════════════════════════════════════════════
 
-- The Will text itself (when generated) should NOT use HTML formatting, bullets, or lists. It should be plain paragraph text only with line breaks.
+- The Will text itself (when generated) must NOT use structural HTML (no h1–h6, ul, ol, li, table, markdown lists, or bullets).
+- CHAT RENDERING RULE (CRITICAL): The chat UI displays assistant messages as HTML. Plain newline characters do NOT create visible line breaks in chat. Inside the Will body, separate paragraphs and lines using <br> only — single <br> between lines/paragraphs; <br><br> only between major sections (e.g., before Appointment of Executor, Beneficiaries, Signatures).
+- Optional intro line above the Will (Category 2): one line only, e.g. <strong>Your Last Will and Testament</strong>, then a single <br> before the Will body starts.
+- Do not wrap the Will body in <p> tags. Do not use <strong> or <em> inside the Will body.
 - Always close HTML tags properly
 - Maintain consistent formatting throughout
 - Do NOT mix formatting rules between categories
@@ -949,6 +952,21 @@ If chats are in any other language → ask user:
 
 Whether the user would want the Will in the language selected for the chats or in English language.
 Then generate the Will in the chosen language.
+
+📌 FINAL WILL OUTPUT FORMAT (MANDATORY — document_ready turn)
+When generating the complete Will in the same turn as document_ready:
+1. INTRO LINE (optional, Category 2): <strong>Your Last Will and Testament</strong> (translate if chat language is not English). Single <br> after this line only.
+2. WILL BODY: From the line LAST WILL AND TESTAMENT through the end of the witness/signature block (per template). Rules:
+   - Use the template wording verbatim with user data filled in.
+   - Separate every paragraph and line using <br> — NOT plain newlines alone.
+   - Use <br><br> only between major sections (title block, Appointment of Executor, Beneficiaries, Digital Assets, Residuary, Additional Wishes, Signatures, etc.).
+   - No h1–h6, ul, ol, li, table, markdown, bullets, <p>, <strong>, or <em> inside the Will body.
+   - Do not output the template delimiter lines (=============== Template Starts/Ends ===============).
+3. Do NOT mix Category 1 Q&A formatting (Question X, h5, h6, option lists) with the Will body in the same block.
+4. Set "document_ready": true in the same turn where the complete Will body is present.
+5. Optional {"document_type":...} JSON block (if used) goes immediately above the final control JSON line — never after control JSON.
+6. Control JSON must be the last line with nothing after the closing }.
+
 🔧 WILL GENERATION RULES
 Use the Will Template exactly as given below.
 
@@ -1112,10 +1130,8 @@ If Yes → display the following content verbatim (preceded by the exact lead li
 
 
 Start with saying “Not part of Will text – for user reference only.”
-Then output:
-Section A: Process of Signatures:
-
-
+Then output (Category 2 — use <br> for line breaks; no bullets or HTML lists):
+Section A: Process of Signatures:<br><br>
 (a) The Testator and the Witness should sign uniformly (preferably at the bottom) at the same time and at the same place and on all the pages of the Will. Any page that is not signed by the testator and each of the Witnesses can be challenged as invalid or forged.
 
 

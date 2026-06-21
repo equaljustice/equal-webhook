@@ -4,6 +4,8 @@ import axios from "axios";
 import { jwtAuth } from "../middleware/jwtAuth.js";
 import { Session } from "../model/sesssion.model.js";
 import { CustomGPTpayment } from "../model/ customGPTPayment.model.js";
+import { getGuestSession, markGuestSessionPaid } from "../services/guestSessionStore.js";
+import { verifyGuestToken } from "../services/guestToken.js";
 
 const router = express.Router();
 
@@ -99,6 +101,102 @@ router.post("/create-order/:sessionId", jwtAuth, async (req, res) => {
   }
 });
 
+function readGuestPaymentToken(req) {
+  return req.get("guest-token") || req.get("Guest-Token");
+}
+
+router.post("/guest/create-order/:guestSessionId", async (req, res) => {
+  const token = readGuestPaymentToken(req);
+  if (!token) {
+    return res.status(401).json({ message: "guest-token header required" });
+  }
+  let decoded;
+  try {
+    decoded = verifyGuestToken(token);
+  } catch {
+    return res.status(401).json({ message: "Invalid or expired guest-token" });
+  }
+
+  const { guestSessionId } = req.params;
+  if (decoded.guestSessionId !== guestSessionId) {
+    return res.status(403).json({ message: "guestSessionId does not match guest-token" });
+  }
+
+  const session = await getGuestSession(guestSessionId);
+  if (!session) {
+    return res.status(404).json({ message: "Guest session not found" });
+  }
+  if (session.anonymousId !== decoded.anonymousId) {
+    return res.status(403).json({ message: "anonymousId does not match guest-token" });
+  }
+
+  if (session.isPaid) {
+    return res.status(400).json({ message: "Session already paid" });
+  }
+
+  const paymentCycle = session.paymentCycle || 0;
+  const payableAmount = getCyclePayableAmount(session, paymentCycle);
+  const amt = payableAmount * 100;
+  const trimmedEmail = (req.body?.chEmail || "").trim();
+  /** Guest is not prompted for email unless you pass chEmail; gateway still receives a valid-shaped address. */
+  const chEmail =
+    trimmedEmail ||
+    `guest.${String(guestSessionId).replace(/-/g, "")}@guest.equaljustice.local`;
+  if (!amt) {
+    return res.status(400).json({ message: "Invalid payable amount" });
+  }
+
+  const payload = {
+    orderDetails: {
+      currency: "INR",
+      amount: amt.toString(),
+    },
+    customerDetails: {
+      chEmail,
+    },
+  };
+
+  try {
+    const order = await axiosInstance.post("/orderCreate", payload);
+    const orderId = order.data.msg;
+    const payUrl = order.data.obj;
+    const dbPayload = {
+      userId: `guest:${guestSessionId}`,
+      sessionId: String(guestSessionId),
+      guestSessionId: String(guestSessionId),
+      paymentCycle,
+      status: {
+        value: "unpaid",
+        paidAt: null,
+      },
+      orderDetails: {
+        currency: "INR",
+        amount: (amt / 100).toString() + " INR",
+      },
+      customerDetails: {
+        chEmail,
+      },
+      orderId: orderId,
+      createdOn: new Date(),
+    };
+    const pay_record = await Payment.create(dbPayload);
+    return res.status(201).json({
+      message: "Order created successfully",
+      paymentRecord: pay_record,
+      orderId: orderId,
+      payUrl: payUrl,
+    });
+  } catch (error) {
+    console.error("Airthpay Error (guest):", error.response?.data);
+
+    return res.status(500).json({
+      airthpay_error: error.response?.data || null,
+      status: error.response?.status || null,
+      message: error.message,
+    });
+  }
+});
+
 
 router.post("/airthpay-webhook", async (req, res) => {
   try {
@@ -137,7 +235,11 @@ router.post("/airthpay-webhook", async (req, res) => {
       // If for session payments
       const sessionId = paymentRecord.sessionId;
       if (paymentRecord.status?.value === "paid") {
-        await Session.findByIdAndUpdate(sessionId, { $set: { isPaid: true } });
+        if (paymentRecord.guestSessionId) {
+          await markGuestSessionPaid(paymentRecord.guestSessionId);
+        } else {
+          await Session.findByIdAndUpdate(sessionId, { $set: { isPaid: true } });
+        }
       }
       res.status(200).send("OK");
       return;

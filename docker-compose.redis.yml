@@ -1,0 +1,23 @@
+# Dev only: Redis while you run `npm run dev` on the host (not inside Docker).
+#
+#   docker compose -f docker-compose.redis.yml up -d
+#   # In .env: REDIS_URL=redis://127.0.0.1:6379
+#
+# For production on a VPS with API in Docker, use docker-compose.prod.yml instead.
+#
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - eqj_redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  eqj_redis_data:
