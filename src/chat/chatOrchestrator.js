@@ -13,15 +13,20 @@ import { FLOW_STATES } from "../flow/flowConstants.js";
 import { appendControlJson } from "./sessionGuards.js";
 import {
   extractUploadRequirement,
+  applyDownloadSnapshot,
+  inferDownloadSnapshot,
   persistSessionDocumentSnapshot,
   paymentBarrierMessage,
   detectChatLanguageFromText,
+  stripControlJsonFromDisplay,
 } from "./messageControlParse.js";
+import { normalizeQaDisplayHtml, streamDisplayFromRaw } from "./replyFormat.js";
 import {
   applyPaymentBarrier,
   enforceFlowGuards,
   enforceLegacySessionGuards,
   getCyclePayableAmount,
+  buildUnpaidPaymentGateResponse,
 } from "./sessionGuards.js";
 import {
   buildFinalGenerationUserMessage,
@@ -29,8 +34,27 @@ import {
   buildGeminiHistory,
   streamGeminiChat,
 } from "./geminiChat.js";
+import { buildPostUploadTurnOverlay } from "./uploadFlowHints.js";
 import { buildGuestGeminiSystemInstruction } from "./guestSignupOffer.js";
-import { appendGuestSystemInstruction } from "./guestPromptContext.js";
+import {
+  appendGuestSystemInstruction,
+  applyPreTurnSessionUpdates,
+  detectLanguageChoiceFromUserMessage,
+  promoteGuestSignupOfferState,
+} from "./guestPromptContext.js";
+import {
+  GUEST_BOOTSTRAP_MESSAGE,
+  buildGuestLanguagePromptHtml,
+  finishGuestStaticTurn,
+  finishGuestLanguageSelectedTurn,
+} from "./guestDisplayMessages.js";
+import {
+  enforceGuestOfferGuards,
+  stripGuestOfferBoilerplate,
+  GUEST_FLOW_PHASE,
+  isAwaitingGuestChoice,
+  isGuestLanguagePhase,
+} from "./guestSessionGuards.js";
 import {
   getOrCreateInstructionCache,
   isInstructionCacheEnabled,
@@ -39,8 +63,6 @@ import {
   SESSION_STATE_PROTOCOL,
   mergeSessionStateFromModel,
   advanceQaPhase,
-  quickOptionsToFlowOptions,
-  isPaymentCompletionMessage,
   QA_PHASES,
 } from "./sessionStateProtocol.js";
 
@@ -108,6 +130,7 @@ async function resolveInstructionLayers({
   assistant,
   session,
   filesToUse,
+  userMessage = "",
   isGuest,
   templateAsset,
   flowMode = false,
@@ -152,6 +175,14 @@ async function resolveInstructionLayers({
         "If information is missing from the document(s), respond with 'Not found in document.' " +
         "Follow the system rules strictly and analyze only what is present in the uploaded document(s)."
     );
+    const postUploadOverlay = buildPostUploadTurnOverlay(
+      session,
+      assistant,
+      userMessage
+    );
+    if (postUploadOverlay) {
+      dynamicParts.push(postUploadOverlay);
+    }
   }
 
   const dynamicOverlay = dynamicParts.join("\n\n");
@@ -206,6 +237,14 @@ async function resolveSystemInstruction({
   return text;
 }
 
+function wrapStreamChunkForDisplay(onStreamChunk) {
+  if (!onStreamChunk) return undefined;
+  return (_chunk, rawFull) => {
+    const display = streamDisplayFromRaw(rawFull);
+    onStreamChunk(_chunk, display);
+  };
+}
+
 function buildFlowResponseEnvelope(session, result, extra = {}) {
   return {
     reply: result.reply,
@@ -220,7 +259,7 @@ function buildFlowResponseEnvelope(session, result, extra = {}) {
     displayNumber: result.displayNumber,
     phase: result.phase || session.flowState,
     flowMode: true,
-    flowOptions: result.flowOptions || [],
+    flowOptions: [],
     inputType: result.inputType || null,
     streaming: !!extra.streaming,
     ...extra,
@@ -243,6 +282,8 @@ export async function handleChatTurn({
     session.useFlowOrchestrator ||
     (await isFlowOrchestratorEnabled(assistant));
 
+  const streamForDisplay = wrapStreamChunkForDisplay(onStreamChunk);
+
   if (useFlow) {
     return handleFlowTurn({
       session,
@@ -251,7 +292,7 @@ export async function handleChatTurn({
       filesToUse,
       isGuest,
       isSpecialAccess,
-      onStreamChunk,
+      onStreamChunk: streamForDisplay,
     });
   }
 
@@ -262,7 +303,7 @@ export async function handleChatTurn({
     filesToUse,
     isGuest,
     isSpecialAccess,
-    onStreamChunk,
+    onStreamChunk: streamForDisplay,
   });
 }
 
@@ -292,6 +333,23 @@ async function handleFlowTurn({
   if (!session.flowKey) {
     initFlowSession(session, bundle.flow);
     session.useFlowOrchestrator = true;
+  }
+
+  if (userMessage !== FLOW_BOOTSTRAP_MESSAGE) {
+    const unpaidGate = buildUnpaidPaymentGateResponse(session, {
+      isSpecialAccess,
+      language: session.selectedLanguage,
+    });
+    if (unpaidGate) {
+      if (onStreamChunk && unpaidGate.reply) {
+        onStreamChunk(unpaidGate.reply, unpaidGate.reply);
+      }
+      return buildFlowResponseEnvelope(session, {
+        ...unpaidGate,
+        phase: session.flowState || FLOW_STATES.WAITING_PAYMENT,
+        streaming: !!onStreamChunk,
+      });
+    }
   }
 
   const context = { isPaid: session.isPaid || isSpecialAccess, isSpecialAccess };
@@ -350,8 +408,23 @@ async function handleFlowTurn({
     });
   }
 
-  // Final LLM generation
+  // Final LLM generation — never invoke model until webhook confirms payment
   if (result.finalGenerate || result.invokeLlm) {
+    const unpaidBeforeGenerate = buildUnpaidPaymentGateResponse(session, {
+      isSpecialAccess,
+      language: session.selectedLanguage,
+    });
+    if (unpaidBeforeGenerate) {
+      if (onStreamChunk && unpaidBeforeGenerate.reply) {
+        onStreamChunk(unpaidBeforeGenerate.reply, unpaidBeforeGenerate.reply);
+      }
+      return buildFlowResponseEnvelope(session, {
+        ...unpaidBeforeGenerate,
+        phase: session.flowState || FLOW_STATES.WAITING_PAYMENT,
+        streaming: !!onStreamChunk,
+      });
+    }
+
     const templateAsset =
       result.templateAsset ||
       bundle.flow.finalTemplateAsset ||
@@ -397,20 +470,19 @@ async function handleFlowTurn({
       });
     }
 
-    session.flowState = uploadInfo.documentReady
-      ? FLOW_STATES.FINAL_GENERATED
-      : session.flowState;
-
     if (uploadInfo.sessionTerminated) {
       session.flowState = FLOW_STATES.TERMINATED;
     }
 
-    persistSessionDocumentSnapshot(
+    const saved = applyDownloadSnapshot(
       session,
       session._id || session.guestSessionId,
       uploadInfo,
       cleanMessage
     );
+    if (saved) {
+      session.flowState = FLOW_STATES.FINAL_GENERATED;
+    }
 
     return buildFlowResponseEnvelope(session, {
       reply: cleanMessage,
@@ -420,7 +492,6 @@ async function handleFlowTurn({
       uploadType: uploadInfo.uploadType,
       nodeId: result.nodeId,
       phase: session.flowState,
-      documentReady: uploadInfo.documentReady,
     }, { streaming: !!onStreamChunk });
   }
 
@@ -447,6 +518,7 @@ async function handleLegacyGeminiTurn({
       assistant,
       session,
       filesToUse,
+      userMessage,
       isGuest,
     });
   } catch (err) {
@@ -461,25 +533,66 @@ async function handleLegacyGeminiTurn({
     session.qaPhase = QA_PHASES.QA_IN_PROGRESS;
   }
 
+  if (isGuest && userMessage === GUEST_BOOTSTRAP_MESSAGE) {
+    return finishGuestStaticTurn({
+      session,
+      reply: buildGuestLanguagePromptHtml(),
+      onStreamChunk,
+      normalizeQaDisplayHtml,
+      persistSessionDocumentSnapshot,
+    });
+  }
+
+  applyPreTurnSessionUpdates(session, userMessage);
+
+  if (isGuest) {
+    const langPick = detectLanguageChoiceFromUserMessage(userMessage);
+    if (langPick && isAwaitingGuestChoice(session)) {
+      session.guestOfferQuestionShown = true;
+      promoteGuestSignupOfferState(session);
+      return finishGuestLanguageSelectedTurn({
+        session,
+        persistSessionDocumentSnapshot,
+      });
+    }
+  }
+
+  const unpaidGate = buildUnpaidPaymentGateResponse(session, {
+    isSpecialAccess,
+    language: session.selectedLanguage,
+  });
+  if (unpaidGate) {
+    if (onStreamChunk && unpaidGate.reply) {
+      onStreamChunk(unpaidGate.reply, unpaidGate.reply);
+    }
+    return {
+      ...unpaidGate,
+      streaming: !!onStreamChunk,
+      instructionCached: false,
+    };
+  }
+
   if (
     session.qaPhase === QA_PHASES.WAITING_PAYMENT &&
-    (session.isPaid || isSpecialAccess || isPaymentCompletionMessage(userMessage))
+    (session.isPaid || isSpecialAccess)
   ) {
     session.qaPhase = QA_PHASES.READY_FOR_FINAL;
   }
 
   const sourceConfig = session.geminiConfig || {};
-  let cachedContentName = session.geminiInstructionCacheName || null;
+  let cachedContentName = null;
+  const hasUploadedFiles = Array.isArray(filesToUse) && filesToUse.length > 0;
 
-  if (!cachedContentName && isInstructionCacheEnabled()) {
+  // Document turns attach fileData — skip context cache (inline instructions + files).
+  if (isInstructionCacheEnabled() && !hasUploadedFiles) {
     cachedContentName = await getOrCreateInstructionCache({
       instructionText: layers.cacheableText,
       sourceConfig,
       displayName: assistant.key || "assistant",
     });
-    if (cachedContentName) {
-      session.geminiInstructionCacheName = cachedContentName;
-    }
+    session.geminiInstructionCacheName = cachedContentName || null;
+  } else if (hasUploadedFiles) {
+    session.geminiInstructionCacheName = null;
   }
 
   const contents = buildLegacyGeminiContents({
@@ -489,36 +602,95 @@ async function handleLegacyGeminiTurn({
     dynamicOverlay: layers.dynamicOverlay,
   });
 
+  const streamOpts = {
+    sourceConfig,
+    systemInstructionText: cachedContentName ? undefined : layers.fullInlineText,
+    cachedContentName: cachedContentName || undefined,
+    contents,
+    onChunk: onStreamChunk,
+  };
+
   let assistantMessage;
   try {
-    assistantMessage = await streamGeminiChat({
-      sourceConfig,
-      systemInstructionText: cachedContentName ? undefined : layers.fullInlineText,
-      cachedContentName: cachedContentName || undefined,
-      contents,
-      onChunk: onStreamChunk,
-    });
+    assistantMessage = await streamGeminiChat(streamOpts);
   } catch (geminiErr) {
-    return { error: geminiErr.message, status: 500, message: "Gemini failed" };
+    const staleCache =
+      cachedContentName &&
+      (/cache|cachedContent|not found|expired|invalid/i.test(
+        String(geminiErr?.message || "")
+      ) ||
+        hasUploadedFiles);
+    if (staleCache || (hasUploadedFiles && cachedContentName)) {
+      console.warn(
+        "[GeminiCache] Stale cache reference — retrying with inline instructions",
+        { name: cachedContentName }
+      );
+      session.geminiInstructionCacheName = null;
+      try {
+        assistantMessage = await streamGeminiChat({
+          ...streamOpts,
+          cachedContentName: undefined,
+          systemInstructionText: layers.fullInlineText,
+        });
+        cachedContentName = null;
+      } catch (retryErr) {
+        return { error: retryErr.message, status: 500, message: "Gemini failed" };
+      }
+    } else {
+      console.error("[Gemini] generateContent failed", {
+        sessionId: session._id || session.guestSessionId,
+        message: geminiErr?.message,
+      });
+      return { error: geminiErr.message, status: 500, message: "Gemini failed" };
+    }
   }
 
   let uploadInfo = extractUploadRequirement(assistantMessage);
   uploadInfo = enforceFlowGuards(session, uploadInfo);
-  uploadInfo = enforceLegacySessionGuards(session, uploadInfo, { isSpecialAccess });
+  uploadInfo = enforceLegacySessionGuards(session, uploadInfo, {
+    isSpecialAccess,
+  });
+  if (isGuest) {
+    uploadInfo = enforceGuestOfferGuards(session, uploadInfo);
+  }
 
   if (uploadInfo.sessionState) {
     mergeSessionStateFromModel(session, uploadInfo.sessionState);
-  }
-  if (uploadInfo.selectedLanguage) {
-    session.selectedLanguage = uploadInfo.selectedLanguage;
   }
 
   advanceQaPhase(session, uploadInfo);
 
   let cleanMessage = uploadInfo.cleanMessage || assistantMessage;
-  const flowOptions = quickOptionsToFlowOptions(
-    uploadInfo.sessionState?.quick_options || session.lastQuickOptions
-  );
+  if (!cleanMessage?.trim() && uploadInfo.sessionState) {
+    cleanMessage =
+      "Thank you. Please wait while I prepare your next question.";
+    console.warn("[Chat] Model returned control JSON only — no user-visible reply", {
+      sessionId: session._id || session.guestSessionId,
+      currentStep: uploadInfo.sessionState?.current_step,
+    });
+  }
+
+  cleanMessage = normalizeQaDisplayHtml(cleanMessage, {
+    documentReady: inferDownloadSnapshot(session, uploadInfo, cleanMessage),
+  });
+
+  if (isGuest) {
+    if (isGuestLanguagePhase(session)) {
+      cleanMessage = stripGuestOfferBoilerplate(cleanMessage);
+    } else if (
+      session.guestFlowPhase === GUEST_FLOW_PHASE.ACTIVE ||
+      session.signupOfferResponse === "declined" ||
+      session.signupOfferResponse === "accepted"
+    ) {
+      cleanMessage = stripGuestOfferBoilerplate(cleanMessage);
+    }
+    if (isAwaitingGuestChoice(session)) {
+      session.guestOfferQuestionShown = true;
+      cleanMessage = "";
+    }
+  }
+
+  const flowOptions = [];
 
   if (uploadInfo.paymentRequired && !isSpecialAccess) {
     const barrier = applyPaymentBarrier(session, {
@@ -540,12 +712,18 @@ async function handleLegacyGeminiTurn({
     };
   }
 
-  persistSessionDocumentSnapshot(
+  applyDownloadSnapshot(
     session,
     session._id || session.guestSessionId,
     uploadInfo,
     cleanMessage
   );
+
+  const guestSignupOfferPending =
+    isGuest &&
+    isAwaitingGuestChoice(session) &&
+    session.signupOfferResponse !== "declined" &&
+    session.signupOfferResponse !== "accepted";
 
   return {
     reply: cleanMessage,
@@ -555,7 +733,9 @@ async function handleLegacyGeminiTurn({
     requiresUpload: uploadInfo.requiresUpload,
     uploadType: uploadInfo.uploadType,
     uploadReason: uploadInfo.reason,
-    documentReady: uploadInfo.documentReady,
+    guestSignupOffer: !!uploadInfo.guestSignupOffer,
+    guestSignupOfferPending,
+    selectedLanguage: uploadInfo.selectedLanguage || session.selectedLanguage || null,
     flowMode: false,
     flowOptions,
     streaming: !!onStreamChunk,

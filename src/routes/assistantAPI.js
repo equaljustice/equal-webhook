@@ -17,7 +17,7 @@ import {
   withTimeout,
   buildDocumentDataFromMessage,
   findLastSubstantiveMessage,
-  persistSessionDocumentSnapshot,
+  applyDownloadSnapshot,
   extractUploadRequirement,
   detectChatLanguageFromText,
   paymentBarrierMessage,
@@ -28,7 +28,21 @@ import {
   executeChatTurnStream,
   preflightChatTurn,
 } from "../chat/chatTurnHandler.js";
-import { getCyclePayableAmount } from "../chat/sessionGuards.js";
+import {
+  getCyclePayableAmount,
+  preparePaymentBarrierCycle,
+} from "../chat/sessionGuards.js";
+import { hasWebhookConfirmedPayment } from "../chat/paymentVerification.js";
+import {
+  isAllowedUploadFile,
+  UPLOAD_TYPE_ERROR,
+} from "../utils/uploadFileTypes.js";
+import {
+  uploadMulterFileToGemini,
+  cleanupMulterFiles,
+  linkUploadedFilesToSession,
+} from "../utils/geminiFileUpload.js";
+import { resolveSessionGeminiConfig } from "../utils/geminiConfig.js";
 
 const router = express.Router();
 const OPENAI_RUN_POLL_MAX_ATTEMPTS = 120;
@@ -40,22 +54,10 @@ const upload = multer({
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },
   fileFilter: (req, file, cb) => {
-    // Accept PDF, DOCX, and image files
-    const allowedMimes = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/msword",
-      "image/jpeg",
-      "image/png",
-      "image/jpg",
-    ];
-    if (allowedMimes.includes(file.mimetype)) {
+    if (isAllowedUploadFile(file)) {
       cb(null, true);
     } else {
-      cb(
-        new Error("Invalid file type. Only PDF, DOCX, and images are allowed."),
-        false
-      );
+      cb(new Error(UPLOAD_TYPE_ERROR), false);
     }
   },
 });
@@ -87,24 +89,40 @@ router.post("/create", async (req, res) => {
     name,
     key,
     id,
+    assistantId: bodyAssistantId,
     price,
     actualPrice,
     additionalPrice,
     actualAdditionalPrice,
     desc,
+    description,
     provider,
     config,
   } = req.body;
 
-  if (!name || !key || !id || !price || !desc || !provider) {
-    return res.status(404).json({ message: "Info is required" });
+  const resolvedId = id ?? bodyAssistantId;
+  const resolvedDesc = desc ?? description;
+
+  if (!name || !key || !resolvedId || price == null || !resolvedDesc || !provider) {
+    const missing = [];
+    if (!name) missing.push("name");
+    if (!key) missing.push("key");
+    if (!resolvedId) missing.push("id (or assistantId)");
+    if (price == null) missing.push("price");
+    if (!resolvedDesc) missing.push("desc (or description)");
+    if (!provider) missing.push("provider");
+    return res.status(400).json({
+      message: "Info is required",
+      missing,
+      hint: "POST body must include: name, key, id (or assistantId), price, desc (or description), provider",
+    });
   }
 
   try {
     const payload = {
       name,
       key,
-      assistantId: id,
+      assistantId: resolvedId,
       price,
       actualPrice: typeof actualPrice === "number" ? actualPrice : price,
       additionalPrice:
@@ -117,7 +135,7 @@ router.post("/create", async (req, res) => {
             : typeof additionalPrice === "number"
               ? additionalPrice
               : price,
-      description: desc,
+      description: resolvedDesc,
       provider,
       docDownloadAvailable: req.body.docDownloadAvailable === true,
       config: config || {},
@@ -252,7 +270,7 @@ router.post("/start-session", jwtAuth, async (req, res) => {
     } else if (provider === "gemini") {
       // For Gemini, threadId may not be needed, but store config
       const { v4: uuidv4 } = await import("uuid");
-      geminiConfig = assistant.config || {};
+      geminiConfig = await resolveSessionGeminiConfig(assistant.config || {});
       threadId = uuidv4(); // Use a unique threadId (uuid) for Gemini
     }
 
@@ -264,7 +282,7 @@ router.post("/start-session", jwtAuth, async (req, res) => {
     // deferPayment: true  → Q&A is free, payment triggered by AI before final output
     // deferPayment: false → original flow, payment required upfront before chatting
     const deferPayment = assistant.config?.deferPayment === true;
-    const isPaid = isSpecialAccess || deferPayment ? true : false;
+    const isPaid = isSpecialAccess;
 
     // Check if assistant supports multiple file uploads
     const supportsMultipleUploads =
@@ -298,6 +316,7 @@ router.post("/start-session", jwtAuth, async (req, res) => {
       provider,
       geminiConfig,
       isPaid,
+      deferPayment,
       supportsMultipleUploads,
     });
 
@@ -330,6 +349,8 @@ router.get("/get-sessions", jwtAuth, async (req, res) => {
     );
     const enriched = sessions.map((s) => ({
       ...s,
+      deferPayment:
+        s.deferPayment === true || s.geminiConfig?.deferPayment === true,
       docDownloadAvailable:
         !!(s.assistantKey && keyToDoc[s.assistantKey] === true),
     }));
@@ -394,86 +415,21 @@ router.post(
         }
       }
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const fs = await import("fs/promises");
-
-      // Helper function to upload a single file to Gemini
-      const uploadFileToGemini = async (file) => {
-        // Read file buffer
-        const fileBuffer = await fs.readFile(file.path);
-
-        // Determine mimeType with fallback
-        let mimeType = file.mimetype;
-        if (!mimeType || mimeType === "application/octet-stream") {
-          // Fallback based on file extension
-          const ext = path.extname(file.originalname || "").toLowerCase();
-          const mimeTypes = {
-            ".pdf": "application/pdf",
-            ".doc": "application/msword",
-            ".docx":
-              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".png": "image/png",
-          };
-          mimeType = mimeTypes[ext] || "application/pdf";
-        }
-
-        // Upload file to Gemini Files API
-        let uploadResponse;
-        try {
-          // Format 1: Using file path with config containing mimeType
-          uploadResponse = await ai.files.upload({
-            file: file.path,
-            config: {
-              mimeType: mimeType,
-              displayName: file.originalname || `document_${uuidv4()}`,
-            },
-          });
-        } catch (pathErr) {
-          // Format 2: Using file buffer if path doesn't work
-          uploadResponse = await ai.files.upload({
-            file: fileBuffer,
-            config: {
-              mimeType: mimeType,
-              displayName: file.originalname || `document_${uuidv4()}`,
-            },
-          });
-        }
-
-        // Extract file URI from response (handle different response structures)
-        const fileId =
-          uploadResponse?.file?.uri ||
-          uploadResponse?.file?.name ||
-          uploadResponse?.uri ||
-          uploadResponse?.fileId ||
-          uploadResponse?.name;
-
-        if (!fileId) {
-          throw new Error(
-            "Failed to extract file ID from Gemini upload response"
-          );
-        }
-
-        return fileId;
-      };
-
-      // Upload all files to Gemini
       const uploadedFiles = [];
       const fileErrors = [];
 
       for (const file of files) {
         try {
-          const fileId = await uploadFileToGemini(file);
+          const uploaded = await uploadMulterFileToGemini(file);
           uploadedFiles.push({
-            fileId: fileId,
-            fileName: file.originalname,
+            fileId: uploaded.fileId,
+            fileName: uploaded.fileName,
+            mimeType: uploaded.mimeType,
+            sourceMimeType: uploaded.sourceMimeType,
           });
-          // Clean up temp file after successful upload
-          await fs.unlink(file.path).catch(() => {});
+          await cleanupMulterFiles([file]);
         } catch (uploadErr) {
-          // Clean up temp file on error
-          await fs.unlink(file.path).catch(() => {});
+          await cleanupMulterFiles([file]);
           fileErrors.push({
             fileName: file.originalname,
             error: uploadErr.message,
@@ -481,7 +437,6 @@ router.post(
         }
       }
 
-      // If all files failed, return error
       if (uploadedFiles.length === 0) {
         return res.status(500).json({
           error: "Failed to upload all files",
@@ -489,298 +444,43 @@ router.post(
         });
       }
 
-      // If some files failed, include errors in response but continue
       const fileIds = uploadedFiles.map((f) => f.fileId);
 
-      // If sessionId was provided, link fileIds to session and update upload status
-      let assistantReply = null;
       if (session) {
-        // Handle multiple uploads: append all new fileIds to array
-        if (!session.uploadedFileIds) {
-          session.uploadedFileIds = [];
-        }
-        // Add all newly uploaded files to the array
-        for (const fileId of fileIds) {
-          session.uploadedFileIds.push(fileId);
-        }
-        // Also keep uploadedFileId for backward compatibility (use latest)
-        session.uploadedFileId = fileIds[fileIds.length - 1];
-
-        session.isDocUploaded = true;
-        session.isDocUploadRequired = false;
-        // Remove uploadAttempts tracking - no longer needed
-
-        // Automatically continue conversation with uploaded document
-        try {
-          // Create a message indicating document was uploaded
-          const fileCount = session.supportsMultipleUploads
-            ? session.uploadedFileIds?.length || 1
-            : 1;
-          const uploadMessage =
-            fileCount > 1
-              ? `${fileCount} documents uploaded successfully. Please analyze them.`
-              : "Document uploaded successfully. Please analyze it.";
-
-          if (session.provider === "gemini") {
-            // Gemini logic - automatically process the uploaded document
-            const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-            // Build history for context
-            const history = (session.messages || []).map((msg) => ({
-              role: msg.role === "user" ? "user" : "model",
-              parts: [{ text: msg.content }],
-            }));
-
-            // Build message with uploaded file(s)
-            const messageParts = [{ text: uploadMessage }];
-
-            // Add all uploaded files to the message
-            const filesToInclude = session.supportsMultipleUploads
-              ? session.uploadedFileIds || fileIds
-              : fileIds;
-
-            for (const fileUri of filesToInclude) {
-              if (fileUri) {
-                messageParts.push({
-                  fileData: {
-                    fileUri: fileUri,
-                  },
-                });
-              }
-            }
-
-            history.push({ role: "user", parts: messageParts });
-            const sourceConfig = session.geminiConfig || {};
-            const model = resolveGeminiModel(sourceConfig);
-
-            // Pull systemInstruction from assistant asset if available
-            let systemInstructionText = undefined;
-            try {
-              const assistant = await Assistant.findOne({
-                assistantId: session.assistantId,
-              });
-              if (
-                assistant &&
-                assistant.config &&
-                assistant.config.systemInstructionAsset
-              ) {
-                try {
-                  // Read from GCS (with local filesystem fallback)
-                  systemInstructionText = await readPromptFile(
-                    assistant.config.systemInstructionAsset
-                  );
-                } catch (err) {
-                  // Continue without system instruction if file not found
-                  console.warn(
-                    `Failed to load system instruction: ${err.message}`
-                  );
-                }
-
-                // Add file analysis instructions
-                if (systemInstructionText) {
-                  const fileCount = filesToInclude.length;
-                  const fileText =
-                    fileCount > 1 ? "documents have" : "document has";
-                  systemInstructionText +=
-                    `\n\nIMPORTANT: ${fileCount} uploaded ${fileText} been provided for analysis. ` +
-                    "The uploaded document(s) are read-only. Do not invent missing clauses. " +
-                    "If information is missing from the document(s), respond with 'Not found in document.' " +
-                    "Follow the system rules strictly and analyze only what is present in the uploaded document(s).";
-                }
-              }
-            } catch (resolveErr) {
-              // Continue without system instruction on error
-            }
-
-            const config = buildGeminiGenerationConfig({
-              sourceConfig,
-              systemInstructionText,
-            });
-
-            // Generate assistant response
-            let assistantMessage = "";
-            try {
-              await withTimeout(
-                (async () => {
-                  const response = await ai.models.generateContentStream({
-                    model,
-                    config,
-                    contents: history,
-                  });
-                  for await (const chunk of response) {
-                    if (chunk.text) {
-                      assistantMessage += chunk.text;
-                    }
-                  }
-                })(),
-                GEMINI_STREAM_TIMEOUT_MS,
-                "Gemini stream"
-              );
-              // Extract upload requirement from structured output
-              const uploadInfo = extractUploadRequirement(assistantMessage);
-              const cleanMessage = uploadInfo.cleanMessage || assistantMessage;
-              assistantReply = cleanMessage;
-
-              // Save messages to session (without JSON marker)
-              session.messages.push({ role: "user", content: uploadMessage });
-              session.messages.push({
-                role: "assistant",
-                content: cleanMessage,
-              });
-
-              const resolvedFinalResponse =
-                typeof uploadInfo.finalResponse === "string" &&
-                uploadInfo.finalResponse.trim().length > 0
-                  ? uploadInfo.finalResponse.trim()
-                  : null;
-              if (resolvedFinalResponse) {
-                session.final_response = resolvedFinalResponse;
-              }
-
-              persistSessionDocumentSnapshot(
-                session,
-                session._id,
-                uploadInfo,
-                cleanMessage
-              );
-
-              // Check if assistant is asking for re-upload in the auto-resume response
-              const requiresReUpload =
-                uploadInfo.requiresUpload &&
-                uploadInfo.uploadType === "re_upload";
-              if (requiresReUpload) {
-                // Assistant is asking for re-upload, set the flag
-                session.isDocUploadRequired = true;
-                session.isDocUploaded = false;
-                // For multiple uploads, don't clear all files - just mark as needing re-upload
-                // For single upload, clear the fileId
-                if (!session.supportsMultipleUploads) {
-                  session.uploadedFileId = null;
-                  session.uploadedFileIds = [];
-                }
-              }
-            } catch (geminiErr) {
-              // If Gemini fails, continue without assistant reply
-              console.error(
-                "Failed to generate assistant response after upload:",
-                geminiErr
-              );
-            }
-          } else if (session.provider === "openai") {
-            // OpenAI logic - automatically process the uploaded document
-            // Add message to thread
-            await client.beta.threads.messages.create(session.threadId, {
-              role: "user",
-              content: uploadMessage,
-            });
-
-            // Run the assistant
-            const run = await client.beta.threads.runs.create(
-              session.threadId,
-              {
-                assistant_id: session.assistantId,
-              }
-            );
-
-            // Poll until completed with bounded attempts (anti-stall)
-            let runStatus;
-            let attempts = 0;
-            do {
-              await new Promise((r) => setTimeout(r, 1000));
-              runStatus = await client.beta.threads.runs.retrieve(
-                session.threadId,
-                run.id
-              );
-              attempts += 1;
-            } while (
-              runStatus.status !== "completed" &&
-              attempts < OPENAI_RUN_POLL_MAX_ATTEMPTS
-            );
-            if (runStatus.status !== "completed") {
-              throw new Error("OpenAI run did not complete in time");
-            }
-
-            // Fetch messages
-            const messages = await client.beta.threads.messages.list(
-              session.threadId
-            );
-            const assistantMessage =
-              messages.data[0].content[0].text.value || "No response";
-
-            // Extract upload requirement from structured output
-            const uploadInfo = extractUploadRequirement(assistantMessage);
-            const cleanMessage = uploadInfo.cleanMessage || assistantMessage;
-            assistantReply = cleanMessage;
-
-            // Save message history (without JSON marker)
-            session.messages.push({ role: "user", content: uploadMessage });
-            session.messages.push({
-              role: "assistant",
-              content: cleanMessage,
-            });
-
-            const resolvedFinalResponse =
-              typeof uploadInfo.finalResponse === "string" &&
-              uploadInfo.finalResponse.trim().length > 0
-                ? uploadInfo.finalResponse.trim()
-                : null;
-            if (resolvedFinalResponse) {
-              session.final_response = resolvedFinalResponse;
-            }
-
-            persistSessionDocumentSnapshot(
-              session,
-              session._id,
-              uploadInfo,
-              cleanMessage
-            );
-
-            // Check if assistant is asking for re-upload in the auto-resume response
-            const requiresReUpload =
-              uploadInfo.requiresUpload &&
-              uploadInfo.uploadType === "re_upload";
-            if (requiresReUpload) {
-              // Assistant is asking for re-upload, set the flag
-              session.isDocUploadRequired = true;
-              session.isDocUploaded = false;
-              session.uploadedFileId = null;
-            }
-          }
-        } catch (autoContinueErr) {
-          // If auto-continue fails, log but don't fail the upload
-          console.error(
-            "Failed to auto-continue conversation after upload:",
-            autoContinueErr
-          );
-        }
-
+        linkUploadedFilesToSession(session, uploadedFiles);
         await session.save();
       }
 
+      const fileCount = session?.supportsMultipleUploads
+        ? session?.uploadedFileIds?.length || fileIds.length
+        : fileIds.length;
+      const analysisMessage = buildPostUploadAnalysisMessage(
+        session,
+        null,
+        fileCount
+      );
+
       return res.status(200).json({
-        fileIds: fileIds, // Array of all uploaded file IDs
-        files: uploadedFiles, // Array of {fileId, fileName} objects
+        fileIds,
+        files: uploadedFiles,
         message:
           uploadedFiles.length > 1
             ? `${uploadedFiles.length} files uploaded successfully`
             : "File uploaded successfully",
-        assistantReply: assistantReply, // Include assistant's response if available
-        conversationResumed: !!assistantReply,
+        triggerAnalysis: session?.provider === "gemini",
+        analysisMessage,
+        conversationResumed: false,
         supportsMultipleUploads: session?.supportsMultipleUploads || false,
         totalUploadedFiles: session?.uploadedFileIds?.length || fileIds.length,
         uploadedFileIds: session?.uploadedFileIds || fileIds,
-        // Backward compatibility - include single fileId and fileName
-        fileId: fileIds[0], // First file ID for backward compatibility
+        fileId: fileIds[0],
         fileName: uploadedFiles[0]?.fileName,
-        // Include errors if any files failed
+        isDocUploaded: session?.isDocUploaded ?? true,
+        isDocUploadRequired: session?.isDocUploadRequired ?? false,
         ...(fileErrors.length > 0 && { errors: fileErrors }),
       });
     } catch (error) {
-      // Clean up temp file on error
-      if (req.file?.path) {
-        const fs = await import("fs/promises");
-        await fs.unlink(req.file.path).catch(() => {});
-      }
+      await cleanupMulterFiles(files);
       return res.status(500).json({
         error: "File upload failed",
         message: error.message,
@@ -817,6 +517,7 @@ router.post("/send-message-stream", jwtAuth, async (req, res) => {
       userMessage,
       fileId,
       isSpecialAccess,
+      persistBeforeStreamDone: () => session.save(),
     });
     await session.save();
   } catch (error) {
@@ -913,12 +614,7 @@ router.post("/send-message", jwtAuth, async (req, res) => {
     // entire response with a safe payment prompt. This prevents any assessment
     // content from leaking even if the AI ignores instructions.
     if (uploadInfo.paymentRequired && !isSpecialAccess) {
-      if (session.isPaid) {
-        session.paymentCycle = (session.paymentCycle || 0) + 1;
-      }
-      const paymentCycle = session.paymentCycle || 0;
-      const paymentAmount = getCyclePayableAmount(session, paymentCycle);
-      session.isPaid = false;
+      const { paymentCycle, paymentAmount } = preparePaymentBarrierCycle(session);
       cleanMessage = paymentBarrierMessage(
         detectChatLanguageFromText(cleanMessage)
       );
@@ -951,12 +647,7 @@ router.post("/send-message", jwtAuth, async (req, res) => {
       session.final_response = resolvedFinalResponse;
     }
 
-    persistSessionDocumentSnapshot(
-      session,
-      sessionId,
-      uploadInfo,
-      cleanMessage
-    );
+    applyDownloadSnapshot(session, sessionId, uploadInfo, cleanMessage);
 
     // Use structured upload requirement (works for all languages)
     const requiresUpload = uploadInfo.requiresUpload;
@@ -970,12 +661,10 @@ router.post("/send-message", jwtAuth, async (req, res) => {
       // If re-upload, reset the uploaded status
       if (isReUpload) {
         session.isDocUploaded = false;
-        // For multiple uploads, don't clear all files - just mark as needing re-upload
-        // For single upload, clear the fileId
-        if (!session.supportsMultipleUploads) {
-          session.uploadedFileId = null;
-          session.uploadedFileIds = [];
-        }
+        session.uploadedFileId = null;
+        session.uploadedFileIds = [];
+        session.uploadedFilesMeta = [];
+        session.replaceNextUpload = true;
       }
     } else {
       // Only clear upload requirement if document is uploaded AND assistant didn't ask for upload
@@ -1014,14 +703,27 @@ router.post("/send-message", jwtAuth, async (req, res) => {
   }
 });
 
-//Mark payment for session
+// Sync isPaid only when Razorpay webhook has recorded payment (never trust client alone).
 router.post("/mark-payment", jwtAuth, async (req, res) => {
   const { sessionId } = req.body;
   const session = await Session.findById(sessionId);
   if (!session) return res.status(404).json({ error: "Session not found" });
+  if (session.userId?.toString() !== req.user.id) {
+    return res.status(403).json({ error: "Session not found" });
+  }
 
-  session.isPaid = true;
-  await session.save();
+  const webhookPaid = await hasWebhookConfirmedPayment({ sessionId });
+  if (!webhookPaid) {
+    return res.status(402).json({
+      error: "Payment not confirmed",
+      message: "Payment has not been confirmed by the payment provider yet.",
+    });
+  }
+
+  if (!session.isPaid) {
+    session.isPaid = true;
+    await session.save();
+  }
   res.json({ message: "Payment confirmed. You can now chat!" });
 });
 

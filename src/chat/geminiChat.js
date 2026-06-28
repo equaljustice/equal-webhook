@@ -84,10 +84,17 @@ export function buildGeminiHistory(
   });
 
   const currentParts = [{ text: wrappedUser }];
+  const fileMetaById = new Map(
+    (session?.uploadedFilesMeta || []).map((m) => [m.fileId, m])
+  );
   for (const fileUri of filesToUse) {
-    if (fileUri) {
-      currentParts.push({ fileData: { fileUri } });
+    if (!fileUri) continue;
+    const meta = fileMetaById.get(fileUri);
+    const fileData = { fileUri };
+    if (meta?.mimeType) {
+      fileData.mimeType = meta.mimeType;
     }
+    currentParts.push({ fileData });
   }
   history.push({ role: "user", parts: currentParts });
   return history;
@@ -109,7 +116,7 @@ export function buildLegacyGeminiContents({
   filesToUse = [],
   dynamicOverlay = "",
 }) {
-  const useFullHistory = isFinalGenerationTurn(session, userMessage);
+  const useFullHistory = isFinalGenerationTurn(session);
   return buildGeminiHistory(session, userMessage, filesToUse, {
     dynamicOverlay,
     useTrimmedHistory: !useFullHistory,

@@ -2,7 +2,7 @@
   "language_select": {
     "title": { "en": "Language Selection" },
     "text": {
-      "en": "Please select your preferred language for this session:"
+      "en": "Please select a language:"
     }
   },
   "greeting": {

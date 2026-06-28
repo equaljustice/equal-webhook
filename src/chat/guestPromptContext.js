@@ -1,10 +1,72 @@
 import { detectChatLanguageFromText } from "./messageControlParse.js";
+import {
+  GUEST_FLOW_PHASE,
+  isAwaitingGuestChoice,
+  isGuestLanguagePhase,
+  markGuestFlowActive,
+  guestOfferOverlayForPhase,
+} from "./guestSessionGuards.js";
 
 /** Default on; set GUEST_SIGNUP_OFFER_ENABLED=false to disable. */
 export function isGuestSignupOfferEnabled() {
   const v = process.env.GUEST_SIGNUP_OFFER_ENABLED;
   if (v === "false" || v === "0") return false;
   return true;
+}
+
+/** Ensure guest signup UI only after the user picked a language (never from model JSON alone). */
+export function promoteGuestSignupOfferState(session) {
+  if (!session || !isGuestSignupOfferEnabled()) return;
+  if (!session.languageConfirmedByUser) return;
+  if (!isAwaitingGuestChoice(session)) return;
+  if (
+    session.signupOfferResponse === "declined" ||
+    session.signupOfferResponse === "accepted"
+  ) {
+    return;
+  }
+  session.signupOfferShown = true;
+  session.signupOfferResponse = "pending";
+  session.guestFlowPhase = GUEST_FLOW_PHASE.GUEST_OFFER;
+}
+
+function applyUserLanguageChoice(session, lang) {
+  if (!session || !lang) return;
+  session.selectedLanguage = lang;
+  session.languageConfirmedByUser = true;
+  if (!session.answers) session.answers = {};
+  session.answers.language = lang;
+  session.guestFlowPhase = GUEST_FLOW_PHASE.GUEST_OFFER;
+  promoteGuestSignupOfferState(session);
+}
+
+/**
+ * Server-side updates before each model turn (language pick, guest continue, etc.).
+ */
+export function applyPreTurnSessionUpdates(session, userMessage) {
+  if (!session) return;
+
+  const lang = detectLanguageChoiceFromUserMessage(userMessage);
+  if (lang && !session.languageConfirmedByUser) {
+    applyUserLanguageChoice(session, lang);
+  }
+
+  const m = String(userMessage || "").trim().toLowerCase();
+
+  if (isAwaitingGuestChoice(session)) {
+    if (/^(b|continue as guest|continue as a guest)$/i.test(m)) {
+      session.signupOfferResponse = "declined";
+      markGuestFlowActive(session);
+    } else if (/^(a|log in|login|sign up|signup|sign-up)$/i.test(m)) {
+      session.signupOfferResponse = "accepted";
+      session.guestFlowPhase = GUEST_FLOW_PHASE.ACTIVE;
+    } else if (
+      m.length > 20 &&
+      !detectLanguageChoiceFromUserMessage(userMessage)
+    ) {
+      markGuestFlowActive(session);
+    }
+  }
 }
 
 const LANGUAGE_CHOICE_PATTERNS = [
@@ -65,35 +127,11 @@ export function appendGuestSystemInstruction(baseText = "", session = {}) {
     return baseText || "";
   }
 
-  const response = session.signupOfferResponse || null;
-  let statusBlock = "";
-
-  if (response === "declined") {
-    statusBlock =
-      "\nThe user already chose to CONTINUE AS GUEST. Do NOT emit guest_signup_offer JSON again. " +
-      "Proceed with your normal post-language greeting and Q&A from your main instructions.";
-  } else if (response === "accepted") {
-    statusBlock =
-      "\nThe user chose to log in or sign up via the chat UI. Do not repeat the signup offer.";
-  } else if (response === "pending" && session.signupOfferShown) {
-    statusBlock =
-      "\nYou already showed the guest signup offer. Wait for the user to use the on-screen buttons " +
-      "or to say they want to continue as guest before resuming the normal flow.";
-  } else {
-    statusBlock =
-      "\nWhen the user has JUST selected their language (language choice, not a numbered legal answer), " +
-      "your VERY NEXT reply MUST:\n" +
-      "1) Briefly explain guest mode: this chat is kept about 24 hours without login; logging in saves chats to their account.\n" +
-      "2) Ask if they want to log in / sign up now OR continue as guest.\n" +
-      "3) End with a separate final line containing ONLY valid JSON:\n" +
-      '   {"guest_signup_offer":true,"selected_language":"<en|hi|gu|...>"}\n' +
-      "After they clearly continue as guest, proceed with your normal post-language greeting from your main instructions.";
-  }
+  const statusBlock = guestOfferOverlayForPhase(session);
 
   const addendum =
     "\n\n=== GUEST MODE (overlay — follow with your main instructions) ===\n" +
     "The user is NOT logged in. Sessions expire in about 24 hours on this device unless they log in.\n" +
-    "Follow LANGUAGE SELECTION from your main instructions first when no language is set yet.\n" +
     statusBlock;
 
   return (baseText || "") + addendum;
@@ -104,38 +142,66 @@ export function applyGuestSignupOfferFromReply(session, uploadInfo, userMessage)
 
   const lowerUser = String(userMessage || "").trim().toLowerCase();
   if (
-    session.signupOfferResponse === "pending" &&
-    /^(continue as guest|continue|proceed|go ahead|guest)$/i.test(lowerUser)
+    isAwaitingGuestChoice(session) &&
+    /^(b|continue as guest|continue as a guest)$/i.test(lowerUser)
   ) {
     session.signupOfferResponse = "declined";
+    markGuestFlowActive(session);
   }
 
   const langFromUser = detectLanguageChoiceFromUserMessage(userMessage);
-  if (langFromUser && !session.selectedLanguage) {
-    session.selectedLanguage = langFromUser;
+  if (langFromUser && !session.languageConfirmedByUser) {
+    applyUserLanguageChoice(session, langFromUser);
   }
 
-  if (uploadInfo.selectedLanguage) {
-    session.selectedLanguage = uploadInfo.selectedLanguage;
-  }
-
-  if (uploadInfo.guestSignupOffer) {
+  if (uploadInfo.guestSignupOffer && session.languageConfirmedByUser) {
+    if (
+      session.signupOfferResponse === "declined" ||
+      session.guestFlowPhase === GUEST_FLOW_PHASE.ACTIVE
+    ) {
+      uploadInfo.guestSignupOffer = false;
+      return;
+    }
     session.signupOfferShown = true;
     if (!session.signupOfferResponse) {
       session.signupOfferResponse = "pending";
+      session.guestFlowPhase = GUEST_FLOW_PHASE.GUEST_OFFER;
     }
+  } else if (uploadInfo.guestSignupOffer && !session.languageConfirmedByUser) {
+    uploadInfo.guestSignupOffer = false;
   }
 }
 
-export function guestSignupOfferResponseFields(session, uploadInfo) {
-  const offerThisTurn = !!(uploadInfo && uploadInfo.guestSignupOffer);
+export function guestSignupOfferResponseFields(session) {
+  const declined =
+    session?.signupOfferResponse === "declined" ||
+    session?.signupOfferResponse === "accepted" ||
+    session?.guestFlowPhase === GUEST_FLOW_PHASE.ACTIVE;
+
   const pending =
-    session?.signupOfferResponse === "pending" && session?.signupOfferShown === true;
+    isGuestSignupOfferEnabled() &&
+    !declined &&
+    !!session?.languageConfirmedByUser &&
+    isAwaitingGuestChoice(session);
 
   return {
-    guestSignupOffer: offerThisTurn,
+    guestSignupOffer: false,
     guestSignupOfferPending: pending,
+    guestFlowPhase: resolveGuestFlowPhaseForClient(session),
     signupOfferResponse: session?.signupOfferResponse || null,
-    selectedLanguage: session?.selectedLanguage || null,
+    selectedLanguage: session?.languageConfirmedByUser
+      ? session?.selectedLanguage || null
+      : null,
+    languageConfirmedByUser: !!session?.languageConfirmedByUser,
+    guestOfferAwaitingResponse:
+      !declined &&
+      !!session?.languageConfirmedByUser &&
+      isAwaitingGuestChoice(session),
   };
+}
+
+function resolveGuestFlowPhaseForClient(session) {
+  if (isGuestLanguagePhase(session)) return GUEST_FLOW_PHASE.LANGUAGE;
+  if (isAwaitingGuestChoice(session)) return GUEST_FLOW_PHASE.GUEST_OFFER;
+  return GUEST_FLOW_PHASE.ACTIVE;
 }

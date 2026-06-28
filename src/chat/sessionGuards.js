@@ -1,10 +1,56 @@
 import { paymentBarrierMessage, detectChatLanguageFromText } from "./messageControlParse.js";
 import { FLOW_STATES } from "../flow/flowConstants.js";
 import { buildControlJson } from "../flow/flowContent.js";
-import { QA_PHASES } from "./sessionStateProtocol.js";
+import { isUnpaidPaymentGate } from "./sessionAccess.js";
+
+/**
+ * Sensitive actions (payment, upload, session end) are defined per assistant in
+ * instructions. The model sets JSON flags; the server enforces them — no extra
+ * heuristics that second-guess isPaid, qaPhase, or prompt wording.
+ *
+ * payment_required: true  → applyPaymentBarrier (Pay UI, isPaid=false until paid)
+ * upload_required: true   → upload UI (single or multiple per supportsMultipleUploads)
+ * session_terminated: true → end session
+ * Download: server auto-saves after paid final output — no document_ready flag
+ * session_terminated: true → handled by orchestrator
+ */
+
+const REPEATABLE_PAYMENT_KEY_FRAGMENTS = [
+  "emp-termination",
+  "emp_termination",
+  "employment-termination",
+  "cheque-bouncing",
+  "cheque_bouncing",
+  "upi-fraud",
+  "upi_fraud",
+  "salary-non-payment",
+  "salary_non_payment",
+  "senior-citizen",
+  "senior_citizen",
+  "hindu-inheritance",
+  "hindu_inheritance",
+  "interitance-guide",
+  "interitance_guide",
+  "goa-inheritance",
+  "goa_inheritance",
+  "marriage-gift-planning",
+  "marrige_planning",
+  "marriage_planning",
+  "make-my-rent-agreement",
+  "make_my_rent_agreement",
+  "check-my-rent",
+  "check_my_rent",
+];
+
+export function isRepeatablePaymentAssistant(session, assistant) {
+  if (assistant?.config?.paymentMode === "repeatable") return true;
+  if (session?.paymentMode === "repeatable") return true;
+  const key = String(session?.assistantKey || session?.key || "").toLowerCase();
+  return REPEATABLE_PAYMENT_KEY_FRAGMENTS.some((frag) => key.includes(frag));
+}
 
 export function getCyclePayableAmount(session, cycleNumber) {
-  if ((cycleNumber || 0) <= 1) {
+  if ((cycleNumber || 0) === 0) {
     return session.price;
   }
   return typeof session.additionalPrice === "number"
@@ -12,21 +58,29 @@ export function getCyclePayableAmount(session, cycleNumber) {
     : session.price;
 }
 
-/**
- * Apply server-side payment barrier (never trust LLM for payment flags).
- */
+/** First gate uses cycle 0; each subsequent gate increments (repeatable assistants). */
+export function preparePaymentBarrierCycle(session) {
+  let paymentCycle = session.paymentCycle || 0;
+  if (session.isPaid && session.paymentGateShown) {
+    paymentCycle += 1;
+    session.paymentCycle = paymentCycle;
+  }
+  session.paymentGateShown = true;
+  session.isPaid = false;
+  return {
+    paymentCycle,
+    paymentAmount: getCyclePayableAmount(session, paymentCycle),
+  };
+}
+
+/** Hard gate when instructions JSON has payment_required: true. */
 export function applyPaymentBarrier(session, options = {}) {
   const { isSpecialAccess = false, language } = options;
   if (isSpecialAccess) {
     return { activated: false };
   }
 
-  if (session.isPaid) {
-    session.paymentCycle = (session.paymentCycle || 0) + 1;
-  }
-  const paymentCycle = session.paymentCycle || 0;
-  const paymentAmount = getCyclePayableAmount(session, paymentCycle);
-  session.isPaid = false;
+  const { paymentCycle, paymentAmount } = preparePaymentBarrierCycle(session);
 
   const lang =
     language ||
@@ -44,8 +98,34 @@ export function applyPaymentBarrier(session, options = {}) {
 }
 
 /**
- * Enforce flow-state guardrails on LLM-parsed control flags.
+ * Block Gemini when payment gate is shown but webhook has not set isPaid.
+ * Returns a turn envelope or null if the turn may proceed.
  */
+export function buildUnpaidPaymentGateResponse(
+  session,
+  { isSpecialAccess = false, language } = {}
+) {
+  if (!isUnpaidPaymentGate(session, { isSpecialAccess })) return null;
+
+  const paymentCycle = session.paymentCycle || 0;
+  const lang =
+    language ||
+    session.selectedLanguage ||
+    detectChatLanguageFromText(session.messages?.slice(-1)[0]?.content || "");
+
+  return {
+    reply: paymentBarrierMessage(lang),
+    paymentRequired: true,
+    paymentAmount: getCyclePayableAmount(session, paymentCycle),
+    paymentCycle,
+    sessionTerminated: false,
+    requiresUpload: false,
+    flowMode: false,
+    flowOptions: [],
+    blockedUnpaidPayment: true,
+  };
+}
+
 export function enforceFlowGuards(session, uploadInfo) {
   if (!session?.flowKey) return uploadInfo;
 
@@ -80,52 +160,22 @@ export function enforceFlowGuards(session, uploadInfo) {
   return corrected;
 }
 
-/**
- * Server-side guardrails for AI-led (legacy) assistants — payment/termination/document timing.
- */
-export function enforceLegacySessionGuards(session, uploadInfo, { isSpecialAccess = false } = {}) {
+/** Legacy AI assistants: trust instruction JSON; only bypass for special-access users. */
+export function enforceLegacySessionGuards(
+  session,
+  uploadInfo,
+  { isSpecialAccess = false } = {}
+) {
   const corrected = { ...uploadInfo, violations: [] };
-  const phase = session.qaPhase || QA_PHASES.QA_IN_PROGRESS;
 
-  if (corrected.paymentRequired && (session.isPaid || isSpecialAccess)) {
+  if (corrected.paymentRequired && isSpecialAccess) {
     corrected.paymentRequired = false;
-    corrected.violations.push("payment_already_paid");
-  }
-
-  if (
-    corrected.documentReady &&
-    !isSpecialAccess &&
-    !session.isPaid &&
-    phase !== QA_PHASES.READY_FOR_FINAL &&
-    phase !== QA_PHASES.FINAL_GENERATED
-  ) {
-    corrected.documentReady = false;
-    corrected.violations.push("document_before_payment");
-  }
-
-  if (corrected.sessionTerminated) {
-    if (
-      phase === QA_PHASES.QA_IN_PROGRESS ||
-      phase === QA_PHASES.WAITING_PAYMENT
-    ) {
-      corrected.sessionTerminated = false;
-      corrected.terminationMessage = null;
-      corrected.violations.push("termination_during_qa");
-    } else if (
-      !corrected.documentReady &&
-      phase !== QA_PHASES.FINAL_GENERATED &&
-      phase !== QA_PHASES.TERMINATED
-    ) {
-      corrected.sessionTerminated = false;
-      corrected.terminationMessage = null;
-      corrected.violations.push("termination_before_document");
-    }
+    corrected.violations.push("payment_special_access");
   }
 
   if (corrected.violations.length) {
     console.warn("[LegacyGuard] Overrode illegal model flags", {
       sessionId: session._id || session.guestSessionId,
-      qaPhase: phase,
       violations: corrected.violations,
     });
   }

@@ -1,0 +1,29 @@
+📌 DOCUMENT SELECTION MENU (MANDATORY HTML — quick-pick UI)
+Use this exact structure so the chat UI shows (a)/(b)/(c) buttons.
+
+SEPARATION RULE (critical):
+- Thank-you / acknowledgement message = ONE assistant turn (no document menu in same turn).
+- Document selection menu = NEXT assistant turn only (standalone).
+
+HTML template (adapt options to user's path; omit inapplicable letters; keep consecutive a,b,c…):
+<h5><strong>Document selection</strong></h5>
+<h6>Which document do you wish to generate?</h6>
+(a) [clean label only]<br>
+(b) [clean label only]<br>
+(c) [clean label only]<br>
+
+Rules:
+- Each option on its own line ending with single <br> — never inline (a)(b)(c) on one line.
+- Option text = short user-facing label only. Never put [Rule:…], routing, or internal conditions inside option text.
+- Never use (i)(ii)(iii) for user answer menus — only (a)(b)(c).
+- Allow exactly one selection per generation cycle.
+
+📌 ANOTHER DOCUMENT PROMPT (after each completed document):
+<h5><strong>Next step</strong></h5>
+<h6>What would you like to do next?</h6>
+(a) Generate another document<br>
+(b) End session<br>
+
+📌 DOWNLOAD / document_ready JSON:
+- Do NOT set "document_ready" in JSON. The server infers download after webhook-confirmed payment and complete document output.
+- After outputting the full document body, set "payment_required": false only.

@@ -3,6 +3,8 @@
  * and document snapshot persistence. Used by auth and guest chat routes.
  */
 
+import { QA_PHASES } from "./sessionStateProtocol.js";
+
 export const withTimeout = (promise, ms, label = "Operation") => {
   let timeoutId;
   const timeoutPromise = new Promise((_, reject) => {
@@ -67,6 +69,33 @@ export const findLastSubstantiveMessage = (session) => {
   }
   return null;
 };
+
+/**
+ * Server-side download snapshot (replaces model "document_ready" JSON flag).
+ * Saves PDF/Word source when user has paid and the assistant outputs the final document.
+ */
+export function inferDownloadSnapshot(session, uploadInfo, cleanMessage) {
+  if (uploadInfo?.paymentRequired || uploadInfo?.requiresUpload) return false;
+  if (!session?.isPaid || !session?.paymentGateShown) return false;
+  const phase = session.qaPhase || QA_PHASES.QA_IN_PROGRESS;
+  if (phase !== QA_PHASES.READY_FOR_FINAL) return false;
+  const text = String(cleanMessage || "").trim();
+  if (text.length < DOCUMENT_SNAPSHOT_MIN_LENGTH) return false;
+  if (/Question\s+\d+\s*:/i.test(text)) return false;
+  return true;
+}
+
+export function applyDownloadSnapshot(session, sessionId, uploadInfo, cleanMessage) {
+  const snapshotInfo = {
+    ...uploadInfo,
+    documentReady: inferDownloadSnapshot(session, uploadInfo, cleanMessage),
+  };
+  persistSessionDocumentSnapshot(session, sessionId, snapshotInfo, cleanMessage);
+  if (snapshotInfo.documentReady) {
+    session.qaPhase = QA_PHASES.FINAL_GENERATED;
+  }
+  return snapshotInfo.documentReady;
+}
 
 export const persistSessionDocumentSnapshot = (
   session,
@@ -261,19 +290,39 @@ function terminationBarrierMessage(language) {
   }
 }
 
+const TOP_LEVEL_CONTROL_KEYS = [
+  "upload_required",
+  "session_terminated",
+  "payment_required",
+  "document_ready",
+  "guest_signup_offer",
+  "selected_language",
+  "session_state",
+];
+
+function isControlMetadata(metadata) {
+  if (!metadata || typeof metadata !== "object") return false;
+  if (Object.prototype.hasOwnProperty.call(metadata, "session_state")) {
+    return true;
+  }
+  return TOP_LEVEL_CONTROL_KEYS.some((k) =>
+    Object.prototype.hasOwnProperty.call(metadata, k)
+  );
+}
+
 function extractControlJsonFromMessage(message) {
   if (!message || typeof message !== "string") return null;
 
-  const controlKeys = [
-    "upload_required",
-    "session_terminated",
-    "payment_required",
-    "document_ready",
-    "guest_signup_offer",
-  ];
+  const trimmed = message.trimEnd();
+  const lines = trimmed.split("\n");
+  const lastLine = lines[lines.length - 1]?.trim();
+  if (lastLine?.startsWith("{")) {
+    const fromLastLine = parseControlJsonBlock(lastLine);
+    if (fromLastLine) return fromLastLine;
+  }
 
   let lastKeyIdx = -1;
-  for (const key of controlKeys) {
+  for (const key of TOP_LEVEL_CONTROL_KEYS) {
     const idx = message.lastIndexOf(`"${key}"`);
     if (idx > lastKeyIdx) lastKeyIdx = idx;
   }
@@ -282,6 +331,19 @@ function extractControlJsonFromMessage(message) {
   const startIdx = message.lastIndexOf("{", lastKeyIdx);
   if (startIdx === -1) return null;
 
+  const jsonStr = extractBalancedJson(message, startIdx);
+  if (!jsonStr) return null;
+
+  try {
+    const metadata = JSON.parse(jsonStr);
+    if (!isControlMetadata(metadata)) return null;
+    return { jsonStr, metadata };
+  } catch {
+    return null;
+  }
+}
+
+function extractBalancedJson(message, startIdx) {
   let braceCount = 0;
   let inString = false;
   let escapeNext = false;
@@ -319,18 +381,159 @@ function extractControlJsonFromMessage(message) {
   }
 
   if (endIdx === -1) return null;
+  return message.substring(startIdx, endIdx + 1);
+}
 
-  const jsonStr = message.substring(startIdx, endIdx + 1);
+function parseControlJsonBlock(jsonStr) {
   try {
     const metadata = JSON.parse(jsonStr);
-    const hasAnyControlKey = controlKeys.some((k) =>
-      Object.prototype.hasOwnProperty.call(metadata, k)
-    );
-    if (!hasAnyControlKey) return null;
+    if (!isControlMetadata(metadata)) return null;
     return { jsonStr, metadata };
   } catch {
     return null;
   }
+}
+
+const CONTROL_JSON_MARKERS = [
+  '"upload_required"',
+  '"session_terminated"',
+  '"payment_required"',
+  '"document_ready"',
+  '"guest_signup_offer"',
+  '"selected_language"',
+  '"session_state"',
+];
+
+function tailLooksLikeControlJson(text) {
+  if (CONTROL_JSON_MARKERS.some((marker) => text.includes(marker))) {
+    return true;
+  }
+  return /\b(session_state|upload_required|guest_signup_offer|session_terminated|payment_required|document_ready|selected_language)\b/.test(
+    text
+  );
+}
+
+function removeInlineControlJsonBlocks(text) {
+  let out = text;
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    let idx = 0;
+    while (idx < out.length) {
+      const start = out.indexOf("{", idx);
+      if (start === -1) break;
+
+      const block = extractBalancedJson(out, start);
+      if (block) {
+        try {
+          const metadata = JSON.parse(block);
+          if (isControlMetadata(metadata) || metadata.session_state) {
+            out = (out.slice(0, start) + out.slice(start + block.length)).trim();
+            changed = true;
+            idx = Math.max(0, start - 1);
+            continue;
+          }
+        } catch {
+          // not valid JSON — keep scanning
+        }
+      }
+      idx = start + 1;
+    }
+  }
+
+  return out;
+}
+
+function looksLikeStreamingJsonFragment(tail) {
+  if (!tail || !tail.startsWith("{")) return false;
+  if (tail === "{" || tail === "{\n" || tail === "{\r\n") return true;
+  const inner = tail.slice(1);
+  if (!inner.trim()) return true;
+  if (tailLooksLikeControlJson(tail)) return true;
+  if (inner.includes(":") || inner.includes('"')) return true;
+  return false;
+}
+
+/**
+ * Hide incomplete control JSON while streaming (before closing brace arrives).
+ */
+export function stripPartialTrailingControlJson(message) {
+  if (!message || typeof message !== "string") return message || "";
+
+  let text = message;
+  const trimmedStart = text.trimStart();
+
+  if (trimmedStart.startsWith("{") && looksLikeStreamingJsonFragment(trimmedStart)) {
+    const complete = extractBalancedJson(text, text.indexOf("{"));
+    if (!complete) return "";
+  }
+
+  const lines = text.split("\n");
+  const lastLine = lines[lines.length - 1] ?? "";
+  if (lastLine.trim().startsWith("{")) {
+    const tailFromBrace = lastLine.slice(lastLine.indexOf("{"));
+    if (looksLikeStreamingJsonFragment(tailFromBrace)) {
+      text = lines.slice(0, -1).join("\n").trimEnd();
+    }
+  }
+
+  let lastBrace = text.lastIndexOf("{");
+  while (lastBrace !== -1) {
+    const tail = text.slice(lastBrace);
+    const balanced = extractBalancedJson(text, lastBrace);
+
+    if (balanced) {
+      try {
+        const metadata = JSON.parse(balanced);
+        if (isControlMetadata(metadata) || metadata.session_state) {
+          text = text.slice(0, lastBrace).trimEnd();
+          lastBrace = text.lastIndexOf("{");
+          continue;
+        }
+      } catch {
+        // not control JSON
+      }
+      break;
+    }
+
+    if (looksLikeStreamingJsonFragment(tail)) {
+      text = text.slice(0, lastBrace).trimEnd();
+      lastBrace = text.lastIndexOf("{");
+      continue;
+    }
+    break;
+  }
+
+  return text;
+}
+
+/** Remove trailing control/session JSON from assistant text shown to users. */
+export function stripControlJsonFromDisplay(message) {
+  if (!message || typeof message !== "string") return message || "";
+
+  let text = message;
+  let prev = null;
+
+  while (text !== prev) {
+    prev = text;
+    const controlJson = extractControlJsonFromMessage(text);
+    if (controlJson?.jsonStr) {
+      text = text.replace(controlJson.jsonStr, "").trim();
+    }
+  }
+
+  const lines = text.trimEnd().split("\n");
+  const lastLine = lines[lines.length - 1]?.trim();
+  if (lastLine?.startsWith("{") && lastLine.includes("session_state")) {
+    text = lines.slice(0, -1).join("\n").trim();
+  }
+
+  text = removeInlineControlJsonBlocks(text);
+  text = stripPartialTrailingControlJson(text);
+  text = stripPartialTrailingControlJson(text);
+  text = text.replace(/```json\s*[\s\S]*?```/gi, "").trim();
+  return text;
 }
 
 const emptyUploadInfo = (cleanMessage = "") => ({
@@ -370,17 +573,17 @@ export const extractUploadRequirement = (message) => {
         metadata.hasOwnProperty("document_ready");
       const hasGuestOffer =
         metadata.hasOwnProperty("guest_signup_offer");
+      const hasSessionState =
+        metadata.hasOwnProperty("session_state");
 
-      if (hasStandardControl || hasGuestOffer) {
-        const documentReadyFlag =
-          metadata.document_ready === true || metadata.document_ready === "true";
+      if (hasStandardControl || hasGuestOffer || hasSessionState) {
         const sessionTerminatedFlag =
           metadata.session_terminated === true ||
           metadata.session_terminated === "true";
         const guestSignupOfferFlag =
           metadata.guest_signup_offer === true ||
           metadata.guest_signup_offer === "true";
-        if (sessionTerminatedFlag || documentReadyFlag) {
+        if (sessionTerminatedFlag) {
           const docResult = extractDocumentData(message);
           documentData = docResult.data;
 
@@ -392,6 +595,7 @@ export const extractUploadRequirement = (message) => {
         }
 
         cleanMessage = message.replace(jsonMatch, "").trim();
+        cleanMessage = stripControlJsonFromDisplay(cleanMessage);
 
         if (documentData) {
           cleanMessage = cleanMessage.replace(/\n\s*\{[\s\n]*"document_type"[\s\S]*?\}\s*/g, "").trim();
@@ -412,7 +616,7 @@ export const extractUploadRequirement = (message) => {
           paymentRequired:
             metadata.payment_required === true ||
             metadata.payment_required === "true",
-          documentReady: documentReadyFlag,
+          documentReady: false,
           cleanMessage: cleanMessage,
           documentData: documentData,
           finalResponse:

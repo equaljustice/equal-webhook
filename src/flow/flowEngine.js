@@ -8,6 +8,7 @@ import {
 import { buildControlJson, renderNodeContent, buildFlowOptions } from "./flowContent.js";
 import { evaluateCondition, matchRouterRoute, resolveRouterNext } from "./flowConditions.js";
 import { refreshDerivedFlags } from "./flowDerivedFlags.js";
+import { paymentBarrierMessage } from "../chat/messageControlParse.js";
 
 function defaultFlowSession() {
   return {
@@ -191,12 +192,6 @@ function nextDisplayNumber(session) {
   return asked.filter((id) => id.startsWith("q:")).length + 1;
 }
 
-function isPaymentCompletionMessage(text) {
-  return /payment\s+completed|paid\s+successfully|mark\s+payment/i.test(
-    String(text || "")
-  );
-}
-
 export const FLOW_BOOTSTRAP_MESSAGE = "__flow_start__";
 
 /**
@@ -234,11 +229,10 @@ export function processFlowTurn({
     });
   }
 
-  // Waiting for payment — only accept payment completion or block
+  // Waiting for payment — only proceed after webhook sets isPaid on the session
   if (session.flowState === FLOW_STATES.WAITING_PAYMENT) {
-    if (isPaid || isSpecialAccess || isPaymentCompletionMessage(userMessage)) {
+    if (isPaid || isSpecialAccess) {
       session.flowState = FLOW_STATES.READY_FOR_FINAL;
-      session.isPaid = true;
       const nextId = node.next || node.defaultNext;
       if (nextId) {
         session.currentNodeId = nextId;
@@ -257,9 +251,10 @@ export function processFlowTurn({
         });
       }
     }
+    const barrierLang = session.selectedLanguage || language || "en";
     return {
       ok: true,
-      reply: null,
+      reply: paymentBarrierMessage(barrierLang),
       paymentRequired: true,
       phase: session.flowState,
       nodeId,
@@ -395,7 +390,7 @@ function presentNode({ session, flow, content, nodeId, language, context }) {
       });
     }
 
-    if (session.isPaid && repeatable) {
+    if (session.isPaid && repeatable && session.paymentGateShown) {
       session.paymentCycle = (session.paymentCycle || 0) + 1;
     }
 

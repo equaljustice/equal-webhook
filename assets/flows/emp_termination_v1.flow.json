@@ -2,7 +2,7 @@
   "flowKey": "emp_termination",
   "version": 1,
   "deferPayment": true,
-  "paymentMode": "once",
+  "paymentMode": "repeatable",
   "startNodeId": "language_select",
   "finalTemplateAsset": "assets/prompts/emp_termination_intructions.txt",
   "nodes": {

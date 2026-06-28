@@ -8,6 +8,7 @@ import CustomGPTPaymentRoutes from "./src/routes/customGPTPayment.js";
 import promptAdminRoutes from "./src/routes/promptAdmin.js";
 import adminRoutes from "./src/routes/admin.js";
 import analyticsRoutes from "./src/routes/analytics.js";
+import geminiAdminRoutes from "./src/routes/geminiAdmin.js";
 const APIrouter = express.Router();
 
 APIrouter.use("/auth", authRoutes);
@@ -18,6 +19,7 @@ APIrouter.use("/custom-payment", CustomGPTPaymentRoutes);
 APIrouter.use("/prompt-admin", promptAdminRoutes);
 APIrouter.use("/admin", adminRoutes);
 APIrouter.use("/analytics", analyticsRoutes);
+APIrouter.use("/gemini-admin", geminiAdminRoutes);
 
 // Export the router
 export default APIrouter;

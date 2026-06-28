@@ -43,6 +43,7 @@ const sessionSchema = new mongoose.Schema({
   answers: { type: mongoose.Schema.Types.Mixed, default: {} },
   askedNodeOrder: { type: [String], default: [] },
   paymentGateShown: { type: Boolean, default: false },
+  deferPayment: { type: Boolean, default: false },
   flowAudit: { type: [mongoose.Schema.Types.Mixed], default: [] },
   selectedLanguage: { type: String },
   // AI-led session state (legacy + cached-instruction mode)

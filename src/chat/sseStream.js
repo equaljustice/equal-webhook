@@ -16,8 +16,11 @@ export function sseEvent(res, event, data) {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-export function sseToken(res, text, fullText) {
-  sseEvent(res, "token", { text, full: fullText });
+/**
+ * Stream only user-visible text. Control metadata is sent separately in "done".
+ */
+export function sseToken(res, fullVisibleText) {
+  sseEvent(res, "token", { full: fullVisibleText, display: fullVisibleText });
 }
 
 export function sseDone(res, payload) {

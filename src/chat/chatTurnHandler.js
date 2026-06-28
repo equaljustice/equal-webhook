@@ -6,6 +6,33 @@ import {
 import { initSse, sseToken, sseDone, sseError, endSse } from "./sseStream.js";
 import { processGuestAssistantReply, enrichGuestApiResponse } from "./guestSignupOffer.js";
 import { FLOW_BOOTSTRAP_MESSAGE } from "../flow/flowEngine.js";
+import { GUEST_BOOTSTRAP_MESSAGE } from "./guestDisplayMessages.js";
+import { normalizeQaDisplayHtml } from "./replyFormat.js";
+import { canAccessChat } from "./sessionAccess.js";
+
+function formatGeminiErrorMessage(err) {
+  const raw = String(err?.message || err || "").trim();
+  if (!raw) return "Document analysis failed. Please try again.";
+
+  const unsupportedMime = raw.match(/Unsupported MIME type:\s*([^\s"\\]+)/i);
+  if (unsupportedMime) {
+    return "This document format cannot be analyzed directly. Please upload PDF or DOCX, or paste the text in chat.";
+  }
+
+  try {
+    const outer = JSON.parse(raw);
+    const innerMsg = outer?.error?.message;
+    if (typeof innerMsg === "string") {
+      const nested = JSON.parse(innerMsg);
+      const apiMsg = nested?.error?.message;
+      if (apiMsg) return apiMsg;
+    }
+  } catch {
+    // not nested JSON
+  }
+
+  return raw.length > 240 ? `${raw.slice(0, 240)}…` : raw;
+}
 
 /**
  * Shared pre-checks before a chat turn.
@@ -15,7 +42,7 @@ export function preflightChatTurn(session, {
   isSpecialAccess = false,
   requirePaid = true,
 }) {
-  if (requirePaid && !session.isPaid && !isSpecialAccess) {
+  if (requirePaid && !canAccessChat(session, { isSpecialAccess })) {
     return { ok: false, status: 403, body: { error: "Payment required before chatting" } };
   }
   if (session.isDocUploadRequired && !session.isDocUploaded) {
@@ -54,14 +81,21 @@ export function collectFilesToUse(session, fileId) {
 
 function applyUploadFlagsFromResult(session, result) {
   if (!result.requiresUpload) return;
+  if (
+    session.isDocUploaded &&
+    (session.uploadedFileId || session.uploadedFileIds?.length) &&
+    result.uploadType !== "re_upload"
+  ) {
+    return;
+  }
   if (session.uploadAttempts < 2) {
     session.isDocUploadRequired = true;
     if (result.uploadType === "re_upload") {
       session.isDocUploaded = false;
-      if (!session.supportsMultipleUploads) {
-        session.uploadedFileId = null;
-        session.uploadedFileIds = [];
-      }
+      session.uploadedFileId = null;
+      session.uploadedFileIds = [];
+      session.uploadedFilesMeta = [];
+      session.replaceNextUpload = true;
     }
   } else {
     session.isDocUploadRequired = false;
@@ -81,17 +115,16 @@ export async function executeChatTurn({
   res,
   stream = false,
   enrichGuest = null,
+  persistBeforeStreamDone = null,
 }) {
   applyFileIdToSession(session, fileId);
   const filesToUse = collectFilesToUse(session, fileId);
 
   if (!session.messages) session.messages = [];
 
-  let streamBuffer = "";
   const onStreamChunk = stream
-    ? (chunk, full) => {
-        streamBuffer = full;
-        if (res) sseToken(res, chunk, full);
+    ? (_chunk, full) => {
+        if (res) sseToken(res, full);
       }
     : undefined;
 
@@ -107,19 +140,26 @@ export async function executeChatTurn({
 
   if (result.status) {
     if (stream && res) {
-      sseError(res, result.error || result.message, result.status);
+      const msg = formatGeminiErrorMessage(result.error || result.message);
+      sseError(res, msg, result.status);
       return null;
     }
     return { error: true, status: result.status, body: result };
   }
 
-  const isBootstrap = userMessage === FLOW_BOOTSTRAP_MESSAGE;
+  const isBootstrap =
+    userMessage === FLOW_BOOTSTRAP_MESSAGE ||
+    userMessage === GUEST_BOOTSTRAP_MESSAGE;
 
   if (!isBootstrap) {
     session.messages.push({ role: "user", content: userMessage });
   }
   if (result.reply) {
-    session.messages.push({ role: "assistant", content: result.reply });
+    const displayReply = normalizeQaDisplayHtml(result.reply, {
+      documentReady: false,
+    });
+    session.messages.push({ role: "assistant", content: displayReply });
+    result.reply = displayReply;
   }
 
   if (result.paymentRequired && isSpecialAccess) {
@@ -133,27 +173,27 @@ export async function executeChatTurn({
 
   applyUploadFlagsFromResult(session, result);
 
+  const guestUploadInfo = {
+    requiresUpload: result.requiresUpload,
+    uploadType: result.uploadType,
+    reason: result.uploadReason,
+    sessionTerminated: result.sessionTerminated,
+    terminationMessage: result.terminationMessage,
+    paymentRequired: result.paymentRequired,
+    documentReady: false,
+    finalResponse: result.finalResponse,
+    guestSignupOffer: !!result.guestSignupOffer,
+    guestSignupOfferPending: !!result.guestSignupOfferPending,
+    selectedLanguage: result.selectedLanguage || session.selectedLanguage,
+  };
+
   if (isGuest) {
-    processGuestAssistantReply(
-      session,
-      {
-        requiresUpload: result.requiresUpload,
-        uploadType: result.uploadType,
-        reason: result.uploadReason,
-        sessionTerminated: result.sessionTerminated,
-        terminationMessage: result.terminationMessage,
-        paymentRequired: result.paymentRequired,
-        documentReady: result.documentReady,
-        finalResponse: result.finalResponse,
-        guestSignupOffer: false,
-        selectedLanguage: session.selectedLanguage,
-      },
-      userMessage
-    );
+    processGuestAssistantReply(session, guestUploadInfo, userMessage);
   }
 
   const payload = {
     reply: result.reply,
+    displayReply: result.reply || "",
     sessionTerminated: result.sessionTerminated || false,
     terminationMessage: result.terminationMessage || null,
     paymentRequired: result.paymentRequired || false,
@@ -169,26 +209,18 @@ export async function executeChatTurn({
     streaming: result.streaming || false,
     flowOptions: result.flowOptions || [],
     inputType: result.inputType || null,
+    guestSignupOfferPending: result.guestSignupOfferPending || false,
     instructionCached: result.instructionCached || false,
   };
 
-  const finalPayload =
-    isGuest
-      ? enrichGuestApiResponse(payload, session, {
-          requiresUpload: payload.requiresUpload,
-          uploadType: result.uploadType,
-          reason: result.uploadReason,
-          sessionTerminated: payload.sessionTerminated,
-          terminationMessage: payload.terminationMessage,
-          paymentRequired: payload.paymentRequired,
-          documentReady: result.documentReady,
-          finalResponse: result.finalResponse,
-          guestSignupOffer: false,
-          selectedLanguage: session.selectedLanguage,
-        })
-      : payload;
+  const finalPayload = isGuest
+    ? enrichGuestApiResponse(payload, session, guestUploadInfo)
+    : payload;
 
   if (stream && res) {
+    if (typeof persistBeforeStreamDone === "function") {
+      await persistBeforeStreamDone();
+    }
     sseDone(res, finalPayload);
     endSse(res);
   }

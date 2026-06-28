@@ -5,7 +5,23 @@ import { resolveGeminiModel } from "../utils/geminiConfig.js";
 /** In-process registry — cache names are valid across instances only with shared Redis later. */
 const registry = new Map();
 
-const DEFAULT_TTL_SEC = parseInt(process.env.GEMINI_CACHE_TTL_SEC || "3600", 10);
+/** Default 24h — aligns with guest session retention; override via GEMINI_CACHE_TTL_SEC */
+const DEFAULT_TTL_SEC = parseInt(
+  process.env.GEMINI_CACHE_TTL_SEC || String(24 * 60 * 60),
+  10
+);
+
+/** Gemini rejects caches.create when contents is missing or empty. */
+const CACHE_CONTENTS_ANCHOR = {
+  role: "user",
+  parts: [
+    {
+      text:
+        "Master legal-assistant instructions are attached via system instruction. " +
+        "Each new turn supplies SESSION_STATE and the user message — follow those instructions.",
+    },
+  ],
+};
 
 export function isInstructionCacheEnabled() {
   if (process.env.GEMINI_CONTEXT_CACHE_ENABLED === "false") return false;
@@ -54,7 +70,7 @@ export async function getOrCreateInstructionCache({
       config: {
         displayName: `${displayName}-${key.slice(-8)}`,
         systemInstruction: instructionText,
-        contents: [],
+        contents: [CACHE_CONTENTS_ANCHOR],
         ttl: `${DEFAULT_TTL_SEC}s`,
       },
     });
@@ -74,6 +90,7 @@ export async function getOrCreateInstructionCache({
       name: created.name,
       model,
       displayName,
+      ttlSec: DEFAULT_TTL_SEC,
     });
 
     return created.name;

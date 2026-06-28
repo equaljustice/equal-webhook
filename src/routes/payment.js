@@ -6,6 +6,7 @@ import { Session } from "../model/sesssion.model.js";
 import { CustomGPTpayment } from "../model/ customGPTPayment.model.js";
 import { getGuestSession, markGuestSessionPaid } from "../services/guestSessionStore.js";
 import { verifyGuestToken } from "../services/guestToken.js";
+import { getCyclePayableAmount } from "../chat/sessionGuards.js";
 
 const router = express.Router();
 
@@ -19,15 +20,6 @@ const axiosInstance = axios.create({
     "x-client-secret": process.env.APAY_CLIENT_SECRET,
   },
 });
-
-const getCyclePayableAmount = (session, cycleNumber) => {
-  if ((cycleNumber || 0) <= 1) {
-    return session.price;
-  }
-  return typeof session.additionalPrice === "number"
-    ? session.additionalPrice
-    : session.price;
-};
 
 router.post("/create-order/:sessionId", jwtAuth, async (req, res) => {
   const userId = req.user.id;

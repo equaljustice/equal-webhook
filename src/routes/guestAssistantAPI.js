@@ -12,14 +12,15 @@ import {
   getDocumentFilename,
 } from "../utils/documentGenerator.js";
 import {
-  persistSessionDocumentSnapshot,
+  applyDownloadSnapshot,
   extractUploadRequirement,
   detectChatLanguageFromText,
   paymentBarrierMessage,
   buildDocumentDataFromMessage,
   findLastSubstantiveMessage,
 } from "../chat/messageControlParse.js";
-import { getCyclePayableAmount } from "../chat/sessionGuards.js";
+import { preparePaymentBarrierCycle } from "../chat/sessionGuards.js";
+import { hasWebhookConfirmedPayment } from "../chat/paymentVerification.js";
 import {
   getGuestSession,
   putGuestSession,
@@ -37,6 +38,7 @@ import {
   enrichGuestApiResponse,
   processGuestAssistantReply,
 } from "../chat/guestSignupOffer.js";
+import { guestSignupOfferResponseFields } from "../chat/guestPromptContext.js";
 import {
   bootstrapFlowSession,
   executeChatTurn,
@@ -47,6 +49,11 @@ import {
   trackGuestChatStarted,
   trackGuestMessageSent,
 } from "../services/guestAnalytics.js";
+import {
+  isAllowedUploadFile,
+  UPLOAD_TYPE_ERROR,
+} from "../utils/uploadFileTypes.js";
+import { resolveSessionGeminiConfig } from "../utils/geminiConfig.js";
 
 const router = express.Router();
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -58,21 +65,10 @@ const guestUpload = multer({
     fileSize: 50 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
-    const allowedMimes = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/msword",
-      "image/jpeg",
-      "image/png",
-      "image/jpg",
-    ];
-    if (allowedMimes.includes(file.mimetype)) {
+    if (isAllowedUploadFile(file)) {
       cb(null, true);
     } else {
-      cb(
-        new Error("Invalid file type. Only PDF, DOCX, and images are allowed."),
-        false
-      );
+      cb(new Error(UPLOAD_TYPE_ERROR), false);
     }
   },
 });
@@ -105,6 +101,7 @@ function buildGuestSessionDoc({
   geminiConfig,
   provider,
   isPaid,
+  deferPayment = false,
 }) {
   const startedOn = new Date();
   const endedOn = new Date(startedOn.getTime() + GUEST_SESSION_TTL_MS);
@@ -141,19 +138,24 @@ function buildGuestSessionDoc({
     provider,
     geminiConfig: geminiConfig || {},
     isPaid,
+    deferPayment,
     paymentCycle: 0,
     messages: [],
     isDocUploadRequired: false,
     uploadedFileId: null,
     uploadedFileIds: [],
+    uploadedFilesMeta: [],
     uploadAttempts: 0,
     isDocUploaded: false,
     supportsMultipleUploads: assistant.config?.supportsMultipleUploads === true,
     finalDocumentData: null,
     final_response: null,
     selectedLanguage: null,
+    languageConfirmedByUser: false,
+    guestOfferQuestionShown: false,
     signupOfferShown: false,
     signupOfferResponse: null,
+    guestFlowPhase: "language",
     useFlowOrchestrator: false,
     flowKey: null,
     flowVersion: null,
@@ -187,17 +189,18 @@ function requireGuestContext(req, res) {
 }
 
 function guestSessionToClientShape(guestSessionId, session, docDownloadAvailable = false) {
-  const guestSignupOfferPending =
-    session.signupOfferResponse === "pending" && session.signupOfferShown === true;
+  const deferPayment =
+    session.deferPayment === true || session.geminiConfig?.deferPayment === true;
   return {
     ...session,
+    deferPayment,
     _id: guestSessionId,
     key: session.assistantKey,
     assistantKey: session.assistantKey,
     docDownloadAvailable,
     isGuest: true,
     guestRetentionHours: 24,
-    guestSignupOfferPending,
+    ...guestSignupOfferResponseFields(session),
   };
 }
 
@@ -426,14 +429,14 @@ router.post("/guest/start-session", async (req, res) => {
       const thread = await client.beta.threads.create();
       threadId = thread.id;
     } else if (provider === "gemini") {
-      geminiConfig = assistant.config || {};
+      geminiConfig = await resolveSessionGeminiConfig(assistant.config || {});
       threadId = uuidv4();
     } else {
       return res.status(400).json({ message: "Unsupported provider" });
     }
 
     const deferPayment = assistant.config?.deferPayment === true;
-    const isPaid = deferPayment;
+    const isPaid = false;
 
     const guestSessionId = uuidv4();
     const sessionDoc = buildGuestSessionDoc({
@@ -445,6 +448,7 @@ router.post("/guest/start-session", async (req, res) => {
       geminiConfig,
       provider,
       isPaid,
+      deferPayment,
     });
 
     await bootstrapFlowSession(sessionDoc, assistant);
@@ -510,13 +514,15 @@ router.post("/guest/signup-offer-response", async (req, res) => {
     session.signupOfferResponse = response;
     if (response === "accepted") {
       session.signupOfferShown = true;
+      session.guestFlowPhase = "active";
+    } else if (response === "declined") {
+      session.guestFlowPhase = "active";
     }
     await putGuestSession(guestSessionId, session);
 
     return res.status(200).json({
       success: true,
-      signupOfferResponse: session.signupOfferResponse,
-      guestSignupOfferPending: false,
+      ...guestSignupOfferResponseFields(session),
     });
   } catch (err) {
     console.error("guest/signup-offer-response", err);
@@ -565,6 +571,7 @@ router.post("/guest/send-message-stream", async (req, res) => {
       userMessage,
       fileId,
       isGuest: true,
+      persistBeforeStreamDone: () => putGuestSession(guestSessionId, session),
     });
 
     await putGuestSession(guestSessionId, session);
@@ -677,12 +684,7 @@ router.post("/guest/send-message", async (req, res) => {
     let cleanMessage = uploadInfo.cleanMessage || assistantMessage;
 
     if (uploadInfo.paymentRequired && !isSpecialAccess) {
-      if (session.isPaid) {
-        session.paymentCycle = (session.paymentCycle || 0) + 1;
-      }
-      const paymentCycle = session.paymentCycle || 0;
-      const paymentAmount = getCyclePayableAmount(session, paymentCycle);
-      session.isPaid = false;
+      const { paymentCycle, paymentAmount } = preparePaymentBarrierCycle(session);
       cleanMessage = paymentBarrierMessage(
         detectChatLanguageFromText(cleanMessage)
       );
@@ -722,12 +724,7 @@ router.post("/guest/send-message", async (req, res) => {
       session.final_response = resolvedFinalResponse;
     }
 
-    persistSessionDocumentSnapshot(
-      session,
-      guestSessionId,
-      uploadInfo,
-      cleanMessage
-    );
+    applyDownloadSnapshot(session, guestSessionId, uploadInfo, cleanMessage);
 
     const requiresUpload = uploadInfo.requiresUpload;
     const uploadType = uploadInfo.uploadType;
@@ -739,10 +736,10 @@ router.post("/guest/send-message", async (req, res) => {
       session.isDocUploadRequired = true;
       if (isReUpload) {
         session.isDocUploaded = false;
-        if (!session.supportsMultipleUploads) {
-          session.uploadedFileId = null;
-          session.uploadedFileIds = [];
-        }
+        session.uploadedFileId = null;
+        session.uploadedFileIds = [];
+        session.uploadedFilesMeta = [];
+        session.replaceNextUpload = true;
       }
     } else {
       if (session.isDocUploaded && filesToUse.length > 0 && !requiresUpload) {
@@ -817,8 +814,17 @@ router.post("/guest/mark-payment", async (req, res) => {
     if (session.anonymousId !== decoded.anonymousId) {
       return res.status(403).json({ error: "anonymousId does not match guest-token" });
     }
-    session.isPaid = true;
-    await putGuestSession(guestSessionId, session);
+    const webhookPaid = await hasWebhookConfirmedPayment({ guestSessionId });
+    if (!webhookPaid) {
+      return res.status(402).json({
+        error: "Payment not confirmed",
+        message: "Payment has not been confirmed by the payment provider yet.",
+      });
+    }
+    if (!session.isPaid) {
+      session.isPaid = true;
+      await putGuestSession(guestSessionId, session);
+    }
     return res.json({ message: "Payment confirmed. You can now chat!" });
   } catch (err) {
     console.error("guest/mark-payment", err);

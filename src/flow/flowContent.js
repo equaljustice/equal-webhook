@@ -114,7 +114,6 @@ export function buildControlJson(flags = {}) {
     session_terminated: !!flags.sessionTerminated,
     termination_message: flags.terminationMessage || null,
     payment_required: !!flags.paymentRequired,
-    document_ready: !!flags.documentReady,
   };
   return JSON.stringify(payload);
 }
