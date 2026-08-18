@@ -9,7 +9,7 @@ import {
   processFlowTurn,
   FLOW_BOOTSTRAP_MESSAGE,
 } from "../flow/flowEngine.js";
-import { FLOW_STATES } from "../flow/flowConstants.js";
+import { FLOW_STATES, INPUT_TYPES } from "../flow/flowConstants.js";
 import { appendControlJson } from "./sessionGuards.js";
 import {
   extractUploadRequirement,
@@ -21,6 +21,7 @@ import {
   stripControlJsonFromDisplay,
 } from "./messageControlParse.js";
 import { normalizeQaDisplayHtml, streamDisplayFromRaw } from "./replyFormat.js";
+import { applyMultiSelectDisplayMarker } from "./multiSelectControl.js";
 import {
   applyPaymentBarrier,
   enforceFlowGuards,
@@ -246,6 +247,8 @@ function wrapStreamChunkForDisplay(onStreamChunk) {
 }
 
 function buildFlowResponseEnvelope(session, result, extra = {}) {
+  const multiSelect =
+    !!result.multiSelect || result.inputType === INPUT_TYPES.MULTI_SELECT;
   return {
     reply: result.reply,
     paymentRequired: !!result.paymentRequired,
@@ -255,12 +258,15 @@ function buildFlowResponseEnvelope(session, result, extra = {}) {
     uploadType: result.uploadType || null,
     sessionTerminated: !!result.sessionTerminated,
     terminationMessage: result.terminationMessage || null,
+    multiSelect,
     nodeId: result.nodeId,
     displayNumber: result.displayNumber,
     phase: result.phase || session.flowState,
     flowMode: true,
     flowOptions: [],
-    inputType: result.inputType || null,
+    inputType:
+      result.inputType ||
+      (multiSelect ? INPUT_TYPES.MULTI_SELECT : null),
     streaming: !!extra.streaming,
     ...extra,
   };
@@ -455,6 +461,10 @@ async function handleFlowTurn({
     let uploadInfo = extractUploadRequirement(assistantMessage);
     uploadInfo = enforceFlowGuards(session, uploadInfo);
     let cleanMessage = uploadInfo.cleanMessage || assistantMessage;
+    cleanMessage = applyMultiSelectDisplayMarker(
+      cleanMessage,
+      uploadInfo.multiSelect
+    );
 
     if (uploadInfo.paymentRequired && !isSpecialAccess) {
       const barrier = applyPaymentBarrier(session, {
@@ -490,6 +500,7 @@ async function handleFlowTurn({
       terminationMessage: uploadInfo.terminationMessage,
       requiresUpload: uploadInfo.requiresUpload,
       uploadType: uploadInfo.uploadType,
+      multiSelect: !!uploadInfo.multiSelect,
       nodeId: result.nodeId,
       phase: session.flowState,
     }, { streaming: !!onStreamChunk });
@@ -673,6 +684,10 @@ async function handleLegacyGeminiTurn({
   cleanMessage = normalizeQaDisplayHtml(cleanMessage, {
     documentReady: inferDownloadSnapshot(session, uploadInfo, cleanMessage),
   });
+  cleanMessage = applyMultiSelectDisplayMarker(
+    cleanMessage,
+    uploadInfo.multiSelect
+  );
 
   if (isGuest) {
     if (isGuestLanguagePhase(session)) {
@@ -730,6 +745,8 @@ async function handleLegacyGeminiTurn({
     sessionTerminated: uploadInfo.sessionTerminated,
     terminationMessage: uploadInfo.terminationMessage,
     paymentRequired: false,
+    multiSelect: !!uploadInfo.multiSelect,
+    inputType: uploadInfo.multiSelect ? INPUT_TYPES.MULTI_SELECT : null,
     requiresUpload: uploadInfo.requiresUpload,
     uploadType: uploadInfo.uploadType,
     uploadReason: uploadInfo.reason,

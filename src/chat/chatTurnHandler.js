@@ -8,6 +8,7 @@ import { processGuestAssistantReply, enrichGuestApiResponse } from "./guestSignu
 import { FLOW_BOOTSTRAP_MESSAGE } from "../flow/flowEngine.js";
 import { GUEST_BOOTSTRAP_MESSAGE } from "./guestDisplayMessages.js";
 import { normalizeQaDisplayHtml } from "./replyFormat.js";
+import { applyMultiSelectDisplayMarker } from "./multiSelectControl.js";
 import { canAccessChat } from "./sessionAccess.js";
 
 function formatGeminiErrorMessage(err) {
@@ -79,7 +80,7 @@ export function collectFilesToUse(session, fileId) {
   return files;
 }
 
-function applyUploadFlagsFromResult(session, result) {
+export function applyUploadFlagsFromResult(session, result) {
   if (!result.requiresUpload) return;
   if (
     session.isDocUploaded &&
@@ -155,9 +156,12 @@ export async function executeChatTurn({
     session.messages.push({ role: "user", content: userMessage });
   }
   if (result.reply) {
-    const displayReply = normalizeQaDisplayHtml(result.reply, {
-      documentReady: false,
-    });
+    const displayReply = applyMultiSelectDisplayMarker(
+      normalizeQaDisplayHtml(result.reply, {
+        documentReady: false,
+      }),
+      !!result.multiSelect || result.inputType === "multi_select"
+    );
     session.messages.push({ role: "assistant", content: displayReply });
     result.reply = displayReply;
   }
@@ -199,6 +203,7 @@ export async function executeChatTurn({
     paymentRequired: result.paymentRequired || false,
     paymentAmount: result.paymentAmount,
     paymentCycle: result.paymentCycle ?? session.paymentCycle ?? 0,
+    multiSelect: !!result.multiSelect || result.inputType === "multi_select",
     requiresUpload: session.isDocUploadRequired && !session.isDocUploaded,
     isReUpload: result.uploadType === "re_upload",
     uploadReason: result.uploadReason || null,
@@ -208,7 +213,9 @@ export async function executeChatTurn({
     flowMode: result.flowMode || false,
     streaming: result.streaming || false,
     flowOptions: result.flowOptions || [],
-    inputType: result.inputType || null,
+    inputType:
+      result.inputType ||
+      (result.multiSelect ? "multi_select" : null),
     guestSignupOfferPending: result.guestSignupOfferPending || false,
     instructionCached: result.instructionCached || false,
   };

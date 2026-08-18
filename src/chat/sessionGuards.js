@@ -10,6 +10,7 @@ import { isUnpaidPaymentGate } from "./sessionAccess.js";
  *
  * payment_required: true  → applyPaymentBarrier (Pay UI, isPaid=false until paid)
  * upload_required: true   → upload UI (single or multiple per supportsMultipleUploads)
+ * multi_select: true      → frontend multi-option answer UI (language-agnostic)
  * session_terminated: true → end session
  * Download: server auto-saves after paid final output — no document_ready flag
  * session_terminated: true → handled by orchestrator
@@ -40,6 +41,13 @@ const REPEATABLE_PAYMENT_KEY_FRAGMENTS = [
   "make_my_rent_agreement",
   "check-my-rent",
   "check_my_rent",
+  "check-my-will",
+  "check_my_will",
+  "check-will",
+  "check_will",
+  "sir-assessment",
+  "sir_assessment",
+  "sir-check-citizenship-voter-status",
 ];
 
 export function isRepeatablePaymentAssistant(session, assistant) {

@@ -235,7 +235,7 @@ const sectionAFiles = [
   { file: "cheque_bouncing.txt", languageEnd: "🟢 2. INITIAL MESSAGE AFTER LANGUAGE SELECTION" },
   { file: "flight_cancellation_intructions.txt", languageEnd: "🟢 2. INITIAL MESSAGE AFTER LANGUAGE SELECTION" },
   { file: "pre_nuptial_intructions.txt", languageEnd: "🟢 2. INITIAL MESSAGE AFTER LANGUAGE SELECTION" },
-  { file: "check_will_intructions.txt", languageEnd: "🟢 2. INITIAL MESSAGE AFTER LANGUAGE SELECTION" },
+  { file: "check_will_intructions.txt", languageEnd: "🟢 2. TERMINATION POLICY" },
   { file: "senior_citizen.txt", languageEnd: "________________________________________\n🟢 2. INITIAL MESSAGE AFTER LANGUAGE SELECTION" },
   { file: "salary_non_payment_intructions.txt", languageEnd: "________________________________________\n🟢 2. INITIAL MESSAGE AFTER LANGUAGE SELECTION" },
   { file: "upi_fraud.txt", languageEnd: "________________________________________\n🟢 2. INITIAL MESSAGE AFTER LANGUAGE SELECTION" },

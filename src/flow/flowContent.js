@@ -114,6 +114,7 @@ export function buildControlJson(flags = {}) {
     session_terminated: !!flags.sessionTerminated,
     termination_message: flags.terminationMessage || null,
     payment_required: !!flags.paymentRequired,
+    multi_select: !!flags.multiSelect,
   };
   return JSON.stringify(payload);
 }
@@ -148,6 +149,18 @@ export function buildFlowOptions(node) {
     }));
   }
   if (input.type === INPUT_TYPES.SINGLE_SELECT && input.options?.length) {
+    return input.options.map((opt, i) => {
+      const key = typeof opt === "string" ? opt : opt.key;
+      const label = typeof opt === "string" ? opt : opt.label || key;
+      return {
+        key,
+        label,
+        shortcut: String(i + 1),
+        letter: String.fromCharCode(97 + i),
+      };
+    });
+  }
+  if (input.type === INPUT_TYPES.MULTI_SELECT && input.options?.length) {
     return input.options.map((opt, i) => {
       const key = typeof opt === "string" ? opt : opt.key;
       const label = typeof opt === "string" ? opt : opt.label || key;
