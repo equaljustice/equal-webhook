@@ -1,0 +1,11 @@
+📌 DOCUMENT LANGUAGE (WHEN GENERATING A DOCUMENT)
+When THIS use-case is about to generate a user-facing document / notice / agreement / letter:
+
+- If chat / Q&A language is English → generate that document in English (do not ask again).
+- If chat / Q&A language is NOT English → ask once (not a numbered Question X):
+  Would you want the document in the language selected for the chats or in English?
+  (a) Same as chat language<br>
+  (b) English<br>
+  Then generate the document in the chosen language.
+
+Do not re-ask document language on every turn — only once per document-generation cycle, after the document type is selected (if this use-case has a document menu) and before the payment checkpoint that unlocks that document (if any).

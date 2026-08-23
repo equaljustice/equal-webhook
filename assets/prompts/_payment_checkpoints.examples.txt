@@ -1,0 +1,91 @@
+📌 PAYMENT_CHECKPOINTS (USE-CASE CONFIG — copy and fill; amounts/when vary)
+Trigger ONLY these checkpoints. Use the shared Payment Engine in `_common_control_protocol.txt`.
+
+Format (keep ids stable; edit when/amount/unlocks/message per product):
+
+PAYMENT_CHECKPOINTS:
+  - id: <stable_id>
+    when: <exact condition from this use-case>
+    amount_inr: <number or null if message embeds amount>
+    message: "<user-facing payment line in English; translate to chat language at runtime>"
+    unlocks: <what to do after webhook Payment completed>
+    once: true|false
+
+────────────────────────────────────────────────────────
+EXAMPLES (reference only — do not paste all into one file)
+────────────────────────────────────────────────────────
+
+A) RENT / SECURITY DEPOSIT / TENANT EVICTION (batch mid-pay + extra docs)
+PAYMENT_CHECKPOINTS:
+  - id: after_batch_1
+    when: All applicable Batch 1 questions answered validly
+    amount_inr: 499
+    message: "To continue assessment and generate your personalized legal document, please complete the payment of Rs. 499/-."
+    unlocks: Batch 2 and later applicable Batches / assessment
+    once: true
+  - id: extra_document
+    when: User selects any document after the first document in this session
+    amount_inr: 199
+    message: "To generate this additional document, please complete the payment of Rs. 199/-."
+    unlocks: Generate that selected document
+    once: false
+
+B) LIVE-IN AGREEMENT (batch mid-pay + pay before signing guide)
+PAYMENT_CHECKPOINTS:
+  - id: after_batch_1
+    when: All applicable Batch 1 questions answered validly
+    amount_inr: null
+    message: "Please complete the payment to start further assessment."
+    unlocks: Batch 2 and later Batches (not the Agreement yet)
+    once: true
+  - id: before_signing_guide
+    when: Final Agreement body already delivered; before signing-process guidance
+    amount_inr: null
+    message: "Please complete the payment to receive the process of signing."
+    unlocks: Signing-process guidance only
+    once: true
+
+C) SIR / SINGLE-PATH ASSESSMENT (end of Q&A + optional micro pays)
+PAYMENT_CHECKPOINTS:
+  - id: before_main_assessment_output
+    when: All applicable main Q&A complete; before paid assessment output
+    amount_inr: 9
+    message: "To start your detailed SIR - Citizenship assessment, please complete the payment of Rs. 9/-."
+    unlocks: Detailed assessment output / next paid section
+    once: true
+  - id: before_rti
+    when: User opts into RTI draft
+    amount_inr: 5
+    message: "To receive your RTI Application, please complete the payment of Rs. 5/-."
+    unlocks: RTI Application body
+    once: false
+  - id: before_notice_upload_eval
+    when: User opts into AI notice evaluation upload
+    amount_inr: 5
+    message: "To upload your notice for AI evaluation, please complete the payment of Rs. 5/-."
+    unlocks: Set upload_required and continue that path
+    once: false
+
+D) CHECK WILL / DUAL FIXED GATES
+PAYMENT_CHECKPOINTS:
+  - id: before_gap_assessment
+    when: Step 3 summary confirmed; before gap assessment
+    amount_inr: null
+    message: "<use-case payment line>"
+    unlocks: Gap assessment output
+    once: true
+  - id: before_signing_guide
+    when: User selects Yes for signing process; before signing guide
+    amount_inr: null
+    message: "<use-case payment line>"
+    unlocks: Signing-process guidance
+    once: true
+
+E) PER-DOCUMENT LOOP (senior citizen / UPI / many employment flows)
+PAYMENT_CHECKPOINTS:
+  - id: before_each_document
+    when: Immediately before generating each paid document (including every additional document)
+    amount_inr: null
+    message: "<use-case payment line>"
+    unlocks: That document body only
+    once: false
