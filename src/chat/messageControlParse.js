@@ -295,6 +295,7 @@ const TOP_LEVEL_CONTROL_KEYS = [
   "session_terminated",
   "payment_required",
   "multi_select",
+  "batch_form",
   "document_ready",
   "guest_signup_offer",
   "selected_language",
@@ -400,6 +401,7 @@ const CONTROL_JSON_MARKERS = [
   '"session_terminated"',
   '"payment_required"',
   '"multi_select"',
+  '"batch_form"',
   '"document_ready"',
   '"guest_signup_offer"',
   '"selected_language"',
@@ -410,7 +412,7 @@ function tailLooksLikeControlJson(text) {
   if (CONTROL_JSON_MARKERS.some((marker) => text.includes(marker))) {
     return true;
   }
-  return /\b(session_state|upload_required|guest_signup_offer|session_terminated|payment_required|multi_select|document_ready|selected_language)\b/.test(
+  return /\b(session_state|upload_required|guest_signup_offer|session_terminated|payment_required|multi_select|batch_form|document_ready|selected_language)\b/.test(
     text
   );
 }
@@ -546,6 +548,7 @@ const emptyUploadInfo = (cleanMessage = "") => ({
   terminationMessage: null,
   paymentRequired: false,
   multiSelect: false,
+  batchForm: false,
   documentReady: false,
   cleanMessage,
   documentData: null,
@@ -574,6 +577,7 @@ export const extractUploadRequirement = (message) => {
         metadata.hasOwnProperty("session_terminated") ||
         metadata.hasOwnProperty("payment_required") ||
         metadata.hasOwnProperty("multi_select") ||
+        metadata.hasOwnProperty("batch_form") ||
         metadata.hasOwnProperty("document_ready");
       const hasGuestOffer =
         metadata.hasOwnProperty("guest_signup_offer");
@@ -623,6 +627,9 @@ export const extractUploadRequirement = (message) => {
           multiSelect:
             metadata.multi_select === true ||
             metadata.multi_select === "true",
+          batchForm:
+            metadata.batch_form === true ||
+            metadata.batch_form === "true",
           documentReady: false,
           cleanMessage: cleanMessage,
           documentData: documentData,

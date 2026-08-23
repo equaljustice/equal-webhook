@@ -9,6 +9,7 @@ import { FLOW_BOOTSTRAP_MESSAGE } from "../flow/flowEngine.js";
 import { GUEST_BOOTSTRAP_MESSAGE } from "./guestDisplayMessages.js";
 import { normalizeQaDisplayHtml } from "./replyFormat.js";
 import { applyMultiSelectDisplayMarker } from "./multiSelectControl.js";
+import { applyBatchFormDisplayMarker } from "./batchFormControl.js";
 import { canAccessChat } from "./sessionAccess.js";
 
 function formatGeminiErrorMessage(err) {
@@ -156,11 +157,16 @@ export async function executeChatTurn({
     session.messages.push({ role: "user", content: userMessage });
   }
   if (result.reply) {
-    const displayReply = applyMultiSelectDisplayMarker(
-      normalizeQaDisplayHtml(result.reply, {
-        documentReady: false,
-      }),
+    let displayReply = normalizeQaDisplayHtml(result.reply, {
+      documentReady: false,
+    });
+    displayReply = applyMultiSelectDisplayMarker(
+      displayReply,
       !!result.multiSelect || result.inputType === "multi_select"
+    );
+    displayReply = applyBatchFormDisplayMarker(
+      displayReply,
+      !!result.batchForm
     );
     session.messages.push({ role: "assistant", content: displayReply });
     result.reply = displayReply;
@@ -204,6 +210,7 @@ export async function executeChatTurn({
     paymentAmount: result.paymentAmount,
     paymentCycle: result.paymentCycle ?? session.paymentCycle ?? 0,
     multiSelect: !!result.multiSelect || result.inputType === "multi_select",
+    batchForm: !!result.batchForm,
     requiresUpload: session.isDocUploadRequired && !session.isDocUploaded,
     isReUpload: result.uploadType === "re_upload",
     uploadReason: result.uploadReason || null,

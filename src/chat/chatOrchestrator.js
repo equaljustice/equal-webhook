@@ -22,6 +22,7 @@ import {
 } from "./messageControlParse.js";
 import { normalizeQaDisplayHtml, streamDisplayFromRaw } from "./replyFormat.js";
 import { applyMultiSelectDisplayMarker } from "./multiSelectControl.js";
+import { applyBatchFormDisplayMarker } from "./batchFormControl.js";
 import {
   applyPaymentBarrier,
   enforceFlowGuards,
@@ -259,6 +260,7 @@ function buildFlowResponseEnvelope(session, result, extra = {}) {
     sessionTerminated: !!result.sessionTerminated,
     terminationMessage: result.terminationMessage || null,
     multiSelect,
+    batchForm: !!result.batchForm,
     nodeId: result.nodeId,
     displayNumber: result.displayNumber,
     phase: result.phase || session.flowState,
@@ -501,6 +503,7 @@ async function handleFlowTurn({
       requiresUpload: uploadInfo.requiresUpload,
       uploadType: uploadInfo.uploadType,
       multiSelect: !!uploadInfo.multiSelect,
+      batchForm: !!uploadInfo.batchForm,
       nodeId: result.nodeId,
       phase: session.flowState,
     }, { streaming: !!onStreamChunk });
@@ -688,6 +691,10 @@ async function handleLegacyGeminiTurn({
     cleanMessage,
     uploadInfo.multiSelect
   );
+  cleanMessage = applyBatchFormDisplayMarker(
+    cleanMessage,
+    uploadInfo.batchForm
+  );
 
   if (isGuest) {
     if (isGuestLanguagePhase(session)) {
@@ -746,6 +753,7 @@ async function handleLegacyGeminiTurn({
     terminationMessage: uploadInfo.terminationMessage,
     paymentRequired: false,
     multiSelect: !!uploadInfo.multiSelect,
+    batchForm: !!uploadInfo.batchForm,
     inputType: uploadInfo.multiSelect ? INPUT_TYPES.MULTI_SELECT : null,
     requiresUpload: uploadInfo.requiresUpload,
     uploadType: uploadInfo.uploadType,
