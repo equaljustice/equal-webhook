@@ -7,6 +7,7 @@ import { CustomGPTpayment } from "../model/ customGPTPayment.model.js";
 import { getGuestSession, markGuestSessionPaid } from "../services/guestSessionStore.js";
 import { verifyGuestToken } from "../services/guestToken.js";
 import { getCyclePayableAmount } from "../chat/sessionGuards.js";
+import { getBrand } from "../../constants.js";
 
 const router = express.Router();
 
@@ -133,7 +134,7 @@ router.post("/guest/create-order/:guestSessionId", async (req, res) => {
   /** Guest is not prompted for email unless you pass chEmail; gateway still receives a valid-shaped address. */
   const chEmail =
     trimmedEmail ||
-    `guest.${String(guestSessionId).replace(/-/g, "")}@guest.equaljustice.local`;
+    `guest.${String(guestSessionId).replace(/-/g, "")}@${getBrand().guestEmailDomain}`;
   if (!amt) {
     return res.status(400).json({ message: "Invalid payable amount" });
   }

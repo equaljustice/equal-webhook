@@ -18,14 +18,16 @@ import APIrouter from "./routes.js";
 import { connectDB } from "./src/db/config.js";
 import { seedPromptsFromLocal } from "./src/utils/promptManager.js";
 import cors from "cors";
+import { getBrand } from "./constants.js";
 const app = express();
 
 // Root route handler - place early to avoid body parsing issues
 app.get("/", (req, res) => {
+  const brandName = getBrand().name;
   res.send(`
     <html>
       <head>
-        <title>EqualJustice Server Status</title>
+        <title>${brandName} Server Status</title>
         <style>
           body { font-family: Arial, sans-serif; background: #f0f8ff; margin: 0; padding: 0; }
           .container {
@@ -54,9 +56,9 @@ app.get("/", (req, res) => {
       </head>
       <body>
         <div class="container">
-          <h1>EqualJustice Server is Live</h1>
+          <h1>${brandName} Server is Live</h1>
           <div class="live">Status: LIVE ✅</div>
-          <p>Welcome to the EqualJustice API server.<br>
+          <p>Welcome to the ${brandName} API server.<br>
           If you see this message, the service is running properly.</p>
         </div>
       </body>
@@ -68,7 +70,7 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "healthy",
-    service: "EqualJustice API",
+    service: `${getBrand().name} API`,
     timestamp: new Date().toISOString(),
   });
 });

@@ -392,6 +392,8 @@ async function loadHTMLTemplate(documentData, genOptions = {}) {
 
   const content = convertDocumentDataToHTML(documentData);
 
+  const brandEmail = DOCUMENT_CONFIG.branding.email;
+  template = template.replace(/{{BRAND_EMAIL}}/g, () => brandEmail);
   template = template.replace(/{{TITLE}}/g, title);
   template = template.replace(/{{TIMESTAMP}}/g, timestamp);
   template = template.replace(/{{CONTENT}}/g, content);

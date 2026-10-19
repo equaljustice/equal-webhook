@@ -35,12 +35,46 @@ export const ASSISTANT_KEY_TO_DOCUMENT_TEMPLATE = {
   create_my_will: DOCUMENT_TEMPLATE_PROFILE.WILL,
 };
 
+/**
+ * User-facing brand strings. BRAND env: "equaljustice" (default) | "jollyji".
+ * Read lazily (dotenv loads after ESM imports). Internal identifiers such as
+ * the "ej:" Redis prefixes and data-ej-* markers are deliberately not branded.
+ */
+export const BRANDS = {
+  equaljustice: {
+    id: "equaljustice",
+    name: "EqualJustice",
+    trademark: "EqualJustice",
+    email: "equal@equaljustice.ai",
+    site: "equaljustice.ai",
+    guestEmailDomain: "guest.equaljustice.local",
+    watermarkSvg: "assets/templates/ej-watermark.svg",
+  },
+  jollyji: {
+    id: "jollyji",
+    name: "JollyJi",
+    trademark: "JollyJi",
+    email: "askjolly@jollyji.in",
+    site: "jollyji.in",
+    guestEmailDomain: "guest.jollyji.local",
+    watermarkSvg: "assets/templates/jollyji-watermark.svg",
+  },
+};
+
+export function getBrand() {
+  const id = String(process.env.BRAND || "").trim().toLowerCase();
+  return BRANDS[id] || BRANDS.equaljustice;
+}
+
 // Document generation configuration
 export const DOCUMENT_CONFIG = {
-  branding: {
-    companyName: "EqualJustice",
-    email: "equal@equaljustice.ai",
-    trademark: "EqualJustice",
+  get branding() {
+    const brand = getBrand();
+    return {
+      companyName: brand.name,
+      email: brand.email,
+      trademark: brand.trademark,
+    };
   },
   templates: {
     headerFooterHtml: "assets/templates/header-footer.html",
