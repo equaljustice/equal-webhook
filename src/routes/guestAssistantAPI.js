@@ -935,6 +935,41 @@ router.post("/guest/end-session", async (req, res) => {
   }
 });
 
+/**
+ * Guest fields that also exist on the Mongo Session schema but were not copied
+ * on convert — flow orchestrator + AI-led session state. Without them a
+ * guest -> user upgrade mid-flow restarts the Q&A. Null/undefined skipped so
+ * schema defaults apply exactly as before.
+ */
+const GUEST_FLOW_FIELDS_TO_COPY = [
+  "useFlowOrchestrator",
+  "flowKey",
+  "flowVersion",
+  "flowState",
+  "currentNodeId",
+  "answers",
+  "askedNodeOrder",
+  "paymentGateShown",
+  "deferPayment",
+  "flowAudit",
+  "selectedLanguage",
+  "qaPhase",
+  "currentStep",
+  "noticeParagraphKeys",
+  "geminiInstructionCacheName",
+  "lastQuickOptions",
+];
+
+function pickGuestFlowFields(guest) {
+  const out = {};
+  for (const field of GUEST_FLOW_FIELDS_TO_COPY) {
+    if (guest[field] !== undefined && guest[field] !== null) {
+      out[field] = guest[field];
+    }
+  }
+  return out;
+}
+
 router.post("/guest/convert-session", jwtAuth, async (req, res) => {
   try {
     const token = readGuestToken(req);
@@ -989,6 +1024,7 @@ router.post("/guest/convert-session", jwtAuth, async (req, res) => {
       finalDocumentData: guest.finalDocumentData ?? null,
       final_response: guest.final_response ?? null,
       paymentCycle: guest.paymentCycle || 0,
+      ...pickGuestFlowFields(guest),
     });
 
     await Payment.updateMany(
