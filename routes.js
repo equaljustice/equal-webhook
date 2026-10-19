@@ -10,6 +10,7 @@ import adminRoutes from "./src/routes/admin.js";
 import analyticsRoutes from "./src/routes/analytics.js";
 import geminiAdminRoutes from "./src/routes/geminiAdmin.js";
 import useCaseMatchRoutes from "./src/routes/useCaseMatch.js";
+import contactRoutes from "./src/routes/contact.js";
 const APIrouter = express.Router();
 
 APIrouter.use("/auth", authRoutes);
@@ -22,6 +23,7 @@ APIrouter.use("/prompt-admin", promptAdminRoutes);
 APIrouter.use("/admin", adminRoutes);
 APIrouter.use("/analytics", analyticsRoutes);
 APIrouter.use("/gemini-admin", geminiAdminRoutes);
+APIrouter.use("/contact", contactRoutes);
 
 // Export the router
 export default APIrouter;
