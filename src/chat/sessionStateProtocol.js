@@ -3,6 +3,8 @@
  * Instructions file stays cached; dynamic state travels in a small JSON envelope each turn.
  */
 
+import { isProgressEnabled } from "./progressControl.js";
+
 export const QA_PHASES = {
   QA_IN_PROGRESS: "qa_in_progress",
   WAITING_PAYMENT: "waiting_payment",
@@ -53,6 +55,17 @@ Rules:
 - DOWNLOAD: Do NOT set "document_ready" in control JSON (removed). After payment, output the full final document in chat; the server saves it automatically for PDF/Word download when docDownloadAvailable is enabled on the assistant.
 - UPLOAD: Use "upload_required" / "upload_type" per your master instructions and the upload protocol block. Single vs multiple file upload is controlled by assistant config (supportsMultipleUploads), not by control JSON.
 `.trim();
+
+/** One extra rule, appended only when JOLLYJI_PROGRESS_ENABLED is on. */
+export const PROGRESS_PROTOCOL_RULE =
+  '- PROGRESS: In the same last-line control JSON, also include top-level "progress" (integer 0-100: your honest estimate of how much of the question flow is complete) and "batch_label" (short label for the current question batch, e.g. "Batch 2" or "Final Batch"). Omit either key if you cannot estimate it.';
+
+/** Protocol text for the dynamic overlay; identical to SESSION_STATE_PROTOCOL when the flag is off. */
+export function getSessionStateProtocol() {
+  return isProgressEnabled()
+    ? `${SESSION_STATE_PROTOCOL}\n${PROGRESS_PROTOCOL_RULE}`
+    : SESSION_STATE_PROTOCOL;
+}
 
 export function defaultSessionState(session = {}) {
   return {

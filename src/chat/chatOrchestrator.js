@@ -62,11 +62,12 @@ import {
   isInstructionCacheEnabled,
 } from "./geminiInstructionCache.js";
 import {
-  SESSION_STATE_PROTOCOL,
+  getSessionStateProtocol,
   mergeSessionStateFromModel,
   advanceQaPhase,
   QA_PHASES,
 } from "./sessionStateProtocol.js";
+import { isProgressEnabled, computeFlowProgress } from "./progressControl.js";
 
 /**
  * Initialize flow on new session when orchestrator is enabled.
@@ -145,7 +146,7 @@ async function resolveInstructionLayers({
   if (!asset) {
     return {
       cacheableText: null,
-      dynamicOverlay: SESSION_STATE_PROTOCOL,
+      dynamicOverlay: getSessionStateProtocol(),
       fullInlineText: null,
       asset: null,
     };
@@ -161,7 +162,7 @@ async function resolveInstructionLayers({
       "End with control JSON on the last line only.";
   }
 
-  const dynamicParts = [SESSION_STATE_PROTOCOL];
+  const dynamicParts = [getSessionStateProtocol()];
 
   if (isGuest) {
     const guestOverlay = appendGuestSystemInstruction("", session).trim();
@@ -293,7 +294,7 @@ export async function handleChatTurn({
   const streamForDisplay = wrapStreamChunkForDisplay(onStreamChunk);
 
   if (useFlow) {
-    return handleFlowTurn({
+    const flowResult = await handleFlowTurn({
       session,
       assistant,
       userMessage,
@@ -302,6 +303,7 @@ export async function handleChatTurn({
       isSpecialAccess,
       onStreamChunk: streamForDisplay,
     });
+    return attachFlowProgress(flowResult, session, assistant);
   }
 
   return handleLegacyGeminiTurn({
@@ -313,6 +315,21 @@ export async function handleChatTurn({
     isSpecialAccess,
     onStreamChunk: streamForDisplay,
   });
+}
+
+/**
+ * JollyJi stepper: in flow mode progress is computed from the flow graph
+ * (never from model output). No-op when JOLLYJI_PROGRESS_ENABLED is off.
+ */
+async function attachFlowProgress(result, session, assistant) {
+  if (!isProgressEnabled() || !result || result.status || !result.flowMode) {
+    return result;
+  }
+  const version = session.flowVersion || assistant.config?.flowVersion || 1;
+  const bundle = await loadFlowBundle(assistant.key, version);
+  result.progress = bundle ? computeFlowProgress(session, bundle.flow) : null;
+  result.batchLabel = null;
+  return result;
 }
 
 async function handleFlowTurn({
@@ -731,6 +748,7 @@ async function handleLegacyGeminiTurn({
       flowOptions,
       streaming: !!onStreamChunk,
       instructionCached: !!cachedContentName,
+      ...legacyProgressFields(uploadInfo),
     };
   }
 
@@ -765,5 +783,15 @@ async function handleLegacyGeminiTurn({
     flowOptions,
     streaming: !!onStreamChunk,
     instructionCached: !!cachedContentName,
+    ...legacyProgressFields(uploadInfo),
+  };
+}
+
+/** Model-reported progress/batch_label (already validated); {} when flag off. */
+function legacyProgressFields(uploadInfo) {
+  if (!isProgressEnabled()) return {};
+  return {
+    progress: uploadInfo?.progress ?? null,
+    batchLabel: uploadInfo?.batchLabel ?? null,
   };
 }

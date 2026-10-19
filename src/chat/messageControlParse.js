@@ -4,6 +4,12 @@
  */
 
 import { QA_PHASES } from "./sessionStateProtocol.js";
+import {
+  isProgressEnabled,
+  PROGRESS_CONTROL_KEYS,
+  normalizeProgress,
+  normalizeBatchLabel,
+} from "./progressControl.js";
 
 export const withTimeout = (promise, ms, label = "Operation") => {
   let timeoutId;
@@ -302,12 +308,19 @@ const TOP_LEVEL_CONTROL_KEYS = [
   "session_state",
 ];
 
+/** Control keys in effect; progress keys only when JOLLYJI_PROGRESS_ENABLED. */
+function activeControlKeys() {
+  return isProgressEnabled()
+    ? [...TOP_LEVEL_CONTROL_KEYS, ...PROGRESS_CONTROL_KEYS]
+    : TOP_LEVEL_CONTROL_KEYS;
+}
+
 function isControlMetadata(metadata) {
   if (!metadata || typeof metadata !== "object") return false;
   if (Object.prototype.hasOwnProperty.call(metadata, "session_state")) {
     return true;
   }
-  return TOP_LEVEL_CONTROL_KEYS.some((k) =>
+  return activeControlKeys().some((k) =>
     Object.prototype.hasOwnProperty.call(metadata, k)
   );
 }
@@ -324,7 +337,7 @@ function extractControlJsonFromMessage(message) {
   }
 
   let lastKeyIdx = -1;
-  for (const key of TOP_LEVEL_CONTROL_KEYS) {
+  for (const key of activeControlKeys()) {
     const idx = message.lastIndexOf(`"${key}"`);
     if (idx > lastKeyIdx) lastKeyIdx = idx;
   }
@@ -410,6 +423,12 @@ const CONTROL_JSON_MARKERS = [
 
 function tailLooksLikeControlJson(text) {
   if (CONTROL_JSON_MARKERS.some((marker) => text.includes(marker))) {
+    return true;
+  }
+  if (
+    isProgressEnabled() &&
+    PROGRESS_CONTROL_KEYS.some((k) => text.includes(`"${k}"`))
+  ) {
     return true;
   }
   return /\b(session_state|upload_required|guest_signup_offer|session_terminated|payment_required|multi_select|batch_form|document_ready|selected_language)\b/.test(
@@ -583,8 +602,12 @@ export const extractUploadRequirement = (message) => {
         metadata.hasOwnProperty("guest_signup_offer");
       const hasSessionState =
         metadata.hasOwnProperty("session_state");
+      const progressOn = isProgressEnabled();
+      const hasProgress =
+        progressOn &&
+        PROGRESS_CONTROL_KEYS.some((k) => metadata.hasOwnProperty(k));
 
-      if (hasStandardControl || hasGuestOffer || hasSessionState) {
+      if (hasStandardControl || hasGuestOffer || hasSessionState || hasProgress) {
         const sessionTerminatedFlag =
           metadata.session_terminated === true ||
           metadata.session_terminated === "true";
@@ -611,7 +634,15 @@ export const extractUploadRequirement = (message) => {
           cleanMessage = cleanMessage.replace(/\s*\{[\s\n]*"document_type"[\s\S]*?\}\s*$/g, "").trim();
         }
 
+        const progressFields = progressOn
+          ? {
+              progress: normalizeProgress(metadata.progress),
+              batchLabel: normalizeBatchLabel(metadata.batch_label),
+            }
+          : {};
+
         return {
+          ...progressFields,
           requiresUpload:
             metadata.upload_required === true ||
             metadata.upload_required === "true",

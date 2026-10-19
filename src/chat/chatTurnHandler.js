@@ -11,6 +11,7 @@ import { normalizeQaDisplayHtml } from "./replyFormat.js";
 import { applyMultiSelectDisplayMarker } from "./multiSelectControl.js";
 import { applyBatchFormDisplayMarker } from "./batchFormControl.js";
 import { canAccessChat } from "./sessionAccess.js";
+import { isProgressEnabled } from "./progressControl.js";
 
 function formatGeminiErrorMessage(err) {
   const raw = String(err?.message || err || "").trim();
@@ -226,6 +227,13 @@ export async function executeChatTurn({
     guestSignupOfferPending: result.guestSignupOfferPending || false,
     instructionCached: result.instructionCached || false,
   };
+
+  // JollyJi stepper — keys omitted entirely when the flag is off.
+  if (isProgressEnabled()) {
+    payload.progress = Number.isInteger(result.progress) ? result.progress : null;
+    payload.batchLabel =
+      typeof result.batchLabel === "string" ? result.batchLabel : null;
+  }
 
   const finalPayload = isGuest
     ? enrichGuestApiResponse(payload, session, guestUploadInfo)
