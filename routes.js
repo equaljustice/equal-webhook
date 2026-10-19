@@ -9,11 +9,13 @@ import promptAdminRoutes from "./src/routes/promptAdmin.js";
 import adminRoutes from "./src/routes/admin.js";
 import analyticsRoutes from "./src/routes/analytics.js";
 import geminiAdminRoutes from "./src/routes/geminiAdmin.js";
+import useCaseMatchRoutes from "./src/routes/useCaseMatch.js";
 const APIrouter = express.Router();
 
 APIrouter.use("/auth", authRoutes);
 APIrouter.use("/assistant", guestAssistantRoutes);
 APIrouter.use("/assistant", assistantRoutes);
+APIrouter.use("/assistant", useCaseMatchRoutes);
 APIrouter.use("/payment", paymentRoutes);
 APIrouter.use("/custom-payment", CustomGPTPaymentRoutes);
 APIrouter.use("/prompt-admin", promptAdminRoutes);
