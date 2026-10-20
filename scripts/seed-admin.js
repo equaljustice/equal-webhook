@@ -17,7 +17,9 @@ const connectDB = async () => {
       throw new Error("MongoDB URI not found in environment variables");
     }
 
-    await mongoose.connect(mongoUri);
+    // Same DB selection as the app (src/db/config.js); without it the URI's
+    // default database is used and the admin lands where the app never looks.
+    await mongoose.connect(mongoUri, { dbName: process.env.DB_NAME });
     console.log("Connected to MongoDB");
   } catch (error) {
     console.error("MongoDB connection error:", error);
