@@ -51,6 +51,22 @@ export async function readPromptFile(promptPath) {
     }
   }
 
+  return readPromptFromDb(promptPath);
+}
+
+/**
+ * Read a prompt from MongoDB only, in every environment.
+ * The admin panel edits MongoDB, so admin routes must read back the same
+ * document (not the dev-mode local file override in readPromptFile).
+ *
+ * @param {string} promptPath  e.g. "assets/prompts/gst_arrest.txt"
+ * @returns {Promise<string>}
+ */
+export async function readPromptFromDb(promptPath) {
+  if (!promptPath) {
+    throw new Error("Prompt path is required");
+  }
+
   const identifier = extractIdentifier(promptPath);
   console.log(`[PromptManager] READ from MongoDB | identifier: "${identifier}" | path: "${promptPath}"`);
 

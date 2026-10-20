@@ -4,7 +4,7 @@ import os from "os";
 import fs from "fs/promises";
 import { dualAuth } from "../middleware/dualAuth.js";
 import {
-  readPromptFile,
+  readPromptFromDb,
   uploadPromptFile,
   deletePromptFile,
   listPromptFiles,
@@ -100,7 +100,7 @@ router.get("/get/:identifier", dualAuth, async (req, res) => {
     const filename = `${identifier}.txt`;
     const promptPath = `assets/prompts/${filename}`;
 
-    const content = await readPromptFile(promptPath);
+    const content = await readPromptFromDb(promptPath);
     const metadata = await getPromptFileMetadata(promptPath);
 
     return res.status(200).json({
@@ -136,7 +136,7 @@ router.get("/get-by-filename/:filename", dualAuth, async (req, res) => {
     // Construct the prompt path
     const promptPath = `assets/prompts/${filename}`;
 
-    const content = await readPromptFile(promptPath);
+    const content = await readPromptFromDb(promptPath);
     const metadata = await getPromptFileMetadata(promptPath);
 
     return res.status(200).json({
@@ -213,7 +213,7 @@ router.post(
       let previousContent = null;
       if (isUpdate) {
         try {
-          previousContent = await readPromptFile(promptPath);
+          previousContent = await readPromptFromDb(promptPath);
         } catch (_) {
           // ignore
         }
@@ -291,7 +291,7 @@ router.post("/upload", dualAuth, async (req, res) => {
     let previousContent = null;
     if (isUpdate) {
       try {
-        previousContent = await readPromptFile(promptPath);
+        previousContent = await readPromptFromDb(promptPath);
       } catch (_) {
         // ignore
       }
@@ -364,7 +364,7 @@ router.put("/update/:filename", dualAuth, async (req, res) => {
     // Read previous content for audit log
     let previousContent = null;
     try {
-      previousContent = await readPromptFile(promptPath);
+      previousContent = await readPromptFromDb(promptPath);
     } catch (_) {
       // ignore
     }
@@ -427,7 +427,7 @@ router.delete("/delete/:identifier", dualAuth, async (req, res) => {
     // Read previous content for audit log
     let previousContent = null;
     try {
-      previousContent = await readPromptFile(promptPath);
+      previousContent = await readPromptFromDb(promptPath);
     } catch (_) {
       // ignore
     }
@@ -544,7 +544,7 @@ router.post("/preview", dualAuth, async (req, res) => {
       const promptPath = `assets/prompts/${filename}`;
 
       try {
-        previewContent = await readPromptFile(promptPath);
+        previewContent = await readPromptFromDb(promptPath);
         const fileMetadata = await getPromptFileMetadata(promptPath);
         metadata = fileMetadata;
         isExisting = true;
@@ -619,7 +619,7 @@ router.post("/diff", dualAuth, async (req, res) => {
     let fileExists = false;
 
     try {
-      oldContent = await readPromptFile(promptPath);
+      oldContent = await readPromptFromDb(promptPath);
       fileExists = true;
     } catch (error) {
       // File doesn't exist, this is a new file
@@ -744,7 +744,7 @@ router.post("/update-with-preview", dualAuth, async (req, res) => {
     let previousContent = null;
     if (isUpdate) {
       try {
-        previousContent = await readPromptFile(promptPath);
+        previousContent = await readPromptFromDb(promptPath);
       } catch (_) {
         // ignore
       }
