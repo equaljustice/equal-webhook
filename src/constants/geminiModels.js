@@ -1,7 +1,8 @@
 /**
  * Curated Gemini text-generation models for EqualJustice chat orchestration.
- * Excludes image, audio/TTS, live, video, embedding, agent, and deprecated models.
+ * Excludes image, audio/TTS, live, video, embedding, agent, and shut-down models.
  *
+ * Catalog mirrors Google AI Gemini API text models (docs updated 2026-09-15).
  * Ordered by capabilityRank (1 = highest capability). costRank follows the same
  * order — lower rank = higher relative cost on Google's pricing tiers.
  */
@@ -29,33 +30,66 @@ export const GEMINI_CHAT_MODELS = [
       "Deep reasoning and coding — best for difficult termination, inheritance, or multi-branch Q&A.",
   },
   {
-    id: "gemini-3.5-flash",
-    label: "Gemini 3.5 Flash",
+    id: "gemini-3.8-flash",
+    label: "Gemini 3.8 Flash",
     stability: "stable",
     capabilityRank: 3,
     costRank: 3,
-    capabilityLabel: "High intelligence",
+    capabilityLabel: "Highest flash intelligence",
     costLabel: "Medium-high cost",
     description:
-      "Frontier-class flash model for sustained agentic and structured Q&A performance.",
+      "Newest Flash flagship — strong for long-horizon agentic flows, complex enterprise Q&A, and structured legal chat.",
+  },
+  {
+    id: "gemini-3.7-flash",
+    label: "Gemini 3.7 Flash",
+    stability: "stable",
+    capabilityRank: 4,
+    costRank: 4,
+    capabilityLabel: "Very high flash",
+    costLabel: "Medium-high cost",
+    description:
+      "Previous-generation Flash for complex coding, agentic workflows, and reliable multi-step execution.",
+  },
+  {
+    id: "gemini-3.6-flash",
+    label: "Gemini 3.6 Flash",
+    stability: "stable",
+    capabilityRank: 5,
+    costRank: 5,
+    capabilityLabel: "High flash",
+    costLabel: "Medium cost",
+    description:
+      "Balances speed and multimodal capability across general agentic and everyday structured tasks.",
+  },
+  {
+    id: "gemini-3.5-flash",
+    label: "Gemini 3.5 Flash",
+    stability: "stable",
+    capabilityRank: 6,
+    costRank: 6,
+    capabilityLabel: "Strong flash",
+    costLabel: "Medium cost",
+    description:
+      "Legacy 3.5 Flash baseline — solid speed and throughput for routine, high-volume instruction chat.",
   },
   {
     id: "gemini-3-flash-preview",
     label: "Gemini 3 Flash",
     stability: "preview",
-    capabilityRank: 4,
-    costRank: 4,
+    capabilityRank: 7,
+    costRank: 7,
     capabilityLabel: "Strong general",
     costLabel: "Medium cost",
     description:
-      "Frontier performance at lower cost than Pro — good balance for production chat.",
+      "Frontier Flash performance at lower cost than Pro — good balance for production chat.",
   },
   {
     id: "gemini-2.5-flash",
     label: "Gemini 2.5 Flash",
     stability: "stable",
-    capabilityRank: 5,
-    costRank: 5,
+    capabilityRank: 8,
+    costRank: 8,
     capabilityLabel: "Balanced",
     costLabel: "Medium-low cost",
     recommended: true,
@@ -64,32 +98,43 @@ export const GEMINI_CHAT_MODELS = [
   },
   {
     id: "gemini-2.5-flash-preview-05-20",
-    label: "Gemini 2.5 Flash (Preview)",
+    label: "Gemini 2.5 Flash (Preview 05-20)",
     stability: "preview",
-    capabilityRank: 5,
-    costRank: 5,
+    capabilityRank: 8,
+    costRank: 8,
     capabilityLabel: "Balanced (preview)",
     costLabel: "Medium-low cost",
     description:
-      "Preview snapshot of 2.5 Flash — use for early access; prefer stable gemini-2.5-flash for production.",
+      "Dated preview snapshot of 2.5 Flash — prefer stable gemini-2.5-flash for production.",
+  },
+  {
+    id: "gemini-3.5-flash-lite",
+    label: "Gemini 3.5 Flash-Lite",
+    stability: "stable",
+    capabilityRank: 9,
+    costRank: 9,
+    capabilityLabel: "Fast / efficient",
+    costLabel: "Low cost",
+    description:
+      "Fastest, most cost-effective 3.5 Flash variant for high-throughput execution.",
   },
   {
     id: "gemini-3.1-flash-lite",
     label: "Gemini 3.1 Flash-Lite",
     stability: "stable",
-    capabilityRank: 6,
-    costRank: 6,
+    capabilityRank: 10,
+    costRank: 10,
     capabilityLabel: "Lightweight",
     costLabel: "Low cost",
     description:
-      "Fast, cost-efficient multimodal flash — suitable for simpler flows with tight budgets.",
+      "Frontier-class lite performance at a fraction of Pro/Flash cost — simpler flows with tight budgets.",
   },
   {
     id: "gemini-2.5-flash-lite",
     label: "Gemini 2.5 Flash-Lite",
     stability: "stable",
-    capabilityRank: 7,
-    costRank: 7,
+    capabilityRank: 11,
+    costRank: 11,
     capabilityLabel: "Fastest / lightest",
     costLabel: "Lowest cost",
     description:

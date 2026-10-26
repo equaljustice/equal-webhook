@@ -29,6 +29,7 @@ import {
   enforceLegacySessionGuards,
   getCyclePayableAmount,
   buildUnpaidPaymentGateResponse,
+  shouldIgnoreStalePaymentRequired,
 } from "./sessionGuards.js";
 import {
   buildFinalGenerationUserMessage,
@@ -414,7 +415,11 @@ async function handleFlowTurn({
   }
 
   // Payment barrier from flow engine
-  if (result.paymentRequired && !isSpecialAccess) {
+  if (
+    result.paymentRequired &&
+    !isSpecialAccess &&
+    !shouldIgnoreStalePaymentRequired(session, userMessage)
+  ) {
     applyPaymentBarrier(session, {
       isSpecialAccess,
       language: session.selectedLanguage,
@@ -431,6 +436,9 @@ async function handleFlowTurn({
       paymentRequired: true,
       paymentAmount,
     });
+  }
+  if (result.paymentRequired && shouldIgnoreStalePaymentRequired(session, userMessage)) {
+    result.paymentRequired = false;
   }
 
   // Final LLM generation — never invoke model until webhook confirms payment
@@ -485,7 +493,11 @@ async function handleFlowTurn({
       uploadInfo.multiSelect
     );
 
-    if (uploadInfo.paymentRequired && !isSpecialAccess) {
+    if (
+      uploadInfo.paymentRequired &&
+      !isSpecialAccess &&
+      !shouldIgnoreStalePaymentRequired(session, userMessage)
+    ) {
       const barrier = applyPaymentBarrier(session, {
         language: session.selectedLanguage,
       });
@@ -497,6 +509,12 @@ async function handleFlowTurn({
         nodeId: result.nodeId,
         phase: FLOW_STATES.WAITING_PAYMENT,
       });
+    }
+    if (
+      uploadInfo.paymentRequired &&
+      shouldIgnoreStalePaymentRequired(session, userMessage)
+    ) {
+      uploadInfo.paymentRequired = false;
     }
 
     if (uploadInfo.sessionTerminated) {
@@ -731,7 +749,11 @@ async function handleLegacyGeminiTurn({
 
   const flowOptions = [];
 
-  if (uploadInfo.paymentRequired && !isSpecialAccess) {
+  if (
+    uploadInfo.paymentRequired &&
+    !isSpecialAccess &&
+    !shouldIgnoreStalePaymentRequired(session, userMessage)
+  ) {
     const barrier = applyPaymentBarrier(session, {
       language:
         session.selectedLanguage || detectChatLanguageFromText(cleanMessage),
@@ -750,6 +772,12 @@ async function handleLegacyGeminiTurn({
       instructionCached: !!cachedContentName,
       ...legacyProgressFields(uploadInfo),
     };
+  }
+  if (
+    uploadInfo.paymentRequired &&
+    shouldIgnoreStalePaymentRequired(session, userMessage)
+  ) {
+    uploadInfo.paymentRequired = false;
   }
 
   applyDownloadSnapshot(

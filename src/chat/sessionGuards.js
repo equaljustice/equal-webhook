@@ -21,6 +21,8 @@ const REPEATABLE_PAYMENT_KEY_FRAGMENTS = [
   "emp-termination",
   "emp_termination",
   "employment-termination",
+  "ff-reconciliation",
+  "ff_reconciliation",
   "cheque-bouncing",
   "cheque_bouncing",
   "upi-fraud",
@@ -80,6 +82,16 @@ export function preparePaymentBarrierCycle(session) {
     paymentCycle,
     paymentAmount: getCyclePayableAmount(session, paymentCycle),
   };
+}
+
+/**
+ * After Razorpay webhook sets isPaid, the frontend auto-sends a "Payment completed…"
+ * user message. Models sometimes still emit payment_required:true on that turn, which
+ * would call preparePaymentBarrierCycle and wrongly open a new charge cycle.
+ */
+export function shouldIgnoreStalePaymentRequired(session, userMessage) {
+  if (!session?.isPaid) return false;
+  return /payment\s*completed/i.test(String(userMessage || ""));
 }
 
 /** Hard gate when instructions JSON has payment_required: true. */

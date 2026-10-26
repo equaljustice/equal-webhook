@@ -36,12 +36,14 @@ import { hasWebhookConfirmedPayment } from "../chat/paymentVerification.js";
 import {
   isAllowedUploadFile,
   UPLOAD_TYPE_ERROR,
+  MAX_UPLOAD_FILE_BYTES,
 } from "../utils/uploadFileTypes.js";
 import {
   uploadMulterFileToGemini,
   cleanupMulterFiles,
   linkUploadedFilesToSession,
 } from "../utils/geminiFileUpload.js";
+import { buildPostUploadAnalysisMessage } from "../chat/uploadFlowHints.js";
 import { resolveSessionGeminiConfig } from "../utils/geminiConfig.js";
 
 const router = express.Router();
@@ -51,7 +53,7 @@ const OPENAI_RUN_POLL_MAX_ATTEMPTS = 120;
 const upload = multer({
   dest: os.tmpdir(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: MAX_UPLOAD_FILE_BYTES,
   },
   fileFilter: (req, file, cb) => {
     if (isAllowedUploadFile(file)) {
@@ -392,8 +394,9 @@ router.post(
   jwtAuth,
   upload.array("documents", 10), // Support up to 10 files, field name: "documents"
   async (req, res) => {
+    // Hoist so catch can clean up — declaring inside try caused ReferenceError: files is not defined
+    const files = req.files || (req.file ? [req.file] : []);
     try {
-      const files = req.files || (req.file ? [req.file] : []); // Support both single and multiple
       const { sessionId } = req.body;
       const userId = req.user.id;
 
@@ -480,6 +483,7 @@ router.post(
         ...(fileErrors.length > 0 && { errors: fileErrors }),
       });
     } catch (error) {
+      console.error("upload-document failed:", error?.message || error);
       await cleanupMulterFiles(files);
       return res.status(500).json({
         error: "File upload failed",

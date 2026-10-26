@@ -52,6 +52,7 @@ import {
 import {
   isAllowedUploadFile,
   UPLOAD_TYPE_ERROR,
+  MAX_UPLOAD_FILE_BYTES,
 } from "../utils/uploadFileTypes.js";
 import { resolveSessionGeminiConfig } from "../utils/geminiConfig.js";
 
@@ -62,7 +63,7 @@ const OPENAI_RUN_POLL_MAX_ATTEMPTS = 120;
 const guestUpload = multer({
   dest: os.tmpdir(),
   limits: {
-    fileSize: 50 * 1024 * 1024,
+    fileSize: MAX_UPLOAD_FILE_BYTES,
   },
   fileFilter: (req, file, cb) => {
     if (isAllowedUploadFile(file)) {
