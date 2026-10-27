@@ -368,26 +368,79 @@ function extractControlJsonFromMessage(message) {
     if (fromLastLine) return fromLastLine;
   }
 
-  let lastKeyIdx = -1;
-  for (const key of activeControlKeys()) {
-    const idx = message.lastIndexOf(`"${key}"`);
-    if (idx > lastKeyIdx) lastKeyIdx = idx;
-  }
-  if (lastKeyIdx === -1) return null;
-
-  const startIdx = message.lastIndexOf("{", lastKeyIdx);
-  if (startIdx === -1) return null;
-
-  const jsonStr = extractBalancedJson(message, startIdx);
-  if (!jsonStr) return null;
-
-  try {
-    const metadata = JSON.parse(jsonStr);
-    if (!isControlMetadata(metadata)) return null;
-    return { jsonStr, metadata };
-  } catch {
+  if (!activeControlKeys().some((key) => message.includes(`"${key}"`))) {
     return null;
   }
+
+  // Outermost, last-ending balanced object whose TOP-LEVEL keys are control
+  // keys. Picking the nearest "{" before the last key landed inside nested
+  // session_state/answers objects (inline JSON) and lost the control block.
+  let best = null;
+  let pos = message.length;
+  for (let n = 0; n < CONTROL_JSON_SCAN_LIMIT; n++) {
+    const startIdx = message.lastIndexOf("{", pos - 1);
+    if (startIdx === -1) break;
+    pos = startIdx;
+    const jsonStr = extractBalancedJson(message, startIdx);
+    if (!jsonStr) continue;
+    const endIdx = startIdx + jsonStr.length;
+    if (best && endIdx < best.endIdx) continue;
+    let metadata;
+    try {
+      metadata = JSON.parse(jsonStr);
+    } catch {
+      continue;
+    }
+    if (!isControlMetadata(metadata)) continue;
+    best = { jsonStr, metadata, endIdx };
+  }
+  if (!best) return null;
+  return { jsonStr: best.jsonStr, metadata: best.metadata };
+}
+
+const CONTROL_JSON_SCAN_LIMIT = 200;
+
+/** Key tokens that only appear in control JSON ("key": …), never in prose. */
+const CONTROL_KEY_TOKEN_RE =
+  /"(upload_required|upload_type|upload_reason|session_terminated|termination_message|payment_required|multi_select|batch_form|document_ready|guest_signup_offer|selected_language|session_state)"\s*:/;
+
+export function hasControlKeyToken(message) {
+  return CONTROL_KEY_TOKEN_RE.test(String(message || ""));
+}
+
+function salvageFlag(text, key) {
+  return new RegExp(`"${key}"\\s*:\\s*(?:true|"true")`, "i").test(text);
+}
+
+function salvageString(text, key) {
+  const m = new RegExp(`"${key}"\\s*:\\s*"([^"\\\\]{1,200})"`).exec(text);
+  return m ? m[1] : null;
+}
+
+/**
+ * Control JSON was emitted but does not parse (e.g. missing brace). Read only
+ * explicit `"flag": true` pairs the model wrote; never keyword-scan the text.
+ */
+function salvageMalformedControl(message) {
+  const tail = message.slice(-300);
+  console.warn("[ControlParse] Control JSON present but unparseable", { tail });
+  const requiresUpload = salvageFlag(message, "upload_required");
+  const uploadType = salvageString(message, "upload_type");
+  const sessionTerminated = salvageFlag(message, "session_terminated");
+  return {
+    ...emptyUploadInfo(stripControlJsonFromDisplay(message)),
+    requiresUpload,
+    uploadType: requiresUpload ? uploadType || "initial" : null,
+    reason: requiresUpload ? salvageString(message, "upload_reason") : null,
+    sessionTerminated,
+    terminationMessage: sessionTerminated
+      ? salvageString(message, "termination_message") ||
+        terminationBarrierMessage(detectChatLanguageFromText(message))
+      : null,
+    paymentRequired: salvageFlag(message, "payment_required"),
+    multiSelect: salvageFlag(message, "multi_select"),
+    batchForm: salvageFlag(message, "batch_form"),
+  };
 }
 
 function extractBalancedJson(message, startIdx) {
@@ -666,10 +719,18 @@ export const extractUploadRequirement = (message) => {
           cleanMessage = cleanMessage.replace(/\s*\{[\s\n]*"document_type"[\s\S]*?\}\s*$/g, "").trim();
         }
 
+        const nestedState =
+          metadata.session_state && typeof metadata.session_state === "object"
+            ? metadata.session_state
+            : {};
         const progressFields = progressOn
           ? {
-              progress: normalizeProgress(metadata.progress),
-              batchLabel: normalizeBatchLabel(metadata.batch_label),
+              progress: normalizeProgress(
+                metadata.progress ?? nestedState.progress
+              ),
+              batchLabel: normalizeBatchLabel(
+                metadata.batch_label ?? nestedState.batch_label
+              ),
             }
           : {};
 
@@ -718,6 +779,12 @@ export const extractUploadRequirement = (message) => {
         parseError
       );
     }
+  }
+
+  // Unparseable control JSON: its key names contain "upload"/"terminate", so
+  // the keyword scan below must never see it.
+  if (hasControlKeyToken(message)) {
+    return salvageMalformedControl(message);
   }
 
   const lowerMessage = message.toLowerCase();
