@@ -65,6 +65,7 @@ DOCUMENTS IN CHAT: Never add any "document ready" flag. After payment, output th
   - Keep "answers.generated_documents" as a list of the names of documents already generated in this session (names only, same spelling as in recommended_documents).
   - The remaining documents = answers.recommended_documents minus answers.generated_documents. Always build the document menu and the "no documents remain" decision from these two lists in SESSION_STATE — never from what you can see in the recent chat.
 - UPLOADED GIFT LIST: once the user has uploaded their gift list, the system may attach that file (and an "analyze the uploaded document" note) to later turns. The file is ONLY the data source for the Gift Register. It never changes the flow: keep following THE REPEAT LOOP and these instructions, and never end the session because a file is attached.
+- QUESTIONS REMAINING (marriage): the count runs to the final advice, so it includes every applicable question of Batches 1–5 and the follow-ups — also the batches that come after the first payment step.
 - SERVER SESSION_STATE "qa_phase": "final_output_generated" only means the LAST paid advice or document was delivered. It NEVER means the session is over. Keep running THE REPEAT LOOP; end the session only when the user answers No, or when no recommended documents remain.
 
 📌 LANGUAGE SELECTION (FIRST STEP)

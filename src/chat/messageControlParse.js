@@ -8,6 +8,7 @@ import {
   isProgressEnabled,
   PROGRESS_CONTROL_KEYS,
   normalizeProgress,
+  normalizeQuestionsRemaining,
   normalizeBatchLabel,
 } from "./progressControl.js";
 
@@ -778,6 +779,9 @@ export const extractUploadRequirement = (message) => {
 
         return {
           ...progressFields,
+          questionsRemaining: normalizeQuestionsRemaining(
+            metadata.questions_remaining ?? nestedState.questions_remaining
+          ),
           requiresUpload:
             metadata.upload_required === true ||
             metadata.upload_required === "true",

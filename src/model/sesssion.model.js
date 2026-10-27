@@ -21,6 +21,7 @@ const sessionSchema = new mongoose.Schema({
       role: String,
       content: String,
       timestamp: { type: Date, default: Date.now },
+      questionsRemaining: { type: Number }, // dynamic progress (Assistant.config.dynamicProgress)
     },
   ],
   // Document upload fields

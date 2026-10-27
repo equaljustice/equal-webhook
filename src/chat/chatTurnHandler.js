@@ -172,7 +172,14 @@ export async function executeChatTurn({
       displayReply,
       !!result.batchForm
     );
-    session.messages.push({ role: "assistant", content: displayReply });
+    session.messages.push({
+      role: "assistant",
+      content: displayReply,
+      // Kept per message so the progress bar is rebuilt the same way after a reload.
+      ...(Number.isInteger(result.questionsRemaining)
+        ? { questionsRemaining: result.questionsRemaining }
+        : {}),
+    });
     result.reply = displayReply;
   }
 
@@ -230,6 +237,10 @@ export async function executeChatTurn({
     guestSignupOfferPending: result.guestSignupOfferPending || false,
     instructionCached: result.instructionCached || false,
   };
+
+  if (Number.isInteger(result.questionsRemaining)) {
+    payload.questionsRemaining = result.questionsRemaining;
+  }
 
   // JollyJi stepper — keys omitted entirely when the flag is off.
   if (isProgressEnabled()) {

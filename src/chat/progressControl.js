@@ -23,6 +23,26 @@ export function normalizeProgress(value) {
   return Math.min(100, Math.max(0, Math.round(n)));
 }
 
+/**
+ * Dynamic progress (Assistant.config.dynamicProgress): the model reports how many questions
+ * are still ahead for THIS user's branch; the client divides answered by answered + remaining.
+ */
+export const QUESTIONS_REMAINING_RULE =
+  '- QUESTIONS REMAINING: in the same last-line control JSON, always include top-level "questions_remaining": an integer = how many questions this user still has to answer before the final advice is generated: the questions asked in THIS message plus every later question that applies given the answers so far (branching included; questions after a payment step still count; a batch counts as its number of questions). Use 0 when no questions are pending (e.g. on the payment step after the last batch, the advice itself, documents). Never nest it inside session_state.';
+
+export function isDynamicProgressAssistant(assistant) {
+  return assistant?.config?.dynamicProgress === true;
+}
+
+/** Integer 0-500, or null when absent/invalid. Numeric strings accepted. */
+export function normalizeQuestionsRemaining(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.min(500, Math.round(n));
+}
+
 /** Short non-empty string, or null. */
 export function normalizeBatchLabel(value) {
   if (typeof value !== "string") return null;

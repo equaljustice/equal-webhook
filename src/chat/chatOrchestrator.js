@@ -68,7 +68,12 @@ import {
   advanceQaPhase,
   QA_PHASES,
 } from "./sessionStateProtocol.js";
-import { isProgressEnabled, computeFlowProgress } from "./progressControl.js";
+import {
+  isProgressEnabled,
+  computeFlowProgress,
+  isDynamicProgressAssistant,
+  QUESTIONS_REMAINING_RULE,
+} from "./progressControl.js";
 import {
   decideDocPaymentGuard,
   holdDocumentStream,
@@ -177,6 +182,7 @@ async function resolveInstructionLayers({
   }
 
   const dynamicParts = [getSessionStateProtocol()];
+  if (isDynamicProgressAssistant(assistant)) dynamicParts.push(QUESTIONS_REMAINING_RULE);
 
   if (isGuest) {
     const guestOverlay = appendGuestSystemInstruction("", session).trim();
@@ -595,7 +601,9 @@ async function handleLegacyGeminiTurn({
     session.qaPhase = QA_PHASES.QA_IN_PROGRESS;
   }
 
-  if (isGuest && userMessage === GUEST_BOOTSTRAP_MESSAGE) {
+  // Chat start sentinel: the server-owned language picker. Logged-in chats start the same way
+  // as guest chats (Sahil 2026-10-27), so no Gemini call and no "type to begin".
+  if (userMessage === GUEST_BOOTSTRAP_MESSAGE) {
     return finishGuestStaticTurn({
       session,
       reply: buildGuestLanguagePromptHtml(),
@@ -893,6 +901,9 @@ async function handleLegacyGeminiTurn({
     streaming: !!onStreamChunk,
     instructionCached: !!cachedContentName,
     ...legacyProgressFields(uploadInfo),
+    questionsRemaining: isDynamicProgressAssistant(assistant)
+      ? uploadInfo.questionsRemaining ?? null
+      : null,
   };
 }
 
