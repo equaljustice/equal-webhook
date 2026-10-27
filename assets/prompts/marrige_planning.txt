@@ -304,6 +304,7 @@ Immediately after generating the document:
 <h6>Would you like to generate another recommended document?</h6>
 (a) Yes<br>(b) No<br>
 4. If Yes → show updated document menu → PAYMENT BARRIER again before the next document.
+5. A "Yes" answer (e.g. "a", "(a) Yes") to this question NEVER ends the session — always show the remaining documents. Only "No", or no remaining documents, leads to FINAL TERMINATION.
 
 
 📌 GIFT REGISTER FLOW (SPECIAL INSTRUCTIONS TO GENERATE THE GIFT REGISTER / GIFT LEDGER)
