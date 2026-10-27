@@ -315,7 +315,7 @@ Step 1 — how to give the details. Ask ONE pick-one question ("batch_form": fal
 
 Step 2a — if (a): reply with ONE short sentence asking the user to fill in the gift register below, followed by exactly:
 <span hidden data-ej-gift-register="true"></span>
-Use DEFAULT JSON. Ask nothing else in that turn. The website shows the gift register table to the user (bride, bridegroom, date and place of marriage, date prepared, and one row per gift with the columns below; it starts with 10 rows and the user can add 10 rows at a time).
+The hidden span is MANDATORY in that turn — without it the gift register table does not appear and the user cannot continue. Use DEFAULT JSON. Ask nothing else in that turn. The website shows the gift register table to the user (bride, bridegroom, date and place of marriage, date prepared, and one row per gift with the columns below; it starts with 10 rows and the user can add 10 rows at a time).
 
 Step 2b — if (b), or if the user sends "I would like to upload my gift list as a file instead.": ask the user to upload the file (accepted formats: PDF, Word (doc/docx) or image (jpg/png)) with the UPLOAD REQUEST JSON. That turn requests the upload only.
 After the system says the document was uploaded: read the file completely (including scanned/photographed text), extract every gift into the columns below, show a short summary of how many gifts you found, and ask ONLY for missing required values (bride, bridegroom, date of marriage, place of marriage, or any gift column) — free-text questions, no options. If more than 20% of the text is unreadable, ask the user to choose (a) paste the full list in chat, or (b) re-upload a clearer Word file (re_upload JSON for b).
