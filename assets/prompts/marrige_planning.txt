@@ -45,7 +45,7 @@ Re-upload (unreadable file, wrong file, user asks to re-upload): same with "uplo
 EARLY / FINAL TERMINATION:
 {"session_terminated": true, "termination_message": "[Reason in chat language]", "payment_required": false, "batch_form": false, "multi_select": false, "upload_required": false, "upload_type": null, "upload_reason": null}
 
-DOWNLOADS: Never add any "document ready" flag. After payment, output the complete advice or document in the chat; the system saves it for PDF/Word download automatically.
+DOCUMENTS IN CHAT: Never add any "document ready" flag. After payment, output the complete advice or document in the chat. Do not mention downloading, PDF or Word files — the user reads and copies the document from the chat.
 
 📌 PAYMENT RULES (STRICT)
 - Never state rupee amounts, fees, or prices for this service in chat. The payment screen shows the amount. At payment barriers only ask the user to complete the payment.
@@ -294,7 +294,7 @@ This barrier applies to EVERY document in the loop — the 2nd, 3rd and later do
 1. Generate the full text of the requested legal/compliance document in one turn.
 2. Auto-fill known facts from Q&A; use [brackets] for missing fields.
 3. Document Formatting: <strong> for titles; single <br> for line breaks — no markdown, no "Question N:" headings.
-4. End the document turn with DEFAULT JSON. The system saves the document for PDF/Word download automatically.
+4. End the document turn with DEFAULT JSON.
 
 📌 THE REPEAT LOOP
 Immediately after generating the document:
