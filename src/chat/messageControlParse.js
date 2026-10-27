@@ -394,8 +394,50 @@ function extractControlJsonFromMessage(message) {
     if (!isControlMetadata(metadata)) continue;
     best = { jsonStr, metadata, endIdx };
   }
-  if (!best) return null;
+  if (!best) return repairTruncatedControlJson(message);
   return { jsonStr: best.jsonStr, metadata: best.metadata };
+}
+
+const CONTROL_JSON_START_RE =
+  /\{\s*"(?:upload_required|session_terminated|payment_required|batch_form|multi_select|session_state)"\s*:/g;
+const TRAILING_HIDDEN_MARKERS_RE = /(?:\s*<span\s+hidden[^>]*>\s*<\/span>)+\s*$/i;
+
+/**
+ * Large control JSON (e.g. a gift register copied into session_state) sometimes ends one or
+ * more brackets short ("…}]}}" for an object that needs "…}]}}}"). Starting at the last
+ * "{" that opens a control object, close whatever is still open, in order, and parse.
+ */
+function repairTruncatedControlJson(message) {
+  let startIdx = -1;
+  for (const m of message.matchAll(CONTROL_JSON_START_RE)) startIdx = m.index ?? startIdx;
+  if (startIdx === -1) return null;
+  const body = message.slice(startIdx).replace(TRAILING_HIDDEN_MARKERS_RE, "").trimEnd();
+  const stack = [];
+  let inString = false;
+  let escapeNext = false;
+  let end = body.length;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (escapeNext) { escapeNext = false; continue; }
+    if (ch === "\\") { escapeNext = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{" || ch === "[") stack.push(ch === "{" ? "}" : "]");
+    else if (ch === "}" || ch === "]") {
+      if (stack.pop() !== ch) return null;
+      if (stack.length === 0) { end = i + 1; break; }
+    }
+  }
+  if (inString) return null;
+  const jsonStr = body.slice(0, end) + stack.reverse().join("");
+  try {
+    const metadata = JSON.parse(jsonStr);
+    if (!isControlMetadata(metadata)) return null;
+    console.warn("[ControlParse] Repaired truncated control JSON", { closed: stack.length });
+    return { jsonStr: body.slice(0, end), metadata };
+  } catch {
+    return null;
+  }
 }
 
 const CONTROL_JSON_SCAN_LIMIT = 200;

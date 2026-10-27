@@ -129,3 +129,52 @@ test("no control JSON at all → legacy keyword fallback unchanged", () => {
   const plain = extractUploadRequirement(PAY_TEXT);
   assert.deepEqual(flags(plain), { pay: false, term: false, upl: false, batch: false });
 });
+
+// Live 2026-10-27 (marriage v2 browser walks): the model copied the whole gift register into
+// session_state.answers and the control JSON ended one brace short ("…}]}}"), followed by a
+// hidden batch marker. 9 turns were unparseable; the session later ended on "(a) Yes".
+const register = Array.from({ length: 4 }, (_, i) => ({
+  nature_of_gift: "Ordinary goods / gifts like clothes, watch, accessory household goods etc.",
+  approx_value: `${(i + 1) * 10},000`,
+  giver_name: "Neha Jain",
+  relationship: "Bride's aunt",
+  ownership: "Individually / sole owner",
+}));
+const fullJson = (flags) =>
+  JSON.stringify({
+    session_terminated: false,
+    termination_message: null,
+    payment_required: false,
+    batch_form: false,
+    multi_select: false,
+    upload_required: false,
+    upload_type: null,
+    upload_reason: null,
+    ...flags,
+    session_state: { current_step: "doc_loop", language: "en", answers: { gift_register: register } },
+  });
+
+test("repairs control JSON truncated by one brace, with a trailing hidden marker", () => {
+  const truncated = fullJson({ payment_required: true }).slice(0, -1);
+  const msg = `To generate your customized draft for Gift Register, please complete the payment.\n${truncated}<span hidden data-ej-batch-form="true"></span>`;
+  const info = extractUploadRequirement(msg);
+  assert.equal(info.paymentRequired, true);
+  assert.equal(info.sessionTerminated, false);
+  assert.equal(info.requiresUpload, false);
+  assert.ok(!/"session_state"/.test(info.cleanMessage));
+});
+
+test("repaired JSON keeps an explicit session_terminated:false on a Yes turn", () => {
+  const truncated = fullJson({}).slice(0, -2);
+  const msg = `<h6>Which document would you like to generate now?</h6>\n(a) Gift Declaration<br>\n${truncated}`;
+  const info = extractUploadRequirement(msg);
+  assert.equal(info.sessionTerminated, false);
+  assert.equal(info.paymentRequired, false);
+});
+
+test("well-formed control JSON parses exactly as before (no repair path)", () => {
+  const msg = `Hello<br>\n${fullJson({ batch_form: true })}`;
+  const info = extractUploadRequirement(msg);
+  assert.equal(info.batchForm, true);
+  assert.equal(info.sessionTerminated, false);
+});

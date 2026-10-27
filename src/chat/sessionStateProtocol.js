@@ -77,6 +77,9 @@ export function defaultSessionState(session = {}) {
   };
 }
 
+/** Answer values above this size are dropped when merging session_state from the model. */
+export const MAX_ANSWER_JSON_CHARS = 1000;
+
 export function mergeSessionStateFromModel(session, sessionState = {}) {
   if (!sessionState || typeof sessionState !== "object") return;
 
@@ -94,6 +97,11 @@ export function mergeSessionStateFromModel(session, sessionState = {}) {
   }
   if (sessionState.answers && typeof sessionState.answers === "object") {
     const fromModel = { ...sessionState.answers };
+    // Keep the per-turn session_state overlay small: a model that copies a whole gift register
+    // or document into answers produces control JSON too large to parse reliably.
+    for (const [key, value] of Object.entries(fromModel)) {
+      if (JSON.stringify(value ?? null).length > MAX_ANSWER_JSON_CHARS) delete fromModel[key];
+    }
     if (!session.languageConfirmedByUser) {
       delete fromModel.language;
     }
