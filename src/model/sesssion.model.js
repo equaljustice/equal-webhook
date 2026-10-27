@@ -27,6 +27,7 @@ const sessionSchema = new mongoose.Schema({
   isDocUploadRequired: { type: Boolean, default: false },
   uploadedFileId: { type: String }, // Legacy: kept for backward compatibility
   uploadedFileIds: { type: [String], default: [] }, // Array for multiple file uploads
+  consumedFileIds: { type: [String], default: [] }, // uploads no longer attached (detachUploadsAfterDocument)
   uploadAttempts: { type: Number, default: 0 },
   isDocUploaded: { type: Boolean, default: false },
   supportsMultipleUploads: { type: Boolean, default: false }, // Whether this session supports multiple file uploads

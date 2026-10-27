@@ -79,7 +79,10 @@ export function collectFilesToUse(session, fileId) {
   } else if (fileId) {
     files.push(fileId);
   }
-  return files;
+  // Files already used for a paid document (detachUploadsAfterDocument) are not re-attached;
+  // a new upload has a new id and is attached as usual.
+  const consumed = new Set(session.consumedFileIds || []);
+  return consumed.size ? files.filter((id) => !consumed.has(id)) : files;
 }
 
 export function applyUploadFlagsFromResult(session, result) {

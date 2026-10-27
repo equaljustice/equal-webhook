@@ -854,12 +854,19 @@ async function handleLegacyGeminiTurn({
     uploadInfo.paymentRequired = false;
   }
 
-  applyDownloadSnapshot(
+  const documentSaved = applyDownloadSnapshot(
     session,
     session._id || session.guestSessionId,
     uploadInfo,
     cleanMessage
   );
+  // Assistants that use an upload only as a data source for one document (marriage gift
+  // register): once that paid document is produced, stop attaching the file to later turns.
+  // With the file attached, the model read "analyze only the uploaded document" and ended the
+  // session on "Yes" in the document loop (browser walks, 2026-10-27).
+  if (documentSaved && assistant?.config?.detachUploadsAfterDocument === true && filesToUse?.length) {
+    session.consumedFileIds = [...new Set([...(session.consumedFileIds || []), ...filesToUse])];
+  }
 
   const guestSignupOfferPending =
     isGuest &&
