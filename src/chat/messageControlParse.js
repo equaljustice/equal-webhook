@@ -61,6 +61,10 @@ export const buildDocumentDataFromMessage = (cleanMessage, session, llmDocData) 
 
 export const DOCUMENT_SNAPSHOT_MIN_LENGTH = 200;
 
+/** Gift Register intro turn (JollyJi renders the register table) — never a deliverable. */
+export const GIFT_REGISTER_MARKER_RE =
+  /data-ej-gift-register\s*=\s*["']?(?:1|true|yes)["']?/i;
+
 export const findLastSubstantiveMessage = (session) => {
   const messages = session.messages || [];
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -88,6 +92,7 @@ export function inferDownloadSnapshot(session, uploadInfo, cleanMessage) {
   const text = String(cleanMessage || "").trim();
   if (text.length < DOCUMENT_SNAPSHOT_MIN_LENGTH) return false;
   if (/Question\s+\d+\s*:/i.test(text)) return false;
+  if (GIFT_REGISTER_MARKER_RE.test(text)) return false;
   return true;
 }
 
@@ -267,6 +272,33 @@ export function paymentBarrierMessage(language) {
     case "en":
     default:
       return "Thank you for completing all the questions. To receive your personalized assessment, please complete the payment.";
+  }
+}
+
+/** Barrier copy for later payment cycles (one payment per document). */
+export function documentPaymentBarrierMessage(language) {
+  switch (language) {
+    case "hi":
+      return "अपना चुना हुआ दस्तावेज़ तैयार करने के लिए कृपया भुगतान पूरा करें।";
+    case "bn":
+      return "আপনার নির্বাচিত নথি তৈরি করতে অনুগ্রহ করে অর্থপ্রদান সম্পূর্ণ করুন।";
+    case "gu":
+      return "તમારો પસંદ કરેલો દસ્તાવેજ તૈયાર કરવા માટે કૃપા કરીને ચુકવણી પૂર્ણ કરો.";
+    case "pa":
+      return "ਆਪਣਾ ਚੁਣਿਆ ਹੋਇਆ ਦਸਤਾਵੇਜ਼ ਤਿਆਰ ਕਰਨ ਲਈ ਕਿਰਪਾ ਕਰਕੇ ਭੁਗਤਾਨ ਪੂਰਾ ਕਰੋ।";
+    case "ta":
+      return "நீங்கள் தேர்ந்தெடுத்த ஆவணத்தை உருவாக்க, தயவுசெய்து கட்டணத்தை நிறைவு செய்யுங்கள்.";
+    case "te":
+      return "మీరు ఎంచుకున్న పత్రాన్ని రూపొందించడానికి దయచేసి చెల్లింపును పూర్తి చేయండి.";
+    case "kn":
+      return "ನೀವು ಆಯ್ಕೆ ಮಾಡಿದ ದಾಖಲೆಯನ್ನು ರಚಿಸಲು ದಯವಿಟ್ಟು ಪಾವತಿಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ.";
+    case "or":
+      return "ଆପଣ ବାଛିଥିବା ଦଲିଲ ପ୍ରସ୍ତୁତ କରିବାକୁ ଦୟାକରି ଦେୟ ପୂରଣ କରନ୍ତୁ।";
+    case "ur":
+      return "اپنی منتخب کردہ دستاویز تیار کرنے کے لیے براہ کرم ادائیگی مکمل کریں۔";
+    case "en":
+    default:
+      return "To generate your selected document, please complete the payment.";
   }
 }
 

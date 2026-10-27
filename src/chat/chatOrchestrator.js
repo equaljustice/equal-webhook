@@ -69,6 +69,19 @@ import {
   QA_PHASES,
 } from "./sessionStateProtocol.js";
 import { isProgressEnabled, computeFlowProgress } from "./progressControl.js";
+import {
+  decideDocPaymentGuard,
+  holdDocumentStream,
+  isDocPaymentGuardArmed,
+} from "./docPaymentGuard.js";
+
+function lastAssistantContent(session) {
+  const messages = session.messages || [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === "assistant") return messages[i].content || "";
+  }
+  return "";
+}
 
 /**
  * Initialize flow on new session when orchestrator is enabled.
@@ -609,6 +622,9 @@ async function handleLegacyGeminiTurn({
   const unpaidGate = buildUnpaidPaymentGateResponse(session, {
     isSpecialAccess,
     language: session.selectedLanguage,
+    assistant,
+    modelMessage: lastAssistantContent(session),
+    cycleAwareCopy: true,
   });
   if (unpaidGate) {
     if (onStreamChunk && unpaidGate.reply) {
@@ -627,6 +643,17 @@ async function handleLegacyGeminiTurn({
   ) {
     session.qaPhase = QA_PHASES.READY_FOR_FINAL;
   }
+
+  // JOLLYJI_ENFORCE_DOC_PAYMENT: phase before advanceQaPhase decides whether
+  // this cycle's paid deliverable is already consumed. Unarmed → no-op.
+  const phaseAtTurnStart = session.qaPhase;
+  const docGuardArmed = isDocPaymentGuardArmed({
+    session,
+    assistant,
+    phaseAtTurnStart,
+    isSpecialAccess,
+  });
+  const turnStreamChunk = holdDocumentStream(onStreamChunk, docGuardArmed);
 
   const sourceConfig = session.geminiConfig || {};
   let cachedContentName = null;
@@ -656,7 +683,7 @@ async function handleLegacyGeminiTurn({
     systemInstructionText: cachedContentName ? undefined : layers.fullInlineText,
     cachedContentName: cachedContentName || undefined,
     contents,
-    onChunk: onStreamChunk,
+    onChunk: turnStreamChunk,
   };
 
   let assistantMessage;
@@ -749,6 +776,50 @@ async function handleLegacyGeminiTurn({
 
   const flowOptions = [];
 
+  if (docGuardArmed) {
+    const docGuard = decideDocPaymentGuard({
+      session,
+      assistant,
+      uploadInfo,
+      cleanMessage,
+      userMessage,
+      phaseAtTurnStart,
+      isSpecialAccess,
+    });
+    if (docGuard.enforce) {
+      const language =
+        session.selectedLanguage || detectChatLanguageFromText(cleanMessage);
+      const barrier = applyPaymentBarrier(session, {
+        language,
+        assistant,
+        cycleAwareCopy: true,
+      });
+      session.qaPhase = QA_PHASES.WAITING_PAYMENT;
+      console.warn("[DocPaymentGuard] Withheld unpaid document; payment barrier raised", {
+        sessionId: session._id || session.guestSessionId,
+        assistantKey: session.assistantKey || assistant?.key,
+        phaseAtTurnStart,
+        paymentCycle: barrier.paymentCycle,
+        withheldChars: String(cleanMessage || "").length,
+      });
+      if (onStreamChunk && barrier.cleanMessage) {
+        onStreamChunk(barrier.cleanMessage, barrier.cleanMessage);
+      }
+      return {
+        reply: barrier.cleanMessage,
+        paymentRequired: true,
+        paymentAmount: barrier.paymentAmount,
+        paymentCycle: barrier.paymentCycle,
+        sessionTerminated: false,
+        flowMode: false,
+        flowOptions,
+        streaming: !!onStreamChunk,
+        instructionCached: !!cachedContentName,
+        ...legacyProgressFields(uploadInfo),
+      };
+    }
+  }
+
   if (
     uploadInfo.paymentRequired &&
     !isSpecialAccess &&
@@ -757,6 +828,9 @@ async function handleLegacyGeminiTurn({
     const barrier = applyPaymentBarrier(session, {
       language:
         session.selectedLanguage || detectChatLanguageFromText(cleanMessage),
+      assistant,
+      modelMessage: cleanMessage,
+      cycleAwareCopy: true,
     });
     session.qaPhase = QA_PHASES.WAITING_PAYMENT;
     cleanMessage = barrier.cleanMessage;

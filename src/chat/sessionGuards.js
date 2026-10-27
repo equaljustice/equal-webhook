@@ -1,4 +1,9 @@
-import { paymentBarrierMessage, detectChatLanguageFromText } from "./messageControlParse.js";
+import {
+  paymentBarrierMessage,
+  documentPaymentBarrierMessage,
+  detectChatLanguageFromText,
+  GIFT_REGISTER_MARKER_RE,
+} from "./messageControlParse.js";
 import { FLOW_STATES } from "../flow/flowConstants.js";
 import { buildControlJson } from "../flow/flowContent.js";
 import { isUnpaidPaymentGate } from "./sessionAccess.js";
@@ -94,9 +99,59 @@ export function shouldIgnoreStalePaymentRequired(session, userMessage) {
   return /payment\s*completed/i.test(String(userMessage || ""));
 }
 
+const MODEL_PAYMENT_WORD_RE =
+  /payment|\bpay\b|भुगतान|पेमेंट|অর্থপ্রদান|পেমেন্ট|ચુકવણી|ਭੁਗਤਾਨ|கட்டண|చెల్లింపు|ಪಾವತಿ|ଦେୟ|ادائیگی/i;
+const MODEL_PRICE_RE = /₹|\bRs\.?\s*\d|\bINR\b|\brupees?\b|रुपये|रुपए/i;
+const MODEL_PAYMENT_MESSAGE_MAX_VISIBLE = 600;
+
+/**
+ * Model's own barrier sentence (e.g. "To generate your customized draft for
+ * Gift Register, please complete the payment."), or null when it is missing,
+ * long, a question/register turn, or states a price (the Pay UI owns amounts).
+ */
+export function pickModelPaymentMessage(modelMessage) {
+  const text = String(modelMessage || "").trim();
+  if (!text) return null;
+  const visible = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  if (!visible || visible.length > MODEL_PAYMENT_MESSAGE_MAX_VISIBLE) return null;
+  if (/Question\s+\d+\s*:/i.test(text)) return null;
+  if (GIFT_REGISTER_MARKER_RE.test(text)) return null;
+  if (!MODEL_PAYMENT_WORD_RE.test(visible)) return null;
+  if (MODEL_PRICE_RE.test(visible)) return null;
+  return text;
+}
+
+/**
+ * Barrier copy. Cycle 0 (and non-repeatable assistants, and callers that do not
+ * opt in) keep the original assessment text; later cycles on repeatable
+ * assistants are per-document payments.
+ */
+export function resolvePaymentBarrierCopy(
+  session,
+  { paymentCycle, language, modelMessage, assistant, cycleAwareCopy = false }
+) {
+  if (
+    cycleAwareCopy &&
+    (paymentCycle || 0) >= 1 &&
+    isRepeatablePaymentAssistant(session, assistant)
+  ) {
+    return (
+      pickModelPaymentMessage(modelMessage) ||
+      documentPaymentBarrierMessage(language)
+    );
+  }
+  return paymentBarrierMessage(language);
+}
+
 /** Hard gate when instructions JSON has payment_required: true. */
 export function applyPaymentBarrier(session, options = {}) {
-  const { isSpecialAccess = false, language } = options;
+  const {
+    isSpecialAccess = false,
+    language,
+    modelMessage,
+    assistant,
+    cycleAwareCopy = false,
+  } = options;
   if (isSpecialAccess) {
     return { activated: false };
   }
@@ -110,7 +165,13 @@ export function applyPaymentBarrier(session, options = {}) {
 
   return {
     activated: true,
-    cleanMessage: paymentBarrierMessage(lang),
+    cleanMessage: resolvePaymentBarrierCopy(session, {
+      paymentCycle,
+      language: lang,
+      modelMessage,
+      assistant,
+      cycleAwareCopy,
+    }),
     paymentRequired: true,
     paymentAmount,
     paymentCycle,
@@ -124,7 +185,13 @@ export function applyPaymentBarrier(session, options = {}) {
  */
 export function buildUnpaidPaymentGateResponse(
   session,
-  { isSpecialAccess = false, language } = {}
+  {
+    isSpecialAccess = false,
+    language,
+    assistant,
+    modelMessage,
+    cycleAwareCopy = false,
+  } = {}
 ) {
   if (!isUnpaidPaymentGate(session, { isSpecialAccess })) return null;
 
@@ -135,7 +202,13 @@ export function buildUnpaidPaymentGateResponse(
     detectChatLanguageFromText(session.messages?.slice(-1)[0]?.content || "");
 
   return {
-    reply: paymentBarrierMessage(lang),
+    reply: resolvePaymentBarrierCopy(session, {
+      paymentCycle,
+      language: lang,
+      modelMessage,
+      assistant,
+      cycleAwareCopy,
+    }),
     paymentRequired: true,
     paymentAmount: getCyclePayableAmount(session, paymentCycle),
     paymentCycle,
