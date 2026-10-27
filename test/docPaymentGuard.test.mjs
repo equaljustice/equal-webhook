@@ -189,3 +189,14 @@ test("unpaid reminder: cycle ≥1 reuses last barrier sentence; cycle 0 unchange
   assert.equal(r0.reply, paymentBarrierMessage("en"));
   assert.equal(r0.paymentAmount, 499);
 });
+
+test("document barrier: an echoed cycle-0 assessment sentence falls back to document copy", async () => {
+  const { pickModelPaymentMessage, isAssessmentBarrierCopy } = await import("../src/chat/sessionGuards.js");
+  const { paymentBarrierMessage } = await import("../src/chat/messageControlParse.js");
+  const echoed = paymentBarrierMessage("en");
+  assert.equal(isAssessmentBarrierCopy(echoed), true);
+  assert.equal(pickModelPaymentMessage(echoed), null);
+  assert.equal(pickModelPaymentMessage(paymentBarrierMessage("hi")), null);
+  const own = "To generate your customized draft for Gift Register, please complete the payment.";
+  assert.equal(pickModelPaymentMessage(own), own);
+});

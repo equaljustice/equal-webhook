@@ -118,7 +118,22 @@ export function pickModelPaymentMessage(modelMessage) {
   if (GIFT_REGISTER_MARKER_RE.test(text)) return null;
   if (!MODEL_PAYMENT_WORD_RE.test(visible)) return null;
   if (MODEL_PRICE_RE.test(visible)) return null;
+  // The model often echoes the cycle-0 "personalized assessment" sentence it saw earlier in
+  // the chat; that copy is wrong for a document payment, so fall back to document copy.
+  if (isAssessmentBarrierCopy(visible)) return null;
   return text;
+}
+
+const ASSESSMENT_BARRIER_LANGS = ["en", "hi", "bn", "gu", "pa", "ta", "te", "kn", "or", "ur"];
+const normalizeCopy = (s) => String(s || "").replace(/\s+/g, " ").trim();
+
+/** True when text is (or contains) the cycle-0 assessment barrier sentence, any language. */
+export function isAssessmentBarrierCopy(visibleText) {
+  const text = normalizeCopy(visibleText);
+  return ASSESSMENT_BARRIER_LANGS.some((lang) => {
+    const copy = normalizeCopy(paymentBarrierMessage(lang));
+    return copy && text.includes(copy);
+  });
 }
 
 /**
