@@ -28,7 +28,10 @@ export const RECOMMENDED_SUPPORTS_MULTIPLE_UPLOADS = {
   "check-my-rent-agreement": false,
   check_my_will: false,
   side_project: false,
-  service_bond: false, // prompt: after EACH upload, request NEXT (sequential)
+  // Sequential (bond → contract → notice), but every file is needed for the final
+  // assessment: with false each upload REPLACED the previous one and the bond was
+  // lost (QA 2026-10-30 F6). true keeps all files.
+  service_bond: true,
   "get-security-deposit": false,
   "tenant-eviction-rent-recovery": false,
   "goa-inheritance-guide": false,
@@ -61,9 +64,9 @@ export const RECOMMENDED_SUPPORTS_MULTIPLE_UPLOADS = {
 
 function promptSays(key) {
   const multi = RECOMMENDED_SUPPORTS_MULTIPLE_UPLOADS[key];
+  if (key === "service_bond") return "SEQUENTIAL, all kept (bond→contract→notice)";
   if (multi === true) return "MULTI (batch files in one turn)";
   if (multi === false) {
-    if (key === "service_bond") return "SEQUENTIAL single (bond→contract→notice)";
     if (
       [
         "check-my-rent-agreement",

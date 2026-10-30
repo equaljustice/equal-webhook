@@ -315,6 +315,11 @@ export function detectChatLanguageFromText(text = "") {
   return "en";
 }
 
+function hasUploadReason(reason) {
+  const r = typeof reason === "string" ? reason.trim() : "";
+  return !!r && !/^(null|none|n\/a)$/i.test(r);
+}
+
 export function paymentBarrierMessage(language) {
   switch (language) {
     case "hi":
@@ -878,10 +883,16 @@ export const extractUploadRequirement = (message) => {
           questionsRemaining: normalizeQuestionsRemaining(
             metadata.questions_remaining ?? nestedState.questions_remaining
           ),
+          // The protocol sets upload_reason only on upload turns; a reason with
+          // upload_required:false is a model slip that left the user without an
+          // Upload button (QA 2026-10-30 F6, service_bond 2nd upload).
           requiresUpload:
             metadata.upload_required === true ||
-            metadata.upload_required === "true",
-          uploadType: metadata.upload_type || null,
+            metadata.upload_required === "true" ||
+            hasUploadReason(metadata.upload_reason),
+          uploadType:
+            metadata.upload_type ||
+            (hasUploadReason(metadata.upload_reason) ? "initial" : null),
           reason: metadata.upload_reason || null,
           sessionTerminated:
             metadata.session_terminated === true ||
