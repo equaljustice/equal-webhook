@@ -262,6 +262,18 @@ async function resolveSystemInstruction({
   return text;
 }
 
+/**
+ * Nothing for the user to see and nothing to act on: blank, or control JSON only
+ * (tax_residency 2026-10-30 live: a turn of bare JSON left the chat with no reply).
+ * Payment / upload / end turns may legitimately carry no text — the server fills it.
+ */
+function isVisiblyEmptyTurn(raw) {
+  if (!String(raw ?? "").trim()) return true;
+  const info = extractUploadRequirement(raw);
+  if (info.paymentRequired || info.requiresUpload || info.sessionTerminated) return false;
+  return !String(info.cleanMessage || "").replace(/<[^>]*>/g, " ").trim();
+}
+
 function wrapStreamChunkForDisplay(onStreamChunk) {
   if (!onStreamChunk) return undefined;
   return (_chunk, rawFull) => {
@@ -716,6 +728,7 @@ async function handleLegacyGeminiTurn({
   try {
     assistantMessage = await withTurnRetry(() => streamGeminiChat(streamOpts), {
       context: { sessionId: session._id || session.guestSessionId },
+      isEmpty: isVisiblyEmptyTurn,
     });
   } catch (geminiErr) {
     const staleCache =

@@ -51,3 +51,11 @@ test("non-transient errors (e.g. stale cache) are not retried here", async () =>
   await assert.rejects(withTurnRetry(call, quiet), /cachedContent/);
   assert.equal(call.calls(), 1);
 });
+
+test("a caller's isEmpty test decides (e.g. control-JSON-only replies)", async () => {
+  process.env.JOLLYJI_TURN_RETRY = "true";
+  const call = seq('{"payment_required": false}', "Question 6: …");
+  const isEmpty = (raw) => raw.trim().startsWith("{");
+  assert.equal(await withTurnRetry(call, { ...quiet, isEmpty }), "Question 6: …");
+  assert.equal(call.calls(), 2);
+});

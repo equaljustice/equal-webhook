@@ -25,9 +25,12 @@ export function isEmptyModelReply(text) {
 
 /**
  * Runs `call` and retries once when it throws a transient error or returns an empty
- * reply. Non-transient errors are re-thrown unchanged (callers keep their handling).
+ * reply (`isEmpty`: by default blank text; callers pass a control-JSON-aware test). Non-transient errors are re-thrown unchanged (callers keep their handling).
  */
-export async function withTurnRetry(call, { log = console, context = {} } = {}) {
+export async function withTurnRetry(
+  call,
+  { log = console, context = {}, isEmpty = isEmptyModelReply } = {}
+) {
   if (!isTurnRetryEnabled()) return call();
   let first;
   try {
@@ -37,7 +40,7 @@ export async function withTurnRetry(call, { log = console, context = {} } = {}) 
     log.warn?.("[TurnRetry] transient model error — retrying once", { ...context, message: err?.message });
     return call();
   }
-  if (!isEmptyModelReply(first)) return first;
+  if (!isEmpty(first)) return first;
   log.warn?.("[TurnRetry] empty model reply — retrying once", context);
   return call();
 }
