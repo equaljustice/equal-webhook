@@ -1,3 +1,4 @@
+import { declineAdditionalPayment } from "../chat/declineAdditionalPayment.js";
 import express from "express";
 import {
   effectiveDocDownloadAvailable,
@@ -535,6 +536,31 @@ router.post("/guest/signup-offer-response", async (req, res) => {
       error: err.message,
       message: "Failed to record signup offer response",
     });
+  }
+});
+
+// Optional additional document (cycle >= 1): "No thanks" ends the chat without a charge.
+router.post("/guest/decline-payment", async (req, res) => {
+  try {
+    const decoded = requireGuestContext(req, res);
+    if (!decoded) return;
+    const { guestSessionId } = req.body || {};
+    if (!guestSessionId || decoded.guestSessionId !== guestSessionId) {
+      return res.status(403).json({ error: "guestSessionId does not match guest-token" });
+    }
+    const session = await getGuestSession(guestSessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Guest session not found or expired" });
+    }
+    const declined = declineAdditionalPayment(session);
+    if (!declined) {
+      return res.status(409).json({ error: "This payment cannot be declined" });
+    }
+    await putGuestSession(guestSessionId, session);
+    return res.json(declined);
+  } catch (err) {
+    console.error("guest/decline-payment", err);
+    return res.status(500).json({ error: err.message });
   }
 });
 

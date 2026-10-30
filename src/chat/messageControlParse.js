@@ -399,7 +399,7 @@ export function documentPaymentBarrierMessage(language) {
   }
 }
 
-function terminationBarrierMessage(language) {
+export function terminationBarrierMessage(language) {
   switch (language) {
     case "hi":
       return "आपका सेशन समाप्त हो गया है। आप बाहर निकल सकते हैं या नया सेशन शुरू कर सकते हैं।";

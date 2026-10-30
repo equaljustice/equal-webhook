@@ -1,3 +1,4 @@
+import { declineAdditionalPayment } from "../chat/declineAdditionalPayment.js";
 import express from "express";
 import {
   effectiveDocDownloadAvailable,
@@ -496,6 +497,26 @@ router.post(
     }
   }
 );
+
+// Optional additional document (cycle >= 1): "No thanks" ends the chat without a charge.
+router.post("/decline-payment/:sessionId", jwtAuth, async (req, res) => {
+  try {
+    const session = await Session.findById(req.params.sessionId);
+    if (!session) return res.status(404).json({ error: "Session not found" });
+    if (String(session.userId) !== String(req.user.id)) {
+      return res.status(403).json({ error: "Not your session" });
+    }
+    const declined = declineAdditionalPayment(session);
+    if (!declined) {
+      return res.status(409).json({ error: "This payment cannot be declined" });
+    }
+    await session.save();
+    return res.json(declined);
+  } catch (err) {
+    console.error("decline-payment", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
 
 //Send Message
 router.post("/send-message-stream", jwtAuth, async (req, res) => {
