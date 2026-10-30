@@ -1,3 +1,4 @@
+import { applyPromptHygiene } from "./promptHygiene.js";
 import { readPromptFile } from "../utils/promptManager.js";
 import {
   appendGuestSystemInstruction,
@@ -20,8 +21,8 @@ export async function buildGuestGeminiSystemInstruction(
 
   let systemInstructionText;
   try {
-    systemInstructionText = await readPromptFile(
-      assistantRow.config.systemInstructionAsset
+    systemInstructionText = applyPromptHygiene(
+      await readPromptFile(assistantRow.config.systemInstructionAsset)
     );
   } catch (err) {
     throw err;

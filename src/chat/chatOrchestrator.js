@@ -1,3 +1,4 @@
+import { applyPromptHygiene } from "./promptHygiene.js";
 import { readPromptFile } from "../utils/promptManager.js";
 import {
   isFlowOrchestratorEnabled,
@@ -171,7 +172,7 @@ async function resolveInstructionLayers({
     };
   }
 
-  let cacheableText = await readPromptFile(asset);
+  let cacheableText = applyPromptHygiene(await readPromptFile(asset));
 
   if (flowMode) {
     cacheableText +=
@@ -237,7 +238,7 @@ async function resolveSystemInstruction({
       filesToUse
     );
   } else {
-    text = await readPromptFile(asset);
+    text = applyPromptHygiene(await readPromptFile(asset));
     if (filesToUse?.length > 0) {
       const fileCount = filesToUse.length;
       const fileText = fileCount > 1 ? "documents have" : "document has";
