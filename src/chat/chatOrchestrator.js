@@ -1,3 +1,4 @@
+import { withTurnRetry } from "./turnRetry.js";
 import { applyPromptHygiene } from "./promptHygiene.js";
 import { readPromptFile } from "../utils/promptManager.js";
 import {
@@ -713,7 +714,9 @@ async function handleLegacyGeminiTurn({
 
   let assistantMessage;
   try {
-    assistantMessage = await streamGeminiChat(streamOpts);
+    assistantMessage = await withTurnRetry(() => streamGeminiChat(streamOpts), {
+      context: { sessionId: session._id || session.guestSessionId },
+    });
   } catch (geminiErr) {
     const staleCache =
       cachedContentName &&
