@@ -12,9 +12,12 @@
 
 import { isRepeatablePaymentAssistant } from "./sessionGuards.js";
 import { QA_PHASES } from "./sessionStateProtocol.js";
-import { BATCH_FORM_MARKER_RE } from "./batchFormControl.js";
-import { MULTI_SELECT_MARKER_RE } from "./multiSelectControl.js";
-import { GIFT_REGISTER_MARKER_RE } from "./messageControlParse.js";
+import {
+  DOCUMENT_MIN_VISIBLE_CHARS,
+  visibleTextLength,
+  hasQuestionOrFormMarker,
+  isDocumentLikeText,
+} from "./messageControlParse.js";
 import { isPostUploadAnalysisMessage } from "./uploadFlowHints.js";
 
 export function isDocPaymentEnforcementEnabled() {
@@ -22,33 +25,8 @@ export function isDocPaymentEnforcementEnabled() {
   return v === "true" || v === "1";
 }
 
-/**
- * Visible characters (HTML tags stripped, whitespace collapsed). Question menus
- * and document menus in the prompts are a few hundred visible chars; the
- * shortest fixed document template (MARRIAGE GIFT LEDGER, empty) is ~1860.
- */
-export const DOC_PAYMENT_MIN_VISIBLE_CHARS = 1200;
-
-const QUESTION_N_RE = /Question\s+\d+\s*:/i;
-
-export function visibleTextLength(text) {
-  return String(text || "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim().length;
-}
-
-/** Question / form / register turns — never a deliverable. */
-export function hasQuestionOrFormMarker(text) {
-  const s = String(text || "");
-  return (
-    QUESTION_N_RE.test(s) ||
-    GIFT_REGISTER_MARKER_RE.test(s) ||
-    BATCH_FORM_MARKER_RE.test(s) ||
-    MULTI_SELECT_MARKER_RE.test(s)
-  );
-}
+export const DOC_PAYMENT_MIN_VISIBLE_CHARS = DOCUMENT_MIN_VISIBLE_CHARS;
+export { visibleTextLength, hasQuestionOrFormMarker };
 
 /**
  * The paid deliverable of the current cycle was already produced.
@@ -84,8 +62,7 @@ export function isDocumentLikeReply(cleanMessage, uploadInfo, userMessage) {
   if (uploadInfo?.requiresUpload) return false;
   if (isPostUploadAnalysisMessage(userMessage)) return false;
   const text = String(cleanMessage || "");
-  if (hasQuestionOrFormMarker(text)) return false;
-  return visibleTextLength(text) >= DOC_PAYMENT_MIN_VISIBLE_CHARS;
+  return isDocumentLikeText(text);
 }
 
 /**

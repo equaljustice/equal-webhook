@@ -571,6 +571,21 @@ async function handleFlowTurn({
   return buildFlowResponseEnvelope(session, { ...result, reply });
 }
 
+/** Appended to the user's message when a paid cycle is continued server-side. */
+export const PAID_CYCLE_CONTINUE_NOTE =
+  "(Payment completed for this document. Please generate it now.)";
+
+/**
+ * Paid for the current cycle but its document is not out yet. Sessions saved before
+ * documentCycle existed count as delivered once they hold a document.
+ */
+export function isPaidCycleUndelivered(session) {
+  if (!session?.isPaid || !session?.paymentGateShown) return false;
+  const cycle = session.paymentCycle || 0;
+  if (typeof session.documentCycle === "number") return session.documentCycle !== cycle;
+  return !session.finalDocumentData;
+}
+
 async function handleLegacyGeminiTurn({
   session,
   assistant,
@@ -579,6 +594,7 @@ async function handleLegacyGeminiTurn({
   isGuest,
   isSpecialAccess,
   onStreamChunk,
+  paidContinuation = false,
 }) {
   let layers;
   try {
@@ -826,6 +842,33 @@ async function handleLegacyGeminiTurn({
         ...legacyProgressFields(uploadInfo),
       };
     }
+  }
+
+  // Two-stage prompts ask for payment again before the first document (QA 2026-10-30:
+  // 49 + 25 before doc 1). The user already paid this cycle: continue the turn as paid
+  // instead of opening a new charge cycle.
+  if (
+    uploadInfo.paymentRequired &&
+    !isSpecialAccess &&
+    !paidContinuation &&
+    !shouldIgnoreStalePaymentRequired(session, userMessage) &&
+    isPaidCycleUndelivered(session)
+  ) {
+    console.warn("[PaymentCycle] Payment asked again before this cycle's document; continuing as paid", {
+      sessionId: session._id || session.guestSessionId,
+      assistantKey: session.assistantKey || assistant?.key,
+      paymentCycle: session.paymentCycle || 0,
+    });
+    return handleLegacyGeminiTurn({
+      session,
+      assistant,
+      userMessage: `${userMessage}\n\n${PAID_CYCLE_CONTINUE_NOTE}`,
+      filesToUse,
+      isGuest,
+      isSpecialAccess,
+      onStreamChunk,
+      paidContinuation: true,
+    });
   }
 
   if (

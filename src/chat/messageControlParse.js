@@ -11,6 +11,8 @@ import {
   normalizeQuestionsRemaining,
   normalizeBatchLabel,
 } from "./progressControl.js";
+import { BATCH_FORM_MARKER_RE } from "./batchFormControl.js";
+import { MULTI_SELECT_MARKER_RE } from "./multiSelectControl.js";
 
 export const withTimeout = (promise, ms, label = "Operation") => {
   let timeoutId;
@@ -66,6 +68,62 @@ export const DOCUMENT_SNAPSHOT_MIN_LENGTH = 200;
 export const GIFT_REGISTER_MARKER_RE =
   /data-ej-gift-register\s*=\s*["']?(?:1|true|yes)["']?/i;
 
+/**
+ * Visible characters (HTML tags stripped, whitespace collapsed). Question menus
+ * and document menus in the prompts are a few hundred visible chars; the
+ * shortest fixed document template (MARRIAGE GIFT LEDGER, empty) is ~1860.
+ */
+export const DOCUMENT_MIN_VISIBLE_CHARS = 1200;
+
+/** "Question 5:", "Question 5.1:", "Question MA:", "Question 8A2:" — prompts number questions freely. */
+export const QUESTION_LABEL_RE = /Question\s+[\dA-Z][\w.]*\s*:/i;
+
+export function visibleTextLength(text) {
+  return String(text || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim().length;
+}
+
+/** Question / form / register turns — never a deliverable. */
+export function hasQuestionOrFormMarker(text) {
+  const s = String(text || "");
+  return (
+    QUESTION_LABEL_RE.test(s) ||
+    GIFT_REGISTER_MARKER_RE.test(s) ||
+    BATCH_FORM_MARKER_RE.test(s) ||
+    MULTI_SELECT_MARKER_RE.test(s)
+  );
+}
+
+/**
+ * Long enough to be a document and not a question, form, menu or thank-you turn.
+ * Documents often end with the prompt's next question ("Question 22: Would you like
+ * to know the right process of signing…"), so only the text before the first
+ * question label counts, and it must be document-sized on its own.
+ */
+export function isDocumentLikeText(text) {
+  const s = String(text || "");
+  const firstQuestion = s.search(QUESTION_LABEL_RE);
+  const body = firstQuestion === -1 ? s : s.slice(0, firstQuestion);
+  if (GIFT_REGISTER_MARKER_RE.test(body) || BATCH_FORM_MARKER_RE.test(body)) return false;
+  if (firstQuestion === -1 && MULTI_SELECT_MARKER_RE.test(body)) return false;
+  return visibleTextLength(body) >= DOCUMENT_MIN_VISIBLE_CHARS;
+}
+
+/** Latest stored assistant reply that reads as a document (never a question). */
+export const findLastDocumentLikeMessage = (session) => {
+  const messages = session.messages || [];
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role === "assistant" && isDocumentLikeText(m.content)) {
+      return m.content;
+    }
+  }
+  return null;
+};
+
 export const findLastSubstantiveMessage = (session) => {
   const messages = session.messages || [];
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -89,12 +147,13 @@ export function inferDownloadSnapshot(session, uploadInfo, cleanMessage) {
   if (uploadInfo?.paymentRequired || uploadInfo?.requiresUpload) return false;
   if (!session?.isPaid || !session?.paymentGateShown) return false;
   const phase = session.qaPhase || QA_PHASES.QA_IN_PROGRESS;
-  if (phase !== QA_PHASES.READY_FOR_FINAL) return false;
-  const text = String(cleanMessage || "").trim();
-  if (text.length < DOCUMENT_SNAPSHOT_MIN_LENGTH) return false;
-  if (/Question\s+\d+\s*:/i.test(text)) return false;
-  if (GIFT_REGISTER_MARKER_RE.test(text)) return false;
-  return true;
+  // A document that also ends the chat arrives with phase already TERMINATED
+  // (advanceQaPhase runs first); it is still this payment's document.
+  const documentTurn =
+    phase === QA_PHASES.READY_FOR_FINAL ||
+    (phase === QA_PHASES.TERMINATED && uploadInfo?.sessionTerminated === true);
+  if (!documentTurn) return false;
+  return isDocumentLikeText(String(cleanMessage || "").trim());
 }
 
 export function applyDownloadSnapshot(session, sessionId, uploadInfo, cleanMessage) {
@@ -104,7 +163,12 @@ export function applyDownloadSnapshot(session, sessionId, uploadInfo, cleanMessa
   };
   persistSessionDocumentSnapshot(session, sessionId, snapshotInfo, cleanMessage);
   if (snapshotInfo.documentReady) {
-    session.qaPhase = QA_PHASES.FINAL_GENERATED;
+    // A document that ends the chat keeps TERMINATED.
+    if (session.qaPhase !== QA_PHASES.TERMINATED) {
+      session.qaPhase = QA_PHASES.FINAL_GENERATED;
+    }
+    // The current payment cycle has delivered its document (see sessionGuards).
+    session.documentCycle = session.paymentCycle || 0;
   }
   return snapshotInfo.documentReady;
 }
@@ -138,10 +202,11 @@ export const persistSessionDocumentSnapshot = (
         : null) ||
       findLastSubstantiveMessage(session);
   } else if (terminated) {
+    // Never the last question: only an earlier reply that reads as a document.
     docContent =
       resolvedFinalResponse ||
       session.final_response ||
-      findLastSubstantiveMessage(session);
+      findLastDocumentLikeMessage(session);
   }
 
   if (docContent) {
