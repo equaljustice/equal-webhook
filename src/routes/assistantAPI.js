@@ -1,4 +1,8 @@
 import express from "express";
+import {
+  effectiveDocDownloadAvailable,
+  rejectWhenDocDownloadDisabled,
+} from "../chat/docDownloadFlag.js";
 import OpenAI from "openai";
 import { jwtAuth } from "../middleware/jwtAuth.js";
 import { Assistant } from "../model/assistant.model.js";
@@ -80,7 +84,7 @@ async function docDownloadFlagByAssistantKeys(assistantKeys) {
     .lean();
   const map = {};
   for (const row of rows) {
-    map[row.key] = row.docDownloadAvailable === true;
+    map[row.key] = effectiveDocDownloadAvailable(row.docDownloadAvailable);
   }
   return map;
 }
@@ -733,6 +737,7 @@ router.post("/mark-payment", jwtAuth, async (req, res) => {
 
 // Download document endpoint
 router.get("/download-document/:sessionId", jwtAuth, async (req, res) => {
+  if (rejectWhenDocDownloadDisabled(res)) return;
   try {
     const { sessionId } = req.params;
     const { format = "pdf" } = req.query;

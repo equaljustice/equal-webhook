@@ -1,4 +1,8 @@
 import express from "express";
+import {
+  effectiveDocDownloadAvailable,
+  rejectWhenDocDownloadDisabled,
+} from "../chat/docDownloadFlag.js";
 import OpenAI from "openai";
 import { v4 as uuidv4 } from "uuid";
 import multer from "multer";
@@ -240,7 +244,7 @@ router.post("/guest/list-all-sessions", async (req, res) => {
         messages: [],
         isGuest: true,
         guestRetentionHours: 24,
-        docDownloadAvailable: assistant?.docDownloadAvailable === true,
+        docDownloadAvailable: effectiveDocDownloadAvailable(assistant?.docDownloadAvailable),
       };
     });
     return res.status(200).json(sessions);
@@ -274,7 +278,7 @@ router.post("/guest/list-sessions", async (req, res) => {
     const assistant = await Assistant.findOne({ key: assistantKey })
       .select("docDownloadAvailable name")
       .lean();
-    const docDownloadAvailable = assistant?.docDownloadAvailable === true;
+    const docDownloadAvailable = effectiveDocDownloadAvailable(assistant?.docDownloadAvailable);
     const sessions = summaries.map((s) => ({
       _id: s.guestSessionId,
       key: assistantKey,
@@ -355,7 +359,7 @@ router.get("/guest/session/:guestSessionId", async (req, res) => {
       const a = await Assistant.findOne({ assistantId: session.assistantId })
         .select("docDownloadAvailable")
         .lean();
-      docDownloadAvailable = a?.docDownloadAvailable === true;
+      docDownloadAvailable = effectiveDocDownloadAvailable(a?.docDownloadAvailable);
     } catch {
       // ignore
     }
@@ -834,6 +838,7 @@ router.post("/guest/mark-payment", async (req, res) => {
 });
 
 router.get("/guest/download-document/:guestSessionId", async (req, res) => {
+  if (rejectWhenDocDownloadDisabled(res)) return;
   try {
     const decoded = requireGuestContext(req, res);
     if (!decoded) return;
