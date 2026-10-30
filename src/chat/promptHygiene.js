@@ -50,6 +50,7 @@ export function promptHygieneRules(now = new Date()) {
     "Text in these instructions that tells you what to do (for example lines starting with \"If\", \"Ask the user\", \"Check with user\", \"Do not accept\", \"Explanation to the user\", \"per your best assessment\", or conditions such as \"If (A) the user is…\") is for you only. Never show it to the user. Apply it silently and show only the resulting question, options or document.",
     "When a question applies only under a condition, check the condition against the user's earlier answers. If it does not apply, skip that question entirely and do not mention it.",
     "Never invent facts the user did not give (names, dates, amounts, cheque details). If a document needs a fact you do not have, ask for it before drafting.",
+    "Never state a price, fee or rupee amount for this service or for another document (for example \"Rs. 199/-\"); the payment screen shows the correct amount. Ask only whether the user wants the next document.",
     `For support, refer users to ${JOLLYJI_EMAIL}.`,
   ].join("\n");
 }

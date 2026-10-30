@@ -39,6 +39,7 @@ test("flag on: today's date (India) and the no-leak rule are appended", () => {
   assert.match(out, /^Base prompt/);
   assert.match(out, /Today's date is 31 October 2026/);
   assert.match(out, /Never show it to the user/);
+  assert.match(out, /Never state a price/);
 });
 
 test("every shipped prompt is fully rebranded", () => {
