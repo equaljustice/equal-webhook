@@ -1,5 +1,6 @@
 import {
   paymentBarrierMessage,
+  legacyPaymentBarrierMessage,
   documentPaymentBarrierMessage,
   detectChatLanguageFromText,
   GIFT_REGISTER_MARKER_RE,
@@ -130,10 +131,12 @@ const normalizeCopy = (s) => String(s || "").replace(/\s+/g, " ").trim();
 /** True when text is (or contains) the cycle-0 assessment barrier sentence, any language. */
 export function isAssessmentBarrierCopy(visibleText) {
   const text = normalizeCopy(visibleText);
-  return ASSESSMENT_BARRIER_LANGS.some((lang) => {
-    const copy = normalizeCopy(paymentBarrierMessage(lang));
-    return copy && text.includes(copy);
-  });
+  return ASSESSMENT_BARRIER_LANGS.some((lang) =>
+    [paymentBarrierMessage(lang), legacyPaymentBarrierMessage(lang)].some((copy) => {
+      const c = normalizeCopy(copy);
+      return c && text.includes(c);
+    })
+  );
 }
 
 /**

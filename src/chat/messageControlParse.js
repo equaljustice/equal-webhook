@@ -318,6 +318,37 @@ export function detectChatLanguageFromText(text = "") {
 export function paymentBarrierMessage(language) {
   switch (language) {
     case "hi":
+      return "आपके उत्तरों के लिए धन्यवाद। आगे बढ़ने के लिए कृपया भुगतान पूरा करें।";
+    case "bn":
+      return "আপনার উত্তরের জন্য ধন্যবাদ। এগিয়ে যেতে অনুগ্রহ করে অর্থপ্রদান সম্পূর্ণ করুন।";
+    case "gu":
+      return "તમારા જવાબો બદલ આભાર. આગળ વધવા માટે કૃપા કરીને ચુકવણી પૂર્ણ કરો.";
+    case "pa":
+      return "ਤੁਹਾਡੇ ਜਵਾਬਾਂ ਲਈ ਧੰਨਵਾਦ। ਅੱਗੇ ਵਧਣ ਲਈ ਕਿਰਪਾ ਕਰਕੇ ਭੁਗਤਾਨ ਪੂਰਾ ਕਰੋ।";
+    case "ta":
+      return "உங்கள் பதில்களுக்கு நன்றி. தொடர, தயவுசெய்து கட்டணத்தை நிறைவு செய்யுங்கள்.";
+    case "te":
+      return "మీ సమాధానాలకు ధన్యవాదాలు. కొనసాగించడానికి దయచేసి చెల్లింపును పూర్తి చేయండి.";
+    case "kn":
+      return "ನಿಮ್ಮ ಉತ್ತರಗಳಿಗೆ ಧನ್ಯವಾದಗಳು. ಮುಂದುವರಿಯಲು ದಯವಿಟ್ಟು ಪಾವತಿಯನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ.";
+    case "or":
+      return "ଆପଣଙ୍କ ଉତ୍ତର ପାଇଁ ଧନ୍ୟବାଦ। ଆଗକୁ ବଢ଼ିବାକୁ ଦୟାକରି ଦେୟ ପୂରଣ କରନ୍ତୁ।";
+    case "ur":
+      return "آپ کے جوابات کا شکریہ۔ آگے بڑھنے کے لیے براہ کرم ادائیگی مکمل کریں۔";
+    case "en":
+    default:
+      return "Thank you for your answers so far. To continue, please complete the payment.";
+  }
+}
+
+/**
+ * The cycle-0 copy before 2026-10-30 ("Thank you for completing all the questions…
+ * personalized assessment"). Kept only to recognise it in old chats and model echoes:
+ * it was false wherever questions continue after paying (QA 2026-10-30 F5).
+ */
+export function legacyPaymentBarrierMessage(language) {
+  switch (language) {
+    case "hi":
       return "सभी प्रश्नों के उत्तर देने के लिए धन्यवाद। अपनी व्यक्तिगत मूल्यांकन रिपोर्ट प्राप्त करने के लिए कृपया भुगतान पूरा करें।";
     case "bn":
       return "সব প্রশ্নের উত্তর দেওয়ার জন্য ধন্যবাদ। আপনার ব্যক্তিগত মূল্যায়ন রিপোর্ট পেতে অনুগ্রহ করে অর্থপ্রদান সম্পূর্ণ করুন।";
