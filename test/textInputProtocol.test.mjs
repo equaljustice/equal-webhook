@@ -58,3 +58,39 @@ test("the model is told about text_input only when the flag is on", () => {
       v === undefined ? delete process.env[k] : (process.env[k] = v);
   }
 });
+
+test("server infers a typed answer when the model leaves the key out (flag on only)", async () => {
+  const { resolveTextInput } = await import("../src/chat/textInputControl.js");
+  const saved = process.env.JOLLYJI_TEXT_INPUT_PROTOCOL;
+  const info = { textInput: false, multiSelect: false, batchForm: false, requiresUpload: false, paymentRequired: false, sessionTerminated: false };
+  const details = "Question 2: कृपया पार्टी 1 के लिए निम्नलिखित विवरण प्रदान करें: पैन के अनुसार पूरा नाम, पैन नंबर, पता";
+  try {
+    delete process.env.JOLLYJI_TEXT_INPUT_PROTOCOL;
+    assert.equal(resolveTextInput(info, details), false);
+    assert.equal(resolveTextInput({ ...info, textInput: true }, "x"), true);
+    process.env.JOLLYJI_TEXT_INPUT_PROTOCOL = "true";
+    assert.equal(resolveTextInput(info, details), true);
+    assert.equal(resolveTextInput(info, "আপনার নাম কী?"), true);
+    assert.equal(resolveTextInput(info, "प्रश्न 2: कृपया पार्टी 1 के लिए विवरण प्रदान करें: नाम, पैन नंबर।"), true);
+    assert.equal(resolveTextInput(info, "<p>প্রশ্ন ২: আপনার ঠিকানা লিখুন।</p>"), true);
+    assert.equal(resolveTextInput(info, "<p>Party 1 details noted. Thank you.</p>"), false);
+    assert.equal(resolveTextInput(info, "Question 1: NDA के लिए पार्टी 1 का प्रकार? (a) व्यक्ति<br>(b) कंपनी"), false);
+    assert.equal(resolveTextInput(info, "पार्टी? (क) व्यक्ति (ख) कंपनी"), false);
+    assert.equal(resolveTextInput(info, "<p>Here is your NDA draft.</p>"), false);
+    assert.equal(resolveTextInput({ ...info, batchForm: true }, details), false);
+    assert.equal(resolveTextInput({ ...info, paymentRequired: true }, details), false);
+    assert.equal(resolveTextInput({ ...info, requiresUpload: true }, details), false);
+  } finally {
+    saved === undefined ? delete process.env.JOLLYJI_TEXT_INPUT_PROTOCOL : (process.env.JOLLYJI_TEXT_INPUT_PROTOCOL = saved);
+  }
+});
+
+test("text_input is added to each prompt's JSON schema and to upload/payment/end examples", async () => {
+  const { addTextInputToTemplates } = await import("../src/chat/textInputControl.js");
+  const schema = '{\n  "session_terminated": true or false,\n  "payment_required": true or false\n}';
+  assert.equal(addTextInputToTemplates(schema), '{\n  "session_terminated": true or false,\n  "payment_required": true or false,\n  "text_input": true or false\n}');
+  assert.equal(addTextInputToTemplates('"payment_required": true or false,\n "x": 1'), '"payment_required": true or false,\n  "text_input": true or false,\n "x": 1');
+  assert.equal(addTextInputToTemplates('{"upload_required": false, "payment_required": true}'), '{"upload_required": false, "payment_required": true, "text_input": false}');
+  const dflt = '{"upload_required": false, "payment_required": false}';
+  assert.equal(addTextInputToTemplates(dflt), dflt);
+});

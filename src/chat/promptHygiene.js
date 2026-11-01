@@ -8,7 +8,11 @@
  * Off unless JOLLYJI_PROMPT_HYGIENE=true (deploy ≠ enable). The typed-answer rule
  * (textInputControl.js, JOLLYJI_TEXT_INPUT_PROTOCOL) is appended at the same point.
  */
-import { isTextInputProtocolEnabled, textInputProtocolRule } from "./textInputControl.js";
+import {
+  addTextInputToTemplates,
+  isTextInputProtocolEnabled,
+  textInputProtocolRule,
+} from "./textInputControl.js";
 
 export function isPromptHygieneEnabled() {
   const v = String(process.env.JOLLYJI_PROMPT_HYGIENE || "").trim().toLowerCase();
@@ -64,7 +68,9 @@ export function applyPromptHygiene(text, { now } = {}) {
   const hygiene = isPromptHygieneEnabled();
   const textInput = isTextInputProtocolEnabled();
   if (!hygiene && !textInput) return text;
-  const parts = [hygiene ? rebrandPromptText(text) : text];
+  let body = hygiene ? rebrandPromptText(text) : text;
+  if (textInput) body = addTextInputToTemplates(body);
+  const parts = [body];
   if (hygiene) parts.push(promptHygieneRules(now));
   if (textInput) parts.push(textInputProtocolRule());
   return parts.join("\n\n");

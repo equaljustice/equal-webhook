@@ -25,7 +25,7 @@ import {
 import { normalizeQaDisplayHtml, streamDisplayFromRaw } from "./replyFormat.js";
 import { applyMultiSelectDisplayMarker } from "./multiSelectControl.js";
 import { applyBatchFormDisplayMarker } from "./batchFormControl.js";
-import { applyTextInputDisplayMarker } from "./textInputControl.js";
+import { applyTextInputDisplayMarker, resolveTextInput } from "./textInputControl.js";
 import {
   applyPaymentBarrier,
   enforceFlowGuards,
@@ -527,6 +527,7 @@ async function handleFlowTurn({
       cleanMessage,
       uploadInfo.multiSelect
     );
+    uploadInfo.textInput = resolveTextInput(uploadInfo, cleanMessage);
     cleanMessage = applyTextInputDisplayMarker(cleanMessage, uploadInfo.textInput);
 
     if (
@@ -802,7 +803,8 @@ async function handleLegacyGeminiTurn({
     cleanMessage,
     uploadInfo.batchForm
   );
-  cleanMessage = applyTextInputDisplayMarker(cleanMessage, uploadInfo.textInput);
+  uploadInfo.textInput = resolveTextInput(uploadInfo, cleanMessage);
+    cleanMessage = applyTextInputDisplayMarker(cleanMessage, uploadInfo.textInput);
 
   if (isGuest) {
     if (isGuestLanguagePhase(session)) {
