@@ -78,6 +78,7 @@ test("server infers a typed answer when the model leaves the key out (flag on on
     assert.equal(resolveTextInput(info, "पार्टी? (क) व्यक्ति (ख) कंपनी"), false);
     assert.equal(resolveTextInput(info, "<p>Here is your NDA draft.</p>"), false);
     assert.equal(resolveTextInput({ ...info, batchForm: true }, details), false);
+    assert.equal(resolveTextInput({ ...info, batchForm: true, textInput: true }, details), false);
     assert.equal(resolveTextInput({ ...info, paymentRequired: true }, details), false);
     assert.equal(resolveTextInput({ ...info, requiresUpload: true }, details), false);
   } finally {

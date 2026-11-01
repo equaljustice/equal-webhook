@@ -71,10 +71,13 @@ function visibleText(html) {
  * something, offers no lettered options, and is not a form, upload, payment or end.
  */
 export function resolveTextInput(info, cleanMessage) {
-  if (info?.textInput) return true;
-  if (!isTextInputProtocolEnabled() || !info) return false;
+  if (!info) return false;
+  // A form, option list, upload, payment or end has its own UI, whatever the model said
+  // (live: Gemini also set text_input on batch forms).
   if (info.multiSelect || info.batchForm || info.requiresUpload || info.paymentRequired) return false;
   if (info.sessionTerminated || info.guestSignupOffer) return false;
+  if (info.textInput) return true;
+  if (!isTextInputProtocolEnabled()) return false;
   const text = visibleText(cleanMessage);
   if (!ASKS_RE.test(text)) return false;
   return (text.match(LETTERED_OPTION_RE) || []).length < 2;
