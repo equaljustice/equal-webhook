@@ -25,6 +25,7 @@ import {
 import { normalizeQaDisplayHtml, streamDisplayFromRaw } from "./replyFormat.js";
 import { applyMultiSelectDisplayMarker } from "./multiSelectControl.js";
 import { applyBatchFormDisplayMarker } from "./batchFormControl.js";
+import { applyTextInputDisplayMarker } from "./textInputControl.js";
 import {
   applyPaymentBarrier,
   enforceFlowGuards,
@@ -296,6 +297,7 @@ function buildFlowResponseEnvelope(session, result, extra = {}) {
     terminationMessage: result.terminationMessage || null,
     multiSelect,
     batchForm: !!result.batchForm,
+    textInput: !!result.textInput,
     nodeId: result.nodeId,
     displayNumber: result.displayNumber,
     phase: result.phase || session.flowState,
@@ -525,6 +527,7 @@ async function handleFlowTurn({
       cleanMessage,
       uploadInfo.multiSelect
     );
+    cleanMessage = applyTextInputDisplayMarker(cleanMessage, uploadInfo.textInput);
 
     if (
       uploadInfo.paymentRequired &&
@@ -572,6 +575,7 @@ async function handleFlowTurn({
       uploadType: uploadInfo.uploadType,
       multiSelect: !!uploadInfo.multiSelect,
       batchForm: !!uploadInfo.batchForm,
+      textInput: !!uploadInfo.textInput,
       nodeId: result.nodeId,
       phase: session.flowState,
     }, { streaming: !!onStreamChunk });
@@ -798,6 +802,7 @@ async function handleLegacyGeminiTurn({
     cleanMessage,
     uploadInfo.batchForm
   );
+  cleanMessage = applyTextInputDisplayMarker(cleanMessage, uploadInfo.textInput);
 
   if (isGuest) {
     if (isGuestLanguagePhase(session)) {
@@ -949,7 +954,12 @@ async function handleLegacyGeminiTurn({
     paymentRequired: false,
     multiSelect: !!uploadInfo.multiSelect,
     batchForm: !!uploadInfo.batchForm,
-    inputType: uploadInfo.multiSelect ? INPUT_TYPES.MULTI_SELECT : null,
+    textInput: !!uploadInfo.textInput,
+    inputType: uploadInfo.multiSelect
+      ? INPUT_TYPES.MULTI_SELECT
+      : uploadInfo.textInput
+        ? INPUT_TYPES.TEXT
+        : null,
     requiresUpload: uploadInfo.requiresUpload,
     uploadType: uploadInfo.uploadType,
     uploadReason: uploadInfo.reason,

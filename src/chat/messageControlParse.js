@@ -436,6 +436,7 @@ const TOP_LEVEL_CONTROL_KEYS = [
   "payment_required",
   "multi_select",
   "batch_form",
+  "text_input",
   "document_ready",
   "guest_signup_offer",
   "selected_language",
@@ -501,7 +502,7 @@ function extractControlJsonFromMessage(message) {
 }
 
 const CONTROL_JSON_START_RE =
-  /\{\s*"(?:upload_required|session_terminated|payment_required|batch_form|multi_select|session_state)"\s*:/g;
+  /\{\s*"(?:upload_required|session_terminated|payment_required|batch_form|multi_select|text_input|session_state)"\s*:/g;
 const TRAILING_HIDDEN_MARKERS_RE = /(?:\s*<span\s+hidden[^>]*>\s*<\/span>)+\s*$/i;
 
 /**
@@ -546,7 +547,7 @@ const CONTROL_JSON_SCAN_LIMIT = 200;
 
 /** Key tokens that only appear in control JSON ("key": …), never in prose. */
 const CONTROL_KEY_TOKEN_RE =
-  /"(upload_required|upload_type|upload_reason|session_terminated|termination_message|payment_required|multi_select|batch_form|document_ready|guest_signup_offer|selected_language|session_state)"\s*:/;
+  /"(upload_required|upload_type|upload_reason|session_terminated|termination_message|payment_required|multi_select|batch_form|text_input|document_ready|guest_signup_offer|selected_language|session_state)"\s*:/;
 
 export function hasControlKeyToken(message) {
   return CONTROL_KEY_TOKEN_RE.test(String(message || ""));
@@ -584,6 +585,7 @@ function salvageMalformedControl(message) {
     paymentRequired: salvageFlag(message, "payment_required"),
     multiSelect: salvageFlag(message, "multi_select"),
     batchForm: salvageFlag(message, "batch_form"),
+    textInput: salvageFlag(message, "text_input"),
   };
 }
 
@@ -644,6 +646,7 @@ const CONTROL_JSON_MARKERS = [
   '"payment_required"',
   '"multi_select"',
   '"batch_form"',
+  '"text_input"',
   '"document_ready"',
   '"guest_signup_offer"',
   '"selected_language"',
@@ -660,7 +663,7 @@ function tailLooksLikeControlJson(text) {
   ) {
     return true;
   }
-  return /\b(session_state|upload_required|guest_signup_offer|session_terminated|payment_required|multi_select|batch_form|document_ready|selected_language)\b/.test(
+  return /\b(session_state|upload_required|guest_signup_offer|session_terminated|payment_required|multi_select|batch_form|text_input|document_ready|selected_language)\b/.test(
     text
   );
 }
@@ -797,6 +800,7 @@ const emptyUploadInfo = (cleanMessage = "") => ({
   paymentRequired: false,
   multiSelect: false,
   batchForm: false,
+  textInput: false,
   documentReady: false,
   cleanMessage,
   documentData: null,
@@ -826,6 +830,7 @@ export const extractUploadRequirement = (message) => {
         metadata.hasOwnProperty("payment_required") ||
         metadata.hasOwnProperty("multi_select") ||
         metadata.hasOwnProperty("batch_form") ||
+        metadata.hasOwnProperty("text_input") ||
         metadata.hasOwnProperty("document_ready");
       const hasGuestOffer =
         metadata.hasOwnProperty("guest_signup_offer");
@@ -907,6 +912,10 @@ export const extractUploadRequirement = (message) => {
           batchForm:
             metadata.batch_form === true ||
             metadata.batch_form === "true",
+          // Typed-answer question (any language): the UI shows its text box.
+          textInput:
+            metadata.text_input === true ||
+            metadata.text_input === "true",
           documentReady: false,
           cleanMessage: cleanMessage,
           documentData: documentData,

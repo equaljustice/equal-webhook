@@ -10,6 +10,7 @@ import { GUEST_BOOTSTRAP_MESSAGE } from "./guestDisplayMessages.js";
 import { normalizeQaDisplayHtml } from "./replyFormat.js";
 import { applyMultiSelectDisplayMarker } from "./multiSelectControl.js";
 import { applyBatchFormDisplayMarker } from "./batchFormControl.js";
+import { applyTextInputDisplayMarker } from "./textInputControl.js";
 import { canAccessChat } from "./sessionAccess.js";
 import { isProgressEnabled } from "./progressControl.js";
 
@@ -172,6 +173,7 @@ export async function executeChatTurn({
       displayReply,
       !!result.batchForm
     );
+    displayReply = applyTextInputDisplayMarker(displayReply, !!result.textInput);
     session.messages.push({
       role: "assistant",
       content: displayReply,
@@ -222,6 +224,7 @@ export async function executeChatTurn({
     paymentCycle: result.paymentCycle ?? session.paymentCycle ?? 0,
     multiSelect: !!result.multiSelect || result.inputType === "multi_select",
     batchForm: !!result.batchForm,
+    textInput: !!result.textInput,
     requiresUpload: session.isDocUploadRequired && !session.isDocUploaded,
     isReUpload: result.uploadType === "re_upload",
     uploadReason: result.uploadReason || null,

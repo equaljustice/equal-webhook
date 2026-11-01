@@ -5,8 +5,10 @@
  *   2. today's date (India), so documents are not dated 2024/2025;
  *   3. a rule that instructions inside the prompt are never shown to the user.
  *
- * Off unless JOLLYJI_PROMPT_HYGIENE=true (deploy ≠ enable).
+ * Off unless JOLLYJI_PROMPT_HYGIENE=true (deploy ≠ enable). The typed-answer rule
+ * (textInputControl.js, JOLLYJI_TEXT_INPUT_PROTOCOL) is appended at the same point.
  */
+import { isTextInputProtocolEnabled, textInputProtocolRule } from "./textInputControl.js";
 
 export function isPromptHygieneEnabled() {
   const v = String(process.env.JOLLYJI_PROMPT_HYGIENE || "").trim().toLowerCase();
@@ -56,8 +58,14 @@ export function promptHygieneRules(now = new Date()) {
   ].join("\n");
 }
 
-/** Prompt text as the model should see it. Unchanged when the flag is off. */
+/** Prompt text as the model should see it. Unchanged when both flags are off. */
 export function applyPromptHygiene(text, { now } = {}) {
-  if (!isPromptHygieneEnabled() || !text) return text;
-  return `${rebrandPromptText(text)}\n\n${promptHygieneRules(now)}`;
+  if (!text) return text;
+  const hygiene = isPromptHygieneEnabled();
+  const textInput = isTextInputProtocolEnabled();
+  if (!hygiene && !textInput) return text;
+  const parts = [hygiene ? rebrandPromptText(text) : text];
+  if (hygiene) parts.push(promptHygieneRules(now));
+  if (textInput) parts.push(textInputProtocolRule());
+  return parts.join("\n\n");
 }
