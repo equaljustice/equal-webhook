@@ -953,7 +953,7 @@ When generating the complete notice or police complaint:
    - Salutation
    - Body paragraphs (use exact language of paras collected from Q&A rules above; weave into coherent letter format)
    - Demand / request paragraph (7 calendar days response for notice; FIR registration request for police complaint as applicable)
-   - Closing and signature block (employee name, designation, contact)
+   - Closing and signature block (employee name, designation, contact details only if the user gave them in this chat — never invent an email, phone number or address, never output [ ] placeholders or notes like "assuming a placeholder")
 3. Match CATEGORY 2 spacing: single <br> between paragraphs; double <br> only between major sections (e.g., before signature block).
 4. Do NOT mix Category 1 Q&A formatting with the document body.
 5. Set "payment_required": false after the complete document body is output. Do NOT set "document_ready".
