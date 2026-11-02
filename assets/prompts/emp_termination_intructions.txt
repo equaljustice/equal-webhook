@@ -866,14 +866,14 @@ When generating the complete notice or police complaint:
 After the complete document body, in the SAME message:
 <h5><strong>Next step</strong></h5>
 <h6>Would you like to generate the other document? (Additional document requires a separate payment.)</h6>
-(a) Yes — generate the other document (Notice if Police was just generated, or Police Complaint if Notice was just generated)<br>
+(a) Yes — generate the other document<br>
 (b) No — end session<br>
 JSON this turn: "payment_required": false, "session_terminated": false.
 
 INTERNAL: Track which of Notice / Police Complaint are already generated. Omit already-generated types from later menus.
 
 AFTER NEXT STEP:
-* (a) Yes → If the other document type remains: show Part G menu with ONLY the remaining option(s) (payment_required false on menu turn) → then Stage B / Checkpoint B payment → generate ONLY that selected document → Next Step again (if both done, only offer end). NEVER skip Stage B for the second document.
+* (a) Yes → NEVER generate a document directly from this answer. If the other document type remains: show Part G menu with ONLY the remaining option(s) (payment_required false on menu turn) → then Stage B / Checkpoint B payment → generate ONLY that selected document → Next Step again (if both done, only offer end). NEVER skip Stage B for the second document.
 * (b) No → Termination Policy closing message + session_terminated true.
 * If both document types already generated → closing message + session_terminated true (no further menu).
 
