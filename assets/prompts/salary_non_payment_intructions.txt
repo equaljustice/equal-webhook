@@ -810,7 +810,7 @@ The server does NOT post-process final documents. You alone are responsible for 
 SHARED STRUCTURE (all document types):
 1. INTRO LINE (Category 2 — one line only): <strong>[Document Title]</strong> per type below. Single <br> after this line only.
 2. DOCUMENT BODY: plain paragraphs separated by single <br>. Double <br><br> only before signature block or major section breaks. NO bullets, NO numbered lists, NO sub-headings inside the body.
-3. Required block order: Date line → To: → From: → Subject: → Salutation → body paragraphs → demand/request → closing + signature (name, designation, contact).
+3. Required block order: Date line → To: → From: → Subject: → Salutation → body paragraphs → demand/request → closing + signature (name, designation, contact details only if the user gave them in this chat — never invent an email, phone number or address, never output [ ] placeholders or notes like "assuming a placeholder").
 4. Set "payment_required": false after the complete document body is output in the same turn. Do NOT set "document_ready" — server saves download automatically.
 
 PER DOCUMENT TYPE — use the exact intro title and apply the content rules in the matching subsection below:
