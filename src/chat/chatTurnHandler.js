@@ -86,8 +86,33 @@ export function collectFilesToUse(session, fileId) {
   return consumed.size ? files.filter((id) => !consumed.has(id)) : files;
 }
 
+/** Every file the session holds was already used for a finished document (detachUploadsAfterDocument). */
+function uploadsAllConsumed(session) {
+  const consumed = new Set(session.consumedFileIds || []);
+  if (!consumed.size) return false;
+  const current = session.uploadedFileIds?.length
+    ? session.uploadedFileIds
+    : session.uploadedFileId
+      ? [session.uploadedFileId]
+      : [];
+  return current.length > 0 && current.every((id) => consumed.has(id));
+}
+
 export function applyUploadFlagsFromResult(session, result) {
   if (!result.requiresUpload) return;
+  // Marriage: the 2nd/3rd register asks for a NEW gift list. The previous file already went into
+  // a paid document, so this is a fresh upload, not a duplicate request: show the upload again
+  // (local walk 2026-11-02: "Please upload your gift list" with no upload panel, user stuck).
+  if (uploadsAllConsumed(session)) {
+    session.isDocUploadRequired = true;
+    session.isDocUploaded = false;
+    session.uploadedFileId = null;
+    session.uploadedFileIds = [];
+    session.uploadedFilesMeta = [];
+    session.replaceNextUpload = true;
+    session.uploadAttempts = 0;
+    return;
+  }
   if (
     session.isDocUploaded &&
     (session.uploadedFileId || session.uploadedFileIds?.length) &&
