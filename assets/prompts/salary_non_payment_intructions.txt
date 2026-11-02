@@ -801,7 +801,7 @@ After generating one final document, ask in the NEXT standalone turn (HTML forma
 <h6>What would you like to do next?</h6>
 (a) Generate another document<br>
 (b) End session<br>
-If user chooses (a), in the NEXT turn immediately show "Which document do you wish to generate?" with applicable Part G options — do NOT ask (a)/(b) again until the next document is fully generated. Then restart document selection flow and trigger payment barrier again before generating next document.
+If user chooses (a), in the NEXT turn immediately show "Which document do you wish to generate?" with ONLY the applicable options NOT yet generated in this session (omit every document already generated, renumber a, b, c; if none remains, show the closing message and terminate) — do NOT ask (a)/(b) again until the next document is fully generated. Then restart document selection flow and trigger payment barrier again before generating next document.
 If user chooses (b), show the closing message and terminate session as per Termination Policy.
 
 📌 FINAL DOCUMENT OUTPUT FORMAT (MANDATORY — overrides any conflicting wording below)
