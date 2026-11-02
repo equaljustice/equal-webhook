@@ -56,7 +56,7 @@ import {
 } from "../services/guestAnalytics.js";
 import {
   isAllowedUploadFile,
-  UPLOAD_TYPE_ERROR,
+  uploadTypeError,
   MAX_UPLOAD_FILE_BYTES,
 } from "../utils/uploadFileTypes.js";
 import { resolveSessionGeminiConfig } from "../utils/geminiConfig.js";
@@ -74,7 +74,7 @@ const guestUpload = multer({
     if (isAllowedUploadFile(file)) {
       cb(null, true);
     } else {
-      cb(new Error(UPLOAD_TYPE_ERROR), false);
+      cb(new Error(uploadTypeError()), false);
     }
   },
 });

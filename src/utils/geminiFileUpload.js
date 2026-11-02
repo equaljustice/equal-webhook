@@ -7,6 +7,7 @@ import {
   extractTextFromMulterFile,
   isWordUpload,
 } from "./documentTextExtract.js";
+import { extractSpreadsheetText, isSpreadsheetUpload } from "./spreadsheetText.js";
 
 /** MIME types Gemini generateContent rejects even after Files API upload. */
 const GEMINI_GENERATION_UNSUPPORTED_MIMES = new Set([
@@ -53,7 +54,8 @@ function resolveUploadedFileId(uploadResponse) {
 
 /**
  * Upload a multer temp file to Gemini Files API with extension-aware MIME.
- * Word documents are converted to plain text because Gemini cannot analyze DOC/DOCX MIME.
+ * Word documents and spreadsheets (XLSX/CSV) are converted to plain text because Gemini cannot
+ * analyze those MIME types.
  */
 export async function uploadMulterFileToGemini(file, { apiKey } = {}) {
   const ai = new GoogleGenAI({ apiKey: apiKey || process.env.GEMINI_API_KEY });
@@ -66,8 +68,11 @@ export async function uploadMulterFileToGemini(file, { apiKey } = {}) {
   let uploadResponse;
   let analysisMime = sourceMime;
 
-  if (isWordUpload({ mimetype: sourceMime, originalname: file.originalname })) {
-    const extractedText = await extractTextFromMulterFile(file);
+  const spreadsheet = isSpreadsheetUpload({ mimetype: sourceMime, originalname: file.originalname });
+  if (spreadsheet || isWordUpload({ mimetype: sourceMime, originalname: file.originalname })) {
+    const extractedText = spreadsheet
+      ? await extractSpreadsheetText(await fs.readFile(file.path), file.originalname)
+      : await extractTextFromMulterFile(file);
     const textBuffer = Buffer.from(extractedText, "utf8");
     uploadResponse = await uploadBufferToGemini(ai, textBuffer, {
       mimeType: "text/plain",
