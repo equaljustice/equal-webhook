@@ -273,6 +273,16 @@ export function enforceFlowGuards(session, uploadInfo) {
 }
 
 /** Legacy AI assistants: trust instruction JSON; only bypass for special-access users. */
+export const isNoTerminateOnQuestionEnabled = () =>
+  String(process.env.JOLLYJI_NO_TERMINATE_ON_QUESTION || "").toLowerCase() === "true";
+
+/** A batch form, or a "Question N:" with (a)/(b) options or a typed-answer hint. */
+function asksNumberedQuestion(uploadInfo) {
+  if (uploadInfo.batchForm) return true;
+  const text = String(uploadInfo.cleanMessage || "").replace(/<[^>]+>/g, " ");
+  return /Question\s+\d+\s*:/i.test(text) && /\(a\)\s*\S|\[(?:enter|free[\s-]*text)/i.test(text);
+}
+
 export function enforceLegacySessionGuards(
   session,
   uploadInfo,
@@ -283,6 +293,19 @@ export function enforceLegacySessionGuards(
   if (corrected.paymentRequired && isSpecialAccess) {
     corrected.paymentRequired = false;
     corrected.violations.push("payment_special_access");
+  }
+
+  // A reply that asks numbered questions cannot also end the chat (emp termination batch walk
+  // 2026-11-02: Batch 1B shown and session_terminated true in the same turn → "All done",
+  // nothing answerable). JOLLYJI_NO_TERMINATE_ON_QUESTION, off by default.
+  if (
+    corrected.sessionTerminated &&
+    isNoTerminateOnQuestionEnabled() &&
+    asksNumberedQuestion(corrected)
+  ) {
+    corrected.sessionTerminated = false;
+    corrected.terminationMessage = null;
+    corrected.violations.push("terminated_while_asking");
   }
 
   if (corrected.violations.length) {
