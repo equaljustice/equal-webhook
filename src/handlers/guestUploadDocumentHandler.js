@@ -10,6 +10,7 @@ import {
   linkUploadedFilesToSession,
 } from "../utils/geminiFileUpload.js";
 import { buildPostUploadAnalysisMessage } from "../chat/uploadFlowHints.js";
+import { isSequentialUploadsEnabled } from "../utils/sequentialUploads.js";
 
 function readGuestToken(req) {
   return req.get("guest-token") || req.get("Guest-Token");
@@ -90,9 +91,10 @@ export async function guestUploadDocumentHandler(req, res) {
     await putGuestSession(guestSessionId, session);
 
     const fileIds = uploadedFiles.map((f) => f.fileId);
-    const fileCount = session.supportsMultipleUploads
-      ? session.uploadedFileIds?.length || fileIds.length
-      : fileIds.length;
+    const fileCount =
+      session.supportsMultipleUploads || isSequentialUploadsEnabled()
+        ? session.uploadedFileIds?.length || fileIds.length
+        : fileIds.length;
     const analysisMessage = buildPostUploadAnalysisMessage(
       session,
       null,

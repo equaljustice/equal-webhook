@@ -141,9 +141,11 @@ export async function cleanupMulterFiles(files = []) {
 /** Attach Gemini file URIs to session after multipart upload. */
 export function linkUploadedFilesToSession(session, uploadedFiles = []) {
   const shouldReplace =
-    !session.supportsMultipleUploads ||
-    session.replaceNextUpload === true ||
-    session.isDocUploadRequired === true;
+    session.appendNextUpload !== true &&
+    (!session.supportsMultipleUploads ||
+      session.replaceNextUpload === true ||
+      session.isDocUploadRequired === true);
+  session.appendNextUpload = false;
 
   if (shouldReplace) {
     session.uploadedFileIds = [];

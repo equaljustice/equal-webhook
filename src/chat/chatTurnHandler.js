@@ -13,6 +13,7 @@ import { applyBatchFormDisplayMarker } from "./batchFormControl.js";
 import { applyTextInputDisplayMarker } from "./textInputControl.js";
 import { canAccessChat } from "./sessionAccess.js";
 import { isProgressEnabled } from "./progressControl.js";
+import { isSequentialUploadsEnabled, MAX_UPLOAD_ROUNDS } from "../utils/sequentialUploads.js";
 
 function formatGeminiErrorMessage(err) {
   const raw = String(err?.message || err || "").trim();
@@ -73,7 +74,13 @@ export function applyFileIdToSession(session, fileId) {
 
 export function collectFilesToUse(session, fileId) {
   const files = [];
-  if (session.supportsMultipleUploads && session.uploadedFileIds?.length > 0) {
+  // The upload set holds every file of the latest upload (all uploads when multi/sequential);
+  // attaching only uploadedFileId dropped all but the last file of a batch (service bond walk
+  // 2026-11-02: bond + contract uploaded together, the model saw only the contract).
+  if (
+    (session.supportsMultipleUploads || isSequentialUploadsEnabled()) &&
+    session.uploadedFileIds?.length > 0
+  ) {
     files.push(...session.uploadedFileIds);
   } else if (session.uploadedFileId) {
     files.push(session.uploadedFileId);
@@ -118,6 +125,18 @@ export function applyUploadFlagsFromResult(session, result) {
     (session.uploadedFileId || session.uploadedFileIds?.length) &&
     result.uploadType !== "re_upload"
   ) {
+    // Next document of a multi-document path (assistant config supportsMultipleUploads, e.g.
+    // service bond: bond → contract → notice): show the upload again and keep what is held.
+    // Single-upload assistants keep ignoring repeat requests (no re-asking after an upload).
+    if (
+      isSequentialUploadsEnabled() &&
+      session.supportsMultipleUploads &&
+      (session.uploadAttempts || 0) < MAX_UPLOAD_ROUNDS
+    ) {
+      session.isDocUploadRequired = true;
+      session.isDocUploaded = false;
+      session.appendNextUpload = true;
+    }
     return;
   }
   if (session.uploadAttempts < 2) {

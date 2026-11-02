@@ -1,4 +1,5 @@
 import { POST_UPLOAD_ANALYSIS_MESSAGE } from "../utils/geminiFileUpload.js";
+import { isSequentialUploadsEnabled, uploadedFileNames } from "../utils/sequentialUploads.js";
 
 export function isPostUploadAnalysisMessage(text) {
   return /document(s)? uploaded successfully|please analyze/i.test(
@@ -36,10 +37,11 @@ function isServiceBondKey(key) {
  * User message sent by the client after multipart upload to trigger Gemini analysis.
  */
 export function buildPostUploadAnalysisMessage(session, assistant, fileCount = 1) {
+  const names = isSequentialUploadsEnabled() ? uploadedFileNames(session) : "";
   const base =
-    fileCount > 1
+    (fileCount > 1
       ? `${fileCount} documents uploaded successfully. Please analyze them.`
-      : POST_UPLOAD_ANALYSIS_MESSAGE;
+      : POST_UPLOAD_ANALYSIS_MESSAGE) + (names ? ` Files received so far: ${names}.` : "");
 
   const key = assistantKey(session, assistant);
   if (isCheckMyRentKey(key)) {
