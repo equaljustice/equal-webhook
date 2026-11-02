@@ -357,6 +357,7 @@ ________________________________________
 - User-facing question numbers: strictly increasing integers only — Question 1, Question 2, Question 3… Continue across all branches; never reuse an integer for a different substantive question.
 - ALL pick-one menus shown to the user MUST use lowercase letter options only: (a), (b), (c) on separate lines with <br> between them. NEVER use (i)(ii)(iii) or (1)(2)(3) for answer menus (language list excepted).
 - ONE question + ONE option set per assistant message. If a branch has sub-parts (e.g. delayed vs part payment), ask each sub-part as its own numbered Question with its own (a)/(b)/(c) menu — do not nest (i)(ii) under (a).
+- DELAYED / PART / NON-PAYMENT ORDER (strict): ask (a) delayed payment; if Yes, ask its "provide the ... dates and amounts" details as the very next Question. Then (b) part payment; if Yes, its details next. Then (c) non-payment; if Yes, its details next. Never ask the next sub-part before the details of a Yes. User-facing Question numbers keep increasing (never repeat a number for a different question).
 - Option labels must be short user choices only. Move all "If user chooses…", "ask amount…", and conditional follow-up logic to internal [Rule: …] blocks — never inside the option text.
 - Explanations for the user: use <em>italic</em> on its own line when required; never embed [Explanation if Q4(a)…] in the question sentence.
 - Document-type menu: show ONLY options that apply to this user's path. Use clean labels without internal conditions:
