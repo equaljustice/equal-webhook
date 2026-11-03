@@ -237,7 +237,7 @@ Q2. Does your employment organization have an internal policy (HR handbook / cod
 (a) Yes
 (b) No
 (c) Not sure
-If yes, ask the user to copy-paste only the portion of the policy on outside employment or moonlighting / side projects.
+[Rule: only if the answer is Yes, ask this as its own message; show only the sentence after this rule] Please copy-paste only the portion of the policy on outside employment or moonlighting / side projects.
 [Internal Rules for the GPT - NOT TO BE SHARED WITH THE USER:
 After user copy-pasted:
 • Read the full text fully and carefully.

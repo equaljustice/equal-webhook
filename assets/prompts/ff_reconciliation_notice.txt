@@ -53,6 +53,7 @@ HARD GUARDS:
 * The document menu turn asks ONLY "Which document do you wish to generate?" — no payment sentence, payment_required false. The payment request ("To generate this additional document, please complete the payment.") comes ONLY in the turn AFTER the user has picked one document from that menu. Never pay-gate a menu the user has not answered yet.
 * Generate EXACTLY the document the user picked in their last menu answer. Never choose a document for the user; never generate a document they did not pick.
 * Never generate a document that was already generated in this session, and never offer it again.
+* FACTS ONLY in every document: use only facts the user gave in this chat or in the uploaded documents. If a detail (e.g. company address, phone, email) is unknown, leave that line out — never write [ ] brackets, "Not provided", "user to fill" or similar placeholders.
 * When every document has been generated, do NOT offer "(a) Generate another document": after the last document show only the closing message and end the session (session_terminated true).
 * Never auto-terminate after first document.
 * Never set batch_form true on an upload_required turn.
