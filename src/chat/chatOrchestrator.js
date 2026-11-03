@@ -14,6 +14,12 @@ import {
 import { FLOW_STATES, INPUT_TYPES } from "../flow/flowConstants.js";
 import { appendControlJson } from "./sessionGuards.js";
 import {
+  dropGeneratedDocOptions,
+  endsWithClosingAfterDocument,
+  generatedDocTitles,
+  isNoRepeatDocsEnabled,
+} from "./docMenuDedupe.js";
+import {
   extractUploadRequirement,
   applyDownloadSnapshot,
   inferDownloadSnapshot,
@@ -772,6 +778,25 @@ async function handleLegacyGeminiTurn({
   uploadInfo = enforceLegacySessionGuards(session, uploadInfo, {
     isSpecialAccess,
   });
+  if (isNoRepeatDocsEnabled() && uploadInfo.cleanMessage) {
+    const { html, dropped } = dropGeneratedDocOptions(
+      uploadInfo.cleanMessage,
+      generatedDocTitles(session.messages)
+    );
+    if (dropped.length) {
+      console.warn("[NoRepeatDocs] Dropped already generated documents from the menu", {
+        sessionId: session._id || session.guestSessionId,
+        dropped,
+      });
+      uploadInfo = { ...uploadInfo, cleanMessage: html };
+    }
+    if (!uploadInfo.sessionTerminated && endsWithClosingAfterDocument(uploadInfo.cleanMessage)) {
+      console.warn("[NoRepeatDocs] Last document came with the closing message: ending the chat", {
+        sessionId: session._id || session.guestSessionId,
+      });
+      uploadInfo = { ...uploadInfo, sessionTerminated: true, paymentRequired: false };
+    }
+  }
   if (isGuest) {
     uploadInfo = enforceGuestOfferGuards(session, uploadInfo);
   }
