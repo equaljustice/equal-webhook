@@ -23,6 +23,17 @@ test("flag on: a reply that asks questions does not end the chat", () => {
   assert.equal(single.sessionTerminated, false);
 });
 
+test("flag on: a closing choice menu does not end the chat", () => {
+  process.env.JOLLYJI_NO_TERMINATE_ON_QUESTION = "true";
+  const out = enforceLegacySessionGuards({}, {
+    sessionTerminated: true,
+    batchForm: false,
+    cleanMessage:
+      "<p>Police Complaint … Sincerely, Rahul Verma</p><h5>Next step</h5><p>Would you like to generate the other document?</p>(a) Yes — generate the other document<br>(b) No — end session",
+  });
+  assert.equal(out.sessionTerminated, false);
+});
+
 test("flag on: a real closing message still ends the chat", () => {
   process.env.JOLLYJI_NO_TERMINATE_ON_QUESTION = "true";
   const out = enforceLegacySessionGuards({}, {

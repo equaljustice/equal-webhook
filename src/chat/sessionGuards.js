@@ -280,7 +280,23 @@ export const isNoTerminateOnQuestionEnabled = () =>
 function asksNumberedQuestion(uploadInfo) {
   if (uploadInfo.batchForm) return true;
   const text = String(uploadInfo.cleanMessage || "").replace(/<[^>]+>/g, " ");
-  return /Question\s+\d+\s*:/i.test(text) && /\(a\)\s*\S|\[(?:enter|free[\s-]*text)/i.test(text);
+  if (/Question\s+\d+\s*:/i.test(text) && /\(a\)\s*\S|\[(?:enter|free[\s-]*text)/i.test(text)) {
+    return true;
+  }
+  // A closing choice menu ("Next step … (a) Yes — generate the other document (b) No — end
+  // session") is still a question (emp last-pick walk 2026-11-03: ended with the menu unanswerable).
+  const tail = text.trim().slice(-400);
+  return /\(a\)\s*\S/.test(tail) && /\(b\)\s*\S/.test(tail);
+}
+
+export const isPickBeforePayEnabled = () =>
+  String(process.env.JOLLYJI_PICK_BEFORE_PAY || "").toLowerCase() === "true";
+
+/** "Which document do you wish to generate?" followed by (a)/(b) choices: not answered yet. */
+function asksDocumentMenu(uploadInfo) {
+  const text = String(uploadInfo.cleanMessage || "").replace(/<[^>]+>/g, " ");
+  const at = text.search(/which document (?:do you wish|would you like) to generate/i);
+  return at >= 0 && /\(a\)\s*\S/.test(text.slice(at));
 }
 
 export function enforceLegacySessionGuards(
@@ -306,6 +322,17 @@ export function enforceLegacySessionGuards(
     corrected.sessionTerminated = false;
     corrected.terminationMessage = null;
     corrected.violations.push("terminated_while_asking");
+  }
+
+  // The user picks the document first, then pays for it (F&F last-pick walk 2026-11-03: the
+  // "Which document…" menu and the payment request came in one turn, the pay card covered the
+  // menu and the model chose the document itself). JOLLYJI_PICK_BEFORE_PAY, off by default.
+  if (corrected.paymentRequired && isPickBeforePayEnabled() && asksDocumentMenu(corrected)) {
+    corrected.paymentRequired = false;
+    corrected.cleanMessage = String(corrected.cleanMessage || "")
+      .replace(/(?:<br\s*\/?>|\s)*To generate [^.<]*?please complete the payment\.?/gi, "")
+      .trimEnd();
+    corrected.violations.push("payment_on_unanswered_document_menu");
   }
 
   if (corrected.violations.length) {
